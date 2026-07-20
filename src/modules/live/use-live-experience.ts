@@ -103,9 +103,11 @@ export function useLiveExperience(options: LiveExperienceOptions) {
 
   useLiveConnection(options.target, optionsRef, runtimeRef, setState);
 
+  const profileOptional = options.target?.source === 'ta';
   let player = playerQuery.data ?? null;
-  if (player === null && playerId !== undefined && playerQuery.isError) {
+  if (player === null && playerId !== undefined && playerQuery.isError && !profileOptional) {
     player = { id: playerId, name: playerId, avatar: '', country: '' };
   }
-  return { ...state, player, sendChatMessage, unlockAudio };
+  const playerProfilePending = playerId !== undefined && playerQuery.isPending;
+  return { ...state, player, playerProfilePending, sendChatMessage, unlockAudio };
 }

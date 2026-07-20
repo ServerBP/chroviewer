@@ -18,6 +18,7 @@ export type LiveStatus =
 
 export interface LiveTarget {
   playerId: string;
+  source?: 'scoresaber' | 'ta';
   tournamentId?: string;
   roomId?: string;
   matchId?: string;
@@ -48,10 +49,12 @@ export interface ChatExperience {
 
 export interface LiveExperience extends LiveExperienceState, ChatExperience {
   player: ScoreSaberReplayPlayer | null;
+  playerProfilePending: boolean;
 }
 
 interface LiveTransport {
   clockRef: RefObject<SongClock | null>;
+  play(options?: { autoplay?: boolean }): boolean | undefined;
   seek(time: number): void;
   togglePlay(): boolean | undefined;
 }

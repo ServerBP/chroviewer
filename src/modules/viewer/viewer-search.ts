@@ -7,7 +7,14 @@ export type ViewerShareSource =
   | { type: 'map'; mapKey: string; difficultyIndex?: number }
   | { type: 'replay'; replayUrl: string }
   | { type: 'score'; scoreId: string }
-  | { type: 'live'; playerId: string; tournamentId?: string; roomId?: string; matchId?: string };
+  | {
+      type: 'live';
+      playerId: string;
+      liveSource?: 'scoresaber' | 'ta';
+      tournamentId?: string;
+      roomId?: string;
+      matchId?: string;
+    };
 
 const searchIdentifierSchema = z.union([z.string(), z.pipe(z.int(), z.transform(String))]);
 const mapKeySchema = z.pipe(
@@ -28,6 +35,10 @@ const remoteSourceUrlSchema = z.pipe(
 );
 const mapSourceSchema = z.union([mapKeySchema, remoteSourceUrlSchema]);
 const nonnegativeNumberSchema = z.number().check(z.nonnegative());
+const unitNumberSchema = z.number().check(z.minimum(0), z.maximum(1));
+const renderScaleSchema = z.number().check(z.minimum(0.5), z.maximum(1.5));
+const fovSchema = z.number().check(z.minimum(60), z.maximum(120));
+const audioOffsetSchema = z.int().check(z.minimum(-1000), z.maximum(1000));
 const difficultyIndexSchema = z.int().check(z.nonnegative());
 const liveIdSchema = searchIdentifierSchema.check(z.minLength(1), z.maxLength(128));
 const livePlayerIdSchema = liveIdSchema.check(z.regex(/^\d+$/));
@@ -41,9 +52,21 @@ export const viewerSearchSchema = z.pipe(
     difficulty: z.catch(z.optional(difficultyIndexSchema), undefined),
     beat: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     autoplay: z.catch(z.optional(z.boolean()), undefined),
+    hideUI: z.catch(z.optional(z.boolean()), undefined),
     lightshow: z.catch(z.optional(z.literal('full-lightshow')), undefined),
+    lights: z.catch(z.optional(z.enum(['full', 'static', 'none'])), undefined),
+    masterVolume: z.catch(z.optional(unitNumberSchema), undefined),
+    songVolume: z.catch(z.optional(unitNumberSchema), undefined),
+    hitsoundVolume: z.catch(z.optional(unitNumberSchema), undefined),
+    hitsounds: z.catch(z.optional(z.boolean()), undefined),
+    renderScale: z.catch(z.optional(renderScaleSchema), undefined),
+    graphicsQuality: z.catch(z.optional(z.enum(['none', 'low', 'medium', 'high'])), undefined),
+    camera: z.catch(z.optional(z.enum(['static', 'follow', 'first-person'])), undefined),
+    fov: z.catch(z.optional(fovSchema), undefined),
+    audioOffsetMs: z.catch(z.optional(audioOffsetSchema), undefined),
     settings: z.catch(z.optional(viewerSettingsPatchSchema), undefined),
     playerId: z.catch(z.optional(livePlayerIdSchema), undefined),
+    liveSource: z.catch(z.optional(z.enum(['scoresaber', 'ta'])), undefined),
     tournamentId: z.catch(z.optional(liveIdSchema), undefined),
     roomId: z.catch(z.optional(liveIdSchema), undefined),
     matchId: z.catch(z.optional(liveIdSchema), undefined),
@@ -99,6 +122,7 @@ export function viewerSearchForShare(
   if (source.type === 'live') {
     return {
       playerId: source.playerId,
+      liveSource: source.liveSource,
       tournamentId: source.tournamentId,
       roomId: source.roomId,
       matchId: source.matchId,

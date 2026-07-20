@@ -54,6 +54,7 @@ export function useViewerShare({
       : {
           type: 'live',
           playerId: liveTarget.playerId,
+          liveSource: liveTarget.source,
           tournamentId: liveTarget.tournamentId,
           roomId: liveTarget.roomId,
           matchId: liveTarget.matchId,

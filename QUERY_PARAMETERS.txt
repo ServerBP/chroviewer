@@ -1,0 +1,36 @@
+CHROVIEWER QUERY PARAMETERS
+
+Values in the URL override locally saved viewer settings for that page load.
+
+LIVE SOURCE
+liveSource=ta                 Use TournamentAssistant live replay packets.
+playerId=<platform id>        Platform ID whose live play should be watched.
+hideUI=true                   Hide all cards, controls, settings, errors, and overlays.
+
+AUDIO
+masterVolume=0..1             Overall output level. Multiplies song and hitsound volume.
+songVolume=0..1               Song volume before the master volume is applied.
+hitsoundVolume=0..1           Hitsound volume before the master volume is applied.
+hitsounds=true|false          Enable or disable hitsounds.
+audioOffsetMs=-1000..1000     Shift song and hitsound timing in milliseconds.
+
+LIGHTING AND PERFORMANCE
+lights=full|static|none       Full mapped lights, fixed static lights, or no mapped lights.
+lightshow=full-lightshow      Show only the full lightshow and hide gameplay objects.
+graphicsQuality=none|low|medium|high
+renderScale=0.5..1.5          Internal rendering resolution multiplier.
+
+CAMERA
+camera=static|follow|first-person
+fov=60..120                   Replay camera field of view in degrees.
+
+PLAYBACK AND SOURCES
+autoplay=true|false           Attempt playback without waiting for the play button.
+map=<BeatSaver key or URL>    Load a map preview.
+replayUrl=<HTTPS URL>         Load a replay file.
+scoreId=<ScoreSaber score>    Load a ScoreSaber replay.
+beat=<number>                 Initial beat for non-live playback.
+difficulty=<zero-based index> Difficulty index for a map preview.
+
+EXAMPLE
+?liveSource=ta&playerId=76561199016011545&hideUI=true&masterVolume=0.8&songVolume=0.7&hitsoundVolume=0.5&lights=static&renderScale=0.75

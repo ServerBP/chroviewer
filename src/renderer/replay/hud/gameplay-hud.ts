@@ -20,6 +20,7 @@ import {
 } from './primitives';
 
 const scoreStackCenterX = -3.2;
+const liveHudTextRefreshSeconds = 0.1;
 
 export class ReplayGameplayHud {
   readonly root = new Group();
@@ -46,6 +47,7 @@ export class ReplayGameplayHud {
   private comboBreakTime: number | null = null;
   private songDurationSeconds: number | null = null;
   private scoreStackLayout = '';
+  private lastTextRefreshTime = Number.NEGATIVE_INFINITY;
 
   constructor() {
     this.root.visible = false;
@@ -154,6 +156,7 @@ export class ReplayGameplayHud {
           ? buildReplayTimeline(replay)
           : buildReplayTimeline(replay, hitScoreVisualizer);
     this.comboBreakTime = replay === null ? null : firstComboBreakTime(replay);
+    this.lastTextRefreshTime = Number.NEGATIVE_INFINITY;
     this.root.visible = replay !== null;
     this.flyingScores.clear();
     this.updateComboBreak(0);
@@ -189,7 +192,10 @@ export class ReplayGameplayHud {
   update(time: number) {
     const timeline = this.timeline;
     if (timeline === null) return;
-    this.updateState(replayScoreAt(timeline, time));
+    const refreshText = time < this.lastTextRefreshTime || time - this.lastTextRefreshTime >= liveHudTextRefreshSeconds;
+    this.updateState(replayScoreAt(timeline, time), refreshText);
+    if (refreshText) this.lastTextRefreshTime = time;
+    this.alignScoreStack();
     const duration = replayDuration(timeline.replay, this.songDurationSeconds);
     this.setText(this.songTime, formatTime(time));
     this.songProgressFill.scale.x = duration === 0 ? 0 : Math.min(Math.max(time / duration, 0), 1);
@@ -206,10 +212,12 @@ export class ReplayGameplayHud {
     }
   }
 
-  private updateState(state: ReplayScoreState) {
-    this.setText(this.combo, String(state.combo));
-    this.updateScoreStack(formatScore(state.score), formatAccuracy(state.accuracy), rankFor(state.accuracy));
-    this.setText(this.multiplierNumber, String(state.multiplier));
+  private updateState(state: ReplayScoreState, refreshText = true) {
+    if (refreshText) {
+      this.setText(this.combo, String(state.combo));
+      this.updateScoreStack(formatScore(state.score), formatAccuracy(state.accuracy), rankFor(state.accuracy));
+      this.setText(this.multiplierNumber, String(state.multiplier));
+    }
     this.energyFill.scale.x = state.energy;
     const progress = Math.min(Math.max(state.multiplierProgress, 0), 1);
     this.multiplierProgress.geometry.setDrawRange(0, Math.floor(progress * 64) * 6);
@@ -244,25 +252,21 @@ export class ReplayGameplayHud {
     this.score.text = score;
     this.accuracy.text = accuracy;
     this.rank.text = rank;
+  }
 
+  private alignScoreStack() {
     const texts = [this.score, this.accuracy, this.rank];
-    let pending = texts.length;
-    const align = () => {
-      if (--pending > 0) return;
-      for (const text of texts) {
-        const bounds = text.textRenderInfo?.visibleBounds;
-        if (bounds !== undefined) {
-          const opticalOffset = text === this.accuracy ? 0.03 : 0;
-          text.position.x = scoreStackCenterX - (bounds[0] + bounds[2]) / 2 + opticalOffset;
-        }
+    for (const text of texts) {
+      const bounds = text.textRenderInfo?.visibleBounds;
+      if (bounds !== undefined) {
+        const opticalOffset = text === this.accuracy ? 0.03 : 0;
+        text.position.x = scoreStackCenterX - (bounds[0] + bounds[2]) / 2 + opticalOffset;
       }
-    };
-    for (const text of texts) text.sync(align);
+    }
   }
 
   private setText(mesh: Text, text: string) {
     if (mesh.text === text) return;
     mesh.text = text;
-    mesh.sync();
   }
 }

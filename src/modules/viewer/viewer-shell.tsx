@@ -16,7 +16,7 @@ import {
 import { useTranslations } from 'use-intl';
 
 import type { LightshowMode } from '../../core/lighting/basic-light';
-import { loadViewerSettings } from '../../core/viewer-settings';
+import { loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
 import type { LiveTarget } from '../live/live-types';
@@ -59,9 +59,23 @@ export function ViewerShell() {
   const commonT = useTranslations('common');
   const partyT = useTranslations('watchParty');
   const partyActive = search.party !== undefined;
+  const hideUI = search.hideUI === true;
   const [settings, setSettings] = useState(() => {
     const saved = loadViewerSettings();
-    return search.lightshow === 'full-lightshow' ? { ...saved, staticLights: false } : saved;
+    return sanitizeViewerSettings({
+      ...saved,
+      ...search.settings,
+      ...(search.lightshow === 'full-lightshow' ? { staticLights: false } : {}),
+      ...(search.masterVolume === undefined ? {} : { masterVolume: search.masterVolume }),
+      ...(search.songVolume === undefined ? {} : { songVolume: search.songVolume }),
+      ...(search.hitsoundVolume === undefined ? {} : { hitsoundVolume: search.hitsoundVolume }),
+      ...(search.hitsounds === undefined ? {} : { hitsounds: search.hitsounds }),
+      ...(search.renderScale === undefined ? {} : { renderScale: search.renderScale }),
+      ...(search.graphicsQuality === undefined ? {} : { graphicsQuality: search.graphicsQuality }),
+      ...(search.camera === undefined ? {} : { replayCamera: search.camera }),
+      ...(search.fov === undefined ? {} : { replayCameraFov: search.fov }),
+      ...(search.audioOffsetMs === undefined ? {} : { audioOffsetMs: search.audioOffsetMs }),
+    });
   });
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -81,7 +95,7 @@ export function ViewerShell() {
   effectiveSettingsRef.current = effectiveSettings;
   const [error, setError] = useState('');
   const [lightshowMode, setLightshowMode] = useState<LightshowMode>(
-    search.lightshow ?? (settings.staticLights ? 'static' : 'full'),
+    search.lightshow ?? search.lights ?? (settings.staticLights ? 'static' : 'full'),
   );
   const lightshowModeRef = useRef(lightshowMode);
   const transport = useSongTransport({
@@ -131,6 +145,7 @@ export function ViewerShell() {
       ? null
       : {
           playerId: search.playerId,
+          source: search.liveSource,
           tournamentId: search.tournamentId,
           roomId: search.roomId,
           matchId: search.matchId,
@@ -138,6 +153,7 @@ export function ViewerShell() {
           authToken: search.authToken,
         };
   const liveActive = liveTarget !== null;
+  const taLive = liveTarget?.source === 'ta';
   const remoteActive = liveActive || partyActive;
   const live = useLiveExperience({
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,
@@ -189,8 +205,8 @@ export function ViewerShell() {
     sources.mapMeta !== null &&
     (!partyActive || (partyMapMatchesSource && (partyIsHost || party.serverState?.mapRevealed === true)));
   useEffect(() => {
-    setLiveChatOpen(window.matchMedia('(min-width: 40rem)').matches);
-  }, [search.matchId, search.party, search.playerId, search.roomId, search.tournamentId]);
+    setLiveChatOpen(!taLive && window.matchMedia('(min-width: 40rem)').matches);
+  }, [search.matchId, search.party, search.playerId, search.roomId, search.tournamentId, taLive]);
   useEffect(() => {
     const viewport = window.visualViewport;
     if (viewport === null) return;
@@ -233,7 +249,7 @@ export function ViewerShell() {
     };
   }, []);
   useEffect(() => {
-    if (!remoteActive) return;
+    if (!liveActive || taLive) return;
     function openChat(event: KeyboardEvent) {
       if (event.key !== 'F8') return;
       event.preventDefault();
@@ -246,7 +262,7 @@ export function ViewerShell() {
     return () => {
       window.removeEventListener('keydown', openChat, true);
     };
-  }, [remoteActive]);
+  }, [liveActive, taLive]);
   function toggleHitsounds() {
     setSettings((current) => ({ ...current, hitsounds: !current.hitsounds }));
   }
@@ -405,6 +421,7 @@ export function ViewerShell() {
         className={cn(
           'absolute inset-0 transition-[bottom] duration-300 ease-out',
           remoteActive &&
+            !hideUI &&
             liveChatOpen &&
             'max-sm:bottom-[calc(var(--live-mobile-chat-height)+var(--live-safe-area-bottom)+var(--live-keyboard-inset))]',
         )}
@@ -426,7 +443,7 @@ export function ViewerShell() {
         />
       </div>
 
-      {liveActive && liveInterruption !== null && (
+      {!hideUI && liveActive && liveInterruption !== null && (
         <ViewerOverlay
           backdropBlur={false}
           className={cn(
@@ -456,14 +473,14 @@ export function ViewerShell() {
         />
       )}
 
-      {playbackOverlay !== null && (
+      {!hideUI && playbackOverlay !== null && (
         <ViewerOverlay
           {...playbackOverlay}
           className={'onAction' in playbackOverlay ? '!bottom-16 max-sm:!bottom-24' : undefined}
         />
       )}
 
-      {!liveActive && transport.audioBlocked && (
+      {!hideUI && !liveActive && transport.audioBlocked && (
         <Button
           className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-full shadow-xl backdrop-blur-xl max-sm:bottom-24"
           variant="outline"
@@ -477,7 +494,7 @@ export function ViewerShell() {
         </Button>
       )}
 
-      {remoteActive && liveChatOpen && (
+      {!hideUI && remoteActive && liveChatOpen && (
         <div
           className="fixed inset-x-0 top-0 bottom-[calc(var(--live-mobile-chat-height)+var(--live-safe-area-bottom)+var(--live-keyboard-inset))] z-20 hidden max-sm:block"
           aria-hidden="true"
@@ -502,7 +519,7 @@ export function ViewerShell() {
       <SourcePicker
         choices={sources.sourceChoices}
         input={sources.sourceInput}
-        visible={sources.mapMeta === null && !remoteActive && !sources.sourceLoading && !session.environmentLoading}
+        visible={!hideUI && sources.mapMeta === null && !remoteActive && !sources.sourceLoading && !session.environmentLoading}
         onChoose={(choice) => {
           sources.loadLookup(choice);
         }}
@@ -515,7 +532,7 @@ export function ViewerShell() {
         }}
       />
 
-      {(showMapCard || remoteActive) && (
+      {!hideUI && (showMapCard || remoteActive) && (
         <div
           className={cn(
             'fixed left-3 top-3 z-30 flex max-h-[calc(100dvh-1.5rem)] flex-col items-start gap-2 transition duration-200 max-sm:left-2 max-sm:top-2 max-sm:max-h-[calc(100dvh-1rem)]',
@@ -565,6 +582,7 @@ export function ViewerShell() {
           )}
           {liveActive ? (
             <LiveViewerPanel
+              chatEnabled={!taLive}
               chatInputRef={liveChatInputRef}
               chatOpen={liveChatOpen}
               live={live}
@@ -592,103 +610,104 @@ export function ViewerShell() {
         </div>
       )}
 
-      <ViewerActions
-        chromeVisible={chromeVisible}
-        hasMap={showMapCard}
-        shareEnabled={!partyActive}
-        settingsOpen={settingsOpen}
-        shareCategories={share.shareCategories}
-        shareIncludeTimecode={share.includeTimecode}
-        shareOpen={activePanel === 'share'}
-        shareUrl={share.shareUrl}
-        shortcutsOpen={activePanel === 'shortcuts'}
-        onCopyShare={share.copyShareLink}
-        onSettingsClick={toggleSettings}
-        onShareCategoriesChange={share.setShareCategories}
-        onShareIncludeTimecodeChange={share.setIncludeTimecode}
-        onShareOpenChange={(open) => {
-          setActivePanel(open ? 'share' : null);
-        }}
-        onShortcutsOpenChange={(open) => {
-          setActivePanel(open ? 'shortcuts' : null);
-        }}
-      />
+      {!hideUI && (
+        <ViewerActions
+          chromeVisible={chromeVisible}
+          hasMap={showMapCard}
+          shareEnabled={!partyActive}
+          settingsOpen={settingsOpen}
+          shareCategories={share.shareCategories}
+          shareIncludeTimecode={share.includeTimecode}
+          shareOpen={activePanel === 'share'}
+          shareUrl={share.shareUrl}
+          shortcutsOpen={activePanel === 'shortcuts'}
+          onCopyShare={share.copyShareLink}
+          onSettingsClick={toggleSettings}
+          onShareCategoriesChange={share.setShareCategories}
+          onShareIncludeTimecodeChange={share.setIncludeTimecode}
+          onShareOpenChange={(open) => {
+            setActivePanel(open ? 'share' : null);
+          }}
+          onShortcutsOpenChange={(open) => {
+            setActivePanel(open ? 'shortcuts' : null);
+          }}
+        />
+      )}
 
-      {session.selectedKey !== '' &&
-        (!partyActive || (party.mapReady && (partyIsHost || party.serverState?.mapRevealed === true))) && (
-          <TransportControls
-            mode={partyActive ? 'party' : liveActive ? 'live' : 'playback'}
-            visible={chromeVisible}
-            playing={transport.playing}
-            ended={transport.ended}
-            time={transport.time}
-            duration={transport.duration}
-            songBpm={sources.songBpm}
-            beatStepNumerator={transport.beatStepNumerator}
-            beatStepDenominator={transport.beatStepDenominator}
-            timelineShareUrl={share.timelineShareUrl}
-            timelineCopied={share.timelineCopied}
-            panel={
-              activePanel === 'speed' ||
-              activePanel === 'lights' ||
-              activePanel === 'camera' ||
-              activePanel === 'volume'
-                ? activePanel
-                : null
-            }
-            playbackRate={transport.playbackRate}
-            lightshowMode={lightshowMode}
-            lightshowReadOnly={partyActive && !partyIsHost}
-            replayCamera={settings.replayCamera}
-            hasReplay={sources.replayRef.current !== null}
-            songMuted={settings.songMuted}
-            masterMuted={settings.masterMuted}
-            masterVolume={settings.masterVolume}
-            songVolume={settings.songVolume}
-            hitsounds={settings.hitsounds}
-            hitsoundVolume={settings.hitsoundVolume}
-            reverseTimelineScroll={settings.reverseTimelineScroll}
-            markers={timelineMarkers}
-            onTogglePlay={() => {
-              transport.togglePlay();
-            }}
-            onSeek={transport.seek}
-            onSeekBeats={(beats) => {
-              transport.seekBeats(beats, sources.songBpm);
-            }}
-            onNumeratorChange={transport.setBeatStepNumerator}
-            onDenominatorChange={transport.setBeatStepDenominator}
-            onCopyTimeline={(target) => {
-              void share.copyTimelineShareLink(target);
-            }}
-            onPanelChange={setActivePanel}
-            onPlaybackRateChange={(rate) => {
-              transport.setPlaybackRate(rate);
-              setActivePanel(null);
-            }}
-            onLightshowModeChange={session.changeLightshowMode}
-            onReplayCameraChange={(replayCamera) => {
-              setSettings({ ...settings, replayCamera });
-              setActivePanel(null);
-            }}
-            onMasterVolumeChange={(masterVolume) => {
-              if (settingsRef.current.masterVolume === 0 && masterVolume > 0) void transport.unlockAudio();
-              setSettings((current) => ({ ...current, masterVolume }));
-            }}
-            onSongVolumeChange={(songVolume) => {
-              if (settingsRef.current.songVolume === 0 && songVolume > 0) void transport.unlockAudio();
-              setSettings((current) => ({ ...current, songVolume }));
-            }}
-            onHitsoundVolumeChange={(hitsoundVolume) => {
-              setSettings((current) => ({ ...current, hitsoundVolume }));
-            }}
-            onToggleMasterMuted={toggleMasterMuted}
-            onToggleSongMuted={toggleSongMuted}
-            onToggleHitsounds={toggleHitsounds}
-          />
-        )}
+      {!hideUI && session.selectedKey !== '' && (!partyActive || (party.mapReady && (partyIsHost || party.serverState?.mapRevealed === true))) && (
+        <TransportControls
+          mode={partyActive ? 'party' : liveActive ? 'live' : 'playback'}
+          visible={chromeVisible}
+          playing={transport.playing}
+          ended={transport.ended}
+          time={transport.time}
+          duration={transport.duration}
+          songBpm={sources.songBpm}
+          beatStepNumerator={transport.beatStepNumerator}
+          beatStepDenominator={transport.beatStepDenominator}
+          timelineShareUrl={share.timelineShareUrl}
+          timelineCopied={share.timelineCopied}
+          panel={
+            activePanel === 'speed' ||
+            activePanel === 'lights' ||
+            activePanel === 'camera' ||
+            activePanel === 'volume'
+              ? activePanel
+              : null
+          }
+          playbackRate={transport.playbackRate}
+          lightshowMode={lightshowMode}
+          lightshowReadOnly={partyActive && !partyIsHost}
+          replayCamera={settings.replayCamera}
+          hasReplay={sources.replayRef.current !== null}
+          songMuted={settings.songMuted}
+          masterMuted={settings.masterMuted}
+          masterVolume={settings.masterVolume}
+          songVolume={settings.songVolume}
+          hitsounds={settings.hitsounds}
+          hitsoundVolume={settings.hitsoundVolume}
+          reverseTimelineScroll={settings.reverseTimelineScroll}
+          markers={timelineMarkers}
+          onTogglePlay={() => {
+            transport.togglePlay();
+          }}
+          onSeek={transport.seek}
+          onSeekBeats={(beats) => {
+            transport.seekBeats(beats, sources.songBpm);
+          }}
+          onNumeratorChange={transport.setBeatStepNumerator}
+          onDenominatorChange={transport.setBeatStepDenominator}
+          onCopyTimeline={(target) => {
+            void share.copyTimelineShareLink(target);
+          }}
+          onPanelChange={setActivePanel}
+          onPlaybackRateChange={(rate) => {
+            transport.setPlaybackRate(rate);
+            setActivePanel(null);
+          }}
+          onLightshowModeChange={session.changeLightshowMode}
+          onReplayCameraChange={(replayCamera) => {
+            setSettings({ ...settings, replayCamera });
+            setActivePanel(null);
+          }}
+          onMasterVolumeChange={(masterVolume) => {
+            if (settingsRef.current.masterVolume === 0 && masterVolume > 0) void transport.unlockAudio();
+            setSettings((current) => ({ ...current, masterVolume }));
+          }}
+          onSongVolumeChange={(songVolume) => {
+            if (settingsRef.current.songVolume === 0 && songVolume > 0) void transport.unlockAudio();
+            setSettings((current) => ({ ...current, songVolume }));
+          }}
+          onHitsoundVolumeChange={(hitsoundVolume) => {
+            setSettings((current) => ({ ...current, hitsoundVolume }));
+          }}
+          onToggleMasterMuted={toggleMasterMuted}
+          onToggleSongMuted={toggleSongMuted}
+          onToggleHitsounds={toggleHitsounds}
+        />
+      )}
 
-      {error !== '' && (
+      {!hideUI && error !== '' && (
         <Alert
           className="fixed bottom-20 left-1/2 z-50 w-[min(34rem,calc(100vw-1.5rem))] -translate-x-1/2"
           aria-live="assertive"
@@ -714,21 +733,23 @@ export function ViewerShell() {
           </Button>
         </Alert>
       )}
-      <SettingsDrawer
-        open={settingsOpen}
-        settings={partyActive && !partyIsHost ? effectiveSettings : settings}
-        environments={environmentCatalog}
-        hasReplay={sources.replayRef.current !== null}
-        isMapPreview={session.selectedKey !== '' && sources.replayRef.current === null}
-        onChange={(nextSettings) => {
-          setSettings((current) =>
-            partyActive && !partyIsHost ? preserveLocalWatchPartyViewerSettings(current, nextSettings) : nextSettings,
-          );
-        }}
-        onClose={() => {
-          setSettingsOpen(false);
-        }}
-      />
+      {!hideUI && (
+        <SettingsDrawer
+          open={settingsOpen}
+          settings={partyActive && !partyIsHost ? effectiveSettings : settings}
+          environments={environmentCatalog}
+          hasReplay={sources.replayRef.current !== null}
+          isMapPreview={session.selectedKey !== '' && sources.replayRef.current === null}
+          onChange={(nextSettings) => {
+            setSettings((current) =>
+              partyActive && !partyIsHost ? preserveLocalWatchPartyViewerSettings(current, nextSettings) : nextSettings,
+            );
+          }}
+          onClose={() => {
+            setSettingsOpen(false);
+          }}
+        />
+      )}
     </main>
   );
 }

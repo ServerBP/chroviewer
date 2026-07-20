@@ -13,14 +13,23 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface LiveViewerPanelProps {
+  chatEnabled?: boolean;
   chatInputRef: RefObject<HTMLTextAreaElement | null>;
   chatOpen: boolean;
   live: LiveExperience;
   onChatOpenChange: (open: boolean) => void;
 }
 
-export function LiveViewerPanel({ chatInputRef, chatOpen, live, onChatOpenChange }: LiveViewerPanelProps) {
+export function LiveViewerPanel({
+  chatEnabled = true,
+  chatInputRef,
+  chatOpen,
+  live,
+  onChatOpenChange,
+}: LiveViewerPanelProps) {
   const t = useTranslations('live');
+
+  if (!chatEnabled && live.player === null && !live.playerProfilePending) return null;
 
   function toggleChat() {
     const open = !chatOpen;
@@ -40,27 +49,42 @@ export function LiveViewerPanel({ chatInputRef, chatOpen, live, onChatOpenChange
         <div className="shrink-0">
           <LivePlayerCard live={live} />
         </div>
-        <LiveChat inputRef={chatInputRef} live={live} open={chatOpen} onToggle={toggleChat} />
+        {chatEnabled && <LiveChat inputRef={chatInputRef} live={live} open={chatOpen} onToggle={toggleChat} />}
       </div>
 
-      <Button
-        type="button"
-        variant="secondary"
-        size="icon"
-        className="fixed top-[var(--live-viewport-center-y)] right-[max(0.5rem,env(safe-area-inset-right))] z-50 hidden -translate-y-1/2 rounded-full shadow-lg max-sm:inline-flex"
-        aria-expanded={chatOpen}
-        aria-label={t(chatOpen ? 'chat.close' : 'chat.open')}
-        title={t(chatOpen ? 'chat.close' : 'chat.open')}
-        onClick={toggleChat}
+      <div
+        className={cn(
+          'bg-card/92 fixed inset-x-0 bottom-[var(--live-keyboard-inset)] z-40 hidden flex-col pr-[env(safe-area-inset-right)] pb-[var(--live-safe-area-bottom)] pl-[env(safe-area-inset-left)] max-sm:flex',
+          chatOpen &&
+            'animate-in slide-in-from-bottom-4 fade-in h-[calc(var(--live-mobile-chat-height)+env(safe-area-inset-bottom))] duration-300',
+        )}
       >
-        <MessageCircle className={cn(chatOpen && 'fill-current')} />
-      </Button>
+        <LivePlayerCard live={live} />
+        {chatEnabled && <LiveChat inputRef={chatInputRef} live={live} open={chatOpen} onToggle={toggleChat} />}
+      </div>
+
+      {chatEnabled && (
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="fixed top-[var(--live-viewport-center-y)] right-[max(0.5rem,env(safe-area-inset-right))] z-50 hidden -translate-y-1/2 rounded-full shadow-lg max-sm:inline-flex"
+          aria-expanded={chatOpen}
+          aria-label={t(chatOpen ? 'chat.close' : 'chat.open')}
+          title={t(chatOpen ? 'chat.close' : 'chat.open')}
+          onClick={toggleChat}
+        >
+          <MessageCircle className={cn(chatOpen && 'fill-current')} />
+        </Button>
+      )}
     </>
   );
 }
 
 function LivePlayerCard({ live }: { live: LiveExperience }) {
   const t = useTranslations('live');
+  if (live.player === null && !live.playerProfilePending) return null;
+
   return live.player === null ? (
     <Card className="bg-card/88 text-muted-foreground flex h-14 w-(--live-sidebar-width) items-center gap-2 rounded-b-none px-3 text-xs backdrop-blur-xl max-sm:h-10 max-sm:w-full max-sm:rounded-none max-sm:px-2">
       <Radio className="size-4 animate-pulse" />

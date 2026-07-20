@@ -1,10 +1,14 @@
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 
+import { fromBinary } from '@bufbuild/protobuf';
 import { Result } from 'better-result';
 
 import type { LiveChatMessage } from './generated/proto/scoresaber/live/v1/chat_pb';
 import { LudusPlayState } from './generated/proto/scoresaber/live/v1/common_pb';
-import type { ReplayStreamPacket } from './generated/proto/scoresaber/live/v1/replay_stream_pb';
+import {
+  ReplayStreamPacketSchema,
+  type ReplayStreamPacket,
+} from './generated/proto/scoresaber/live/v1/replay_stream_pb';
 import type { LiveMatchRoomState, LiveRoomStreamSnapshot } from './generated/proto/scoresaber/live/v1/room_state_pb';
 import { fetchLiveBrowserSession } from './live-browser-session';
 import { retainedChatMessages, uniqueChatMessages, upsertChatMessage } from './live-chat-state';
@@ -329,6 +333,12 @@ export function useLiveConnection(
       }
     }
 
+    function handleTournamentAssistantReplay(bytes: ArrayBuffer) {
+      const decoded = Result.try(() => fromBinary(ReplayStreamPacketSchema, new Uint8Array(bytes)));
+      if (decoded.isErr()) return;
+      applyReplayPacket(decoded.value);
+    }
+
     function closeSocket() {
       clearHeartbeat();
       const socket = runtime.socket;
@@ -375,7 +385,7 @@ export function useLiveConnection(
     async function connect() {
       if (runtimeRef.current !== runtime) return;
       updateConnectionState(runtime.reconnectAttempt === 0 ? 'connecting' : 'reconnecting');
-      const browserSession = await fetchLiveBrowserSession(activeTarget);
+      const browserSession = activeTarget.source === 'ta' ? undefined : await fetchLiveBrowserSession(activeTarget);
       if (disposed) return;
       const socketResult = Result.try(() => new WebSocket(runtime.websocketUrl));
       if (socketResult.isErr()) {
@@ -391,6 +401,10 @@ export function useLiveConnection(
       socket.onopen = () => {
         if (disposed || runtime.socket !== socket) return;
         runtime.reconnectAttempt = 0;
+        if (activeTarget.source === 'ta') {
+          updateConnectionState('waiting');
+          return;
+        }
         send(
           encodeConnectEnvelope(
             { authToken, playerId, tournamentId: activeTarget.tournamentId },
@@ -400,7 +414,9 @@ export function useLiveConnection(
         updateConnectionState('connecting');
       };
       socket.onmessage = (event: MessageEvent<ArrayBuffer>) => {
-        if (!disposed && runtime.socket === socket) handleEnvelope(event.data);
+        if (disposed || runtime.socket !== socket) return;
+        if (activeTarget.source === 'ta') handleTournamentAssistantReplay(event.data);
+        else handleEnvelope(event.data);
       };
       socket.onerror = () => {
         if (!disposed && runtime.socket === socket) updateConnectionState('reconnecting');
@@ -424,7 +440,7 @@ export function useLiveConnection(
       if (clock.audioBlocked()) {
         setState((current) => ({ ...current, audioBlocked: true }));
       }
-      if (!clock.isPlaying()) transport.togglePlay();
+      if (!clock.isPlaying()) transport.play({ autoplay: activeTarget.source === 'ta' });
       return clock.isPlaying();
     }
 
@@ -459,6 +475,7 @@ export function useLiveConnection(
     target?.matchId,
     target?.playerId,
     target?.roomId,
+    target?.source,
     target?.tournamentId,
     target?.watcherPlayerId,
   ]);

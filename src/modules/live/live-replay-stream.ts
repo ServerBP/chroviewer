@@ -7,7 +7,7 @@ import {
 import type { LiveRoomReplayState } from './generated/proto/scoresaber/live/v1/room_state_pb';
 import { scheduleReplayPause } from './live-playback';
 import { appendLivePause, applyLiveReplayExtensions, liveNote, livePose } from './live-replay';
-import { acceptLiveReplayPacket, type LiveRuntime } from './live-runtime';
+import { acceptLiveReplayPacket, pruneLiveReplay, type LiveRuntime } from './live-runtime';
 
 export function applyLiveReplayChunk(
   runtime: LiveRuntime,
@@ -50,6 +50,9 @@ export function applyLiveReplayChunk(
   );
   replay.energies.push(...events.energyEvents.map((event) => ({ energy: event.energy, time: event.timeSeconds })));
   runtime.latestFrameTime = Math.max(runtime.latestFrameTime, replay.poses.at(-1)?.time ?? 0);
+  // Keep pose memory bounded even when the audio clock cannot advance yet
+  // (autoplay blocked, map loading, tab hidden, or stream buffering).
+  pruneLiveReplay(runtime, runtime.latestFrameTime);
   if (
     notes.length > 0 ||
     events.scoreEvents.length > 0 ||
