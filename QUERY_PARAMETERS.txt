@@ -14,6 +14,18 @@ hitsoundVolume=0..1           Hitsound volume before the master volume is applie
 hitsounds=true|false          Enable or disable hitsounds.
 audioOffsetMs=-1000..1000     Shift song and hitsound timing in milliseconds.
 
+For liveSource=ta, masterVolume is re-read while the viewer is running. A same-origin
+overlay may update the iframe's query string with history.replaceState and the new
+volume is applied without reloading the iframe, map, audio, or renderer.
+Example: iframe.contentWindow.history.replaceState(null, '', '?liveSource=ta&playerId=123&masterVolume=0.4')
+
+TA IFRAME SYNCHRONISATION
+TA viewers on the same origin announce their platform ID, map hash, available replay
+range, and playback clock to one another. Viewers with the same map hash rendezvous at
+the earliest time available to every iframe and then correct clock drift automatically.
+BroadcastChannel is used when available, with same-origin localStorage events as the
+fallback. No parent-page coordinator is required.
+
 LIGHTING AND PERFORMANCE
 lights=full|static|none       Full mapped lights, fixed static lights, or no mapped lights.
 lightshow=full-lightshow      Show only the full lightshow and hide gameplay objects.

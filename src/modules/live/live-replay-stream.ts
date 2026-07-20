@@ -17,6 +17,7 @@ export function applyLiveReplayChunk(
 ) {
   const replay = runtime.replay;
   if (replay === null) return;
+  if (runtime.taLive && runtime.taBufferingStartedAt === 0) runtime.taBufferingStartedAt = performance.now();
   runtime.playbackAttemptPending = true;
   runtime.latestSongTime = Math.max(runtime.latestSongTime, Number(chunk.cursor?.songTimeMs ?? 0n) / 1000);
   applyLiveReplayExtensions(replay, chunk.replayExtensions, true);

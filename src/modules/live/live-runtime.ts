@@ -11,6 +11,7 @@ export const reconnectDelays = [500, 1000, 2000, 4000, 8000, 10_000];
 export const maxBufferedPackets = 240;
 
 const retainedHistorySeconds = 30;
+const taRetainedHistorySeconds = 90;
 
 export interface LiveRuntime {
   bufferedPackets: ReplayStreamPacket[];
@@ -45,6 +46,10 @@ export interface LiveRuntime {
   socket: WebSocket | null;
   streamEnding: boolean;
   streamPaused: boolean;
+  taLive: boolean;
+  taBufferingStartedAt: number;
+  taLiveMapHash: string;
+  taSyncHolding: boolean;
   targetMatchId: string;
   websocketUrl: string;
 }
@@ -83,6 +88,10 @@ export function createLiveRuntime(target: LiveTarget): LiveRuntime {
     socket: null,
     streamEnding: false,
     streamPaused: false,
+    taLive: target.source === 'ta',
+    taBufferingStartedAt: 0,
+    taLiveMapHash: '',
+    taSyncHolding: false,
     targetMatchId: target.matchId ?? (target.roomId === undefined ? `player:${target.playerId}` : ''),
     websocketUrl:
       target.source === 'ta'
@@ -117,6 +126,9 @@ export function resetLiveStream(runtime: LiveRuntime) {
   runtime.replay = null;
   runtime.streamEnding = false;
   runtime.streamPaused = false;
+  runtime.taLiveMapHash = '';
+  runtime.taBufferingStartedAt = 0;
+  runtime.taSyncHolding = false;
 }
 
 export function replayPacketTargetsPlayer(packet: ReplayStreamPacket, playerId: string) {
@@ -153,8 +165,11 @@ export function increasePlaybackDelay(runtime: LiveRuntime) {
 export function pruneLiveReplay(runtime: LiveRuntime, time: number) {
   const replay = runtime.replay;
   if (replay === null || time - runtime.lastPruneAt < 2) return;
+  // TA startup buffering must retain the first frame so playback begins where
+  // this viewer actually joined, rather than at the newest buffered frame.
+  if (runtime.taLive && !runtime.playbackStarted) return;
   runtime.lastPruneAt = time;
-  const cutoff = time - retainedHistorySeconds;
+  const cutoff = time - (runtime.taLive ? taRetainedHistorySeconds : retainedHistorySeconds);
   if (cutoff <= 0) return;
   let poseIndex = 0;
   while (poseIndex + 1 < replay.poses.length && (replay.poses[poseIndex + 1]?.time ?? 0) < cutoff) poseIndex++;

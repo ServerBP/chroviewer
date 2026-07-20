@@ -34,6 +34,7 @@ import {
   encodeHeartbeatEnvelope,
   ludusWebSocketUrl,
 } from './ludus-protocol';
+import { createTaLiveSync } from './ta-live-sync';
 
 export function useLiveConnection(
   target: LiveTarget | null,
@@ -51,6 +52,7 @@ export function useLiveConnection(
 
     let disposed = false;
     const runtime = createLiveRuntime(activeTarget);
+    const taSync = activeTarget.source === 'ta' ? createTaLiveSync(activeTarget.playerId) : null;
     runtimeRef.current = runtime;
     setState(initialLiveState);
 
@@ -165,7 +167,7 @@ export function useLiveConnection(
       const buffered = runtime.bufferedPackets;
       resetLiveStream(runtime);
       runtime.currentStreamId = packet.streamId;
-      const replay = createLiveReplay(start);
+      const replay = createLiveReplay(start, activeTarget.source === 'ta');
       runtime.replay = replay;
       runtime.playbackRate = replay.metadata.songSpeed && replay.metadata.songSpeed > 0 ? replay.metadata.songSpeed : 1;
       const hash = liveMapHash(start);
@@ -173,6 +175,7 @@ export function useLiveConnection(
         updateConnectionState('error');
         return;
       }
+      runtime.taLiveMapHash = activeTarget.source === 'ta' ? hash : '';
       updateConnectionState(optionsRef.current.hasLiveMap(hash) ? 'buffering' : 'loading');
       void loadReplayMap();
 
@@ -195,7 +198,9 @@ export function useLiveConnection(
     }
 
     function handleReplayEnd(packet: ReplayStreamPacket, deferPlaybackAttempt: boolean) {
-      if (applyLiveReplayEnd(runtime, packet) === 'waiting') {
+      const result = applyLiveReplayEnd(runtime, packet);
+      if (activeTarget.source === 'ta' && result !== 'ignored') runtime.playbackAttemptPending = true;
+      if (result === 'waiting' && activeTarget.source !== 'ta') {
         pausePlayback();
         updateConnectionState('waiting');
       }
@@ -457,7 +462,37 @@ export function useLiveConnection(
 
     function tickPlayback() {
       const transport = optionsRef.current.transport;
-      tickLivePlayback(runtime, transport.clockRef.current, optionsRef.current.selectedKey, playbackActions);
+      const clock = transport.clockRef.current;
+      tickLivePlayback(runtime, clock, optionsRef.current.selectedKey, playbackActions);
+      const replay = runtime.replay;
+      const firstFrameTime = replay?.poses[0]?.time;
+      taSync?.tick(
+        clock === null || replay === null || firstFrameTime === undefined || runtime.taLiveMapHash === ''
+          ? null
+          : {
+              currentTime: clock.currentTime(),
+              firstFrameTime,
+              latestFrameTime: runtime.latestFrameTime,
+              mapHash: runtime.taLiveMapHash,
+              playbackRate: runtime.playbackRate,
+              playing: clock.isPlaying(),
+              ready:
+                runtime.mapLoaded &&
+                runtime.playbackStarted &&
+                !runtime.streamPaused &&
+                clock.currentTime() < clock.duration - 0.02,
+              streamId: runtime.currentStreamId,
+            },
+        {
+          pause: pausePlayback,
+          resume: resumePlayback,
+          seek: seekPlayback,
+          setHolding(holding) {
+            runtime.taSyncHolding = holding;
+          },
+          updateStatus: updateConnectionState,
+        },
+      );
     }
 
     void connect();
@@ -467,6 +502,7 @@ export function useLiveConnection(
       window.clearInterval(playbackId);
       window.clearTimeout(runtime.reconnectId);
       closeSocket();
+      taSync?.dispose();
       pausePlayback();
       if (runtimeRef.current === runtime) runtimeRef.current = null;
     };

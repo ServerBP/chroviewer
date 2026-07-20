@@ -57,6 +57,11 @@ export function tickLivePlayback(
   const currentTime = clock.currentTime();
   processPauseEvents(runtime, currentTime, actions);
   if (runtime.streamPaused) return;
+  if (runtime.taLive) {
+    tickTournamentAssistantPlayback(runtime, clock, firstFrameTime, currentTime, actions);
+    pruneLiveReplay(runtime, currentTime);
+    return;
+  }
   if (runtime.streamEnding && currentTime >= Math.max(runtime.latestSongTime, runtime.latestFrameTime) - 0.02) {
     actions.pause();
     actions.updateStatus('waiting');
@@ -71,6 +76,44 @@ export function tickLivePlayback(
   }
   if (runtime.playbackAttemptPending) tryLivePlayback(runtime, clock, firstFrameTime, actions);
   pruneLiveReplay(runtime, currentTime);
+}
+
+function tickTournamentAssistantPlayback(
+  runtime: LiveRuntime,
+  clock: SongClock,
+  firstFrameTime: number,
+  currentTime: number,
+  actions: LivePlaybackActions,
+) {
+  if (currentTime >= clock.duration - 0.02) {
+    runtime.taSyncHolding = false;
+    actions.updateStatus('waiting');
+    return;
+  }
+  if (runtime.taSyncHolding) return;
+
+  if (!runtime.playbackStarted) {
+    if (!runtime.playbackAttemptPending) return;
+    const availableBuffer = runtime.latestFrameTime - firstFrameTime;
+    const startupWaitExpired =
+      runtime.taBufferingStartedAt > 0 &&
+      performance.now() - runtime.taBufferingStartedAt >= Math.max(2500, runtime.playbackDelay * 1500);
+    if (!runtime.streamEnding && !startupWaitExpired && availableBuffer < runtime.playbackDelay) {
+      actions.updateStatus('buffering');
+      return;
+    }
+    runtime.playbackAttemptPending = false;
+    runtime.playbackStarted = true;
+    actions.seek(firstFrameTime);
+  } else {
+    runtime.playbackAttemptPending = false;
+  }
+
+  // For TA the delay is startup leniency, not a hard live edge. Once started,
+  // continue to the song's real duration even if the final replay packet is
+  // delayed, missing, or followed immediately by a publisher disconnect.
+  if (!clock.isPlaying()) actions.resume();
+  if (clock.isPlaying()) actions.updateStatus('watching');
 }
 
 function tryLivePlayback(runtime: LiveRuntime, clock: SongClock, firstFrameTime: number, actions: LivePlaybackActions) {

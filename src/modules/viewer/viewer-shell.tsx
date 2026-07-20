@@ -75,6 +75,7 @@ export function ViewerShell() {
       ...(search.camera === undefined ? {} : { replayCamera: search.camera }),
       ...(search.fov === undefined ? {} : { replayCameraFov: search.fov }),
       ...(search.audioOffsetMs === undefined ? {} : { audioOffsetMs: search.audioOffsetMs }),
+      ...(search.liveSource === 'ta' ? { preferReplayColors: true } : {}),
     });
   });
   const settingsRef = useRef(settings);
@@ -155,6 +156,30 @@ export function ViewerShell() {
   const liveActive = liveTarget !== null;
   const taLive = liveTarget?.source === 'ta';
   const remoteActive = liveActive || partyActive;
+  useEffect(() => {
+    if (!taLive) return;
+
+    function applyMasterVolumeFromLocation() {
+      const entry = [...new URLSearchParams(window.location.search)].find(
+        ([key]) => key.toLowerCase() === 'mastervolume',
+      );
+      if (entry === undefined) return;
+      const masterVolume = Number(entry[1]);
+      if (!Number.isFinite(masterVolume) || masterVolume < 0 || masterVolume > 1) return;
+      setSettings((current) => (current.masterVolume === masterVolume ? current : { ...current, masterVolume }));
+    }
+
+    applyMasterVolumeFromLocation();
+    // A same-origin overlay can update the iframe URL with history.replaceState.
+    // replaceState emits no browser event, so a small TA-only poll makes the
+    // query parameter a live control without reloading the renderer or map.
+    const interval = window.setInterval(applyMasterVolumeFromLocation, 200);
+    window.addEventListener('popstate', applyMasterVolumeFromLocation);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('popstate', applyMasterVolumeFromLocation);
+    };
+  }, [search.masterVolume, taLive]);
   const live = useLiveExperience({
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,
     appendReplayNoteEvents: session.appendLiveReplayNoteEvents,
@@ -519,7 +544,9 @@ export function ViewerShell() {
       <SourcePicker
         choices={sources.sourceChoices}
         input={sources.sourceInput}
-        visible={!hideUI && sources.mapMeta === null && !remoteActive && !sources.sourceLoading && !session.environmentLoading}
+        visible={
+          !hideUI && sources.mapMeta === null && !remoteActive && !sources.sourceLoading && !session.environmentLoading
+        }
         onChoose={(choice) => {
           sources.loadLookup(choice);
         }}
@@ -634,78 +661,80 @@ export function ViewerShell() {
         />
       )}
 
-      {!hideUI && session.selectedKey !== '' && (!partyActive || (party.mapReady && (partyIsHost || party.serverState?.mapRevealed === true))) && (
-        <TransportControls
-          mode={partyActive ? 'party' : liveActive ? 'live' : 'playback'}
-          visible={chromeVisible}
-          playing={transport.playing}
-          ended={transport.ended}
-          time={transport.time}
-          duration={transport.duration}
-          songBpm={sources.songBpm}
-          beatStepNumerator={transport.beatStepNumerator}
-          beatStepDenominator={transport.beatStepDenominator}
-          timelineShareUrl={share.timelineShareUrl}
-          timelineCopied={share.timelineCopied}
-          panel={
-            activePanel === 'speed' ||
-            activePanel === 'lights' ||
-            activePanel === 'camera' ||
-            activePanel === 'volume'
-              ? activePanel
-              : null
-          }
-          playbackRate={transport.playbackRate}
-          lightshowMode={lightshowMode}
-          lightshowReadOnly={partyActive && !partyIsHost}
-          replayCamera={settings.replayCamera}
-          hasReplay={sources.replayRef.current !== null}
-          songMuted={settings.songMuted}
-          masterMuted={settings.masterMuted}
-          masterVolume={settings.masterVolume}
-          songVolume={settings.songVolume}
-          hitsounds={settings.hitsounds}
-          hitsoundVolume={settings.hitsoundVolume}
-          reverseTimelineScroll={settings.reverseTimelineScroll}
-          markers={timelineMarkers}
-          onTogglePlay={() => {
-            transport.togglePlay();
-          }}
-          onSeek={transport.seek}
-          onSeekBeats={(beats) => {
-            transport.seekBeats(beats, sources.songBpm);
-          }}
-          onNumeratorChange={transport.setBeatStepNumerator}
-          onDenominatorChange={transport.setBeatStepDenominator}
-          onCopyTimeline={(target) => {
-            void share.copyTimelineShareLink(target);
-          }}
-          onPanelChange={setActivePanel}
-          onPlaybackRateChange={(rate) => {
-            transport.setPlaybackRate(rate);
-            setActivePanel(null);
-          }}
-          onLightshowModeChange={session.changeLightshowMode}
-          onReplayCameraChange={(replayCamera) => {
-            setSettings({ ...settings, replayCamera });
-            setActivePanel(null);
-          }}
-          onMasterVolumeChange={(masterVolume) => {
-            if (settingsRef.current.masterVolume === 0 && masterVolume > 0) void transport.unlockAudio();
-            setSettings((current) => ({ ...current, masterVolume }));
-          }}
-          onSongVolumeChange={(songVolume) => {
-            if (settingsRef.current.songVolume === 0 && songVolume > 0) void transport.unlockAudio();
-            setSettings((current) => ({ ...current, songVolume }));
-          }}
-          onHitsoundVolumeChange={(hitsoundVolume) => {
-            setSettings((current) => ({ ...current, hitsoundVolume }));
-          }}
-          onToggleMasterMuted={toggleMasterMuted}
-          onToggleSongMuted={toggleSongMuted}
-          onToggleHitsounds={toggleHitsounds}
-        />
-      )}
+      {!hideUI &&
+        session.selectedKey !== '' &&
+        (!partyActive || (party.mapReady && (partyIsHost || party.serverState?.mapRevealed === true))) && (
+          <TransportControls
+            mode={partyActive ? 'party' : liveActive ? 'live' : 'playback'}
+            visible={chromeVisible}
+            playing={transport.playing}
+            ended={transport.ended}
+            time={transport.time}
+            duration={transport.duration}
+            songBpm={sources.songBpm}
+            beatStepNumerator={transport.beatStepNumerator}
+            beatStepDenominator={transport.beatStepDenominator}
+            timelineShareUrl={share.timelineShareUrl}
+            timelineCopied={share.timelineCopied}
+            panel={
+              activePanel === 'speed' ||
+              activePanel === 'lights' ||
+              activePanel === 'camera' ||
+              activePanel === 'volume'
+                ? activePanel
+                : null
+            }
+            playbackRate={transport.playbackRate}
+            lightshowMode={lightshowMode}
+            lightshowReadOnly={partyActive && !partyIsHost}
+            replayCamera={settings.replayCamera}
+            hasReplay={sources.replayRef.current !== null}
+            songMuted={settings.songMuted}
+            masterMuted={settings.masterMuted}
+            masterVolume={settings.masterVolume}
+            songVolume={settings.songVolume}
+            hitsounds={settings.hitsounds}
+            hitsoundVolume={settings.hitsoundVolume}
+            reverseTimelineScroll={settings.reverseTimelineScroll}
+            markers={timelineMarkers}
+            onTogglePlay={() => {
+              transport.togglePlay();
+            }}
+            onSeek={transport.seek}
+            onSeekBeats={(beats) => {
+              transport.seekBeats(beats, sources.songBpm);
+            }}
+            onNumeratorChange={transport.setBeatStepNumerator}
+            onDenominatorChange={transport.setBeatStepDenominator}
+            onCopyTimeline={(target) => {
+              void share.copyTimelineShareLink(target);
+            }}
+            onPanelChange={setActivePanel}
+            onPlaybackRateChange={(rate) => {
+              transport.setPlaybackRate(rate);
+              setActivePanel(null);
+            }}
+            onLightshowModeChange={session.changeLightshowMode}
+            onReplayCameraChange={(replayCamera) => {
+              setSettings({ ...settings, replayCamera });
+              setActivePanel(null);
+            }}
+            onMasterVolumeChange={(masterVolume) => {
+              if (settingsRef.current.masterVolume === 0 && masterVolume > 0) void transport.unlockAudio();
+              setSettings((current) => ({ ...current, masterVolume }));
+            }}
+            onSongVolumeChange={(songVolume) => {
+              if (settingsRef.current.songVolume === 0 && songVolume > 0) void transport.unlockAudio();
+              setSettings((current) => ({ ...current, songVolume }));
+            }}
+            onHitsoundVolumeChange={(hitsoundVolume) => {
+              setSettings((current) => ({ ...current, hitsoundVolume }));
+            }}
+            onToggleMasterMuted={toggleMasterMuted}
+            onToggleSongMuted={toggleSongMuted}
+            onToggleHitsounds={toggleHitsounds}
+          />
+        )}
 
       {!hideUI && error !== '' && (
         <Alert

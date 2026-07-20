@@ -54,7 +54,7 @@ export function liveMapHash(start: ReplayStreamStart) {
   return normalizeLiveMapHash(value ?? '');
 }
 
-export function createLiveReplay(start: ReplayStreamStart): Replay {
+export function createLiveReplay(start: ReplayStreamStart, useSaberColorsForEnvironment = false): Replay {
   const metadata = start.replayMetadata;
   const beatmap = start.beatmap;
   const hash = liveMapHash(start);
@@ -65,6 +65,8 @@ export function createLiveReplay(start: ReplayStreamStart): Replay {
   let characteristic = beatmap?.characteristic;
   if (characteristic === undefined || characteristic === '') characteristic = metadata?.characteristic;
   if (characteristic === undefined || characteristic === '') characteristic = 'Standard';
+  const leftSaberColor = replayColor(metadata?.leftSaberColor);
+  const rightSaberColor = replayColor(metadata?.rightSaberColor);
   const replay: Replay = {
     metadata: {
       version: version === undefined || version === '' ? 'live' : version,
@@ -86,8 +88,19 @@ export function createLiveReplay(start: ReplayStreamStart): Replay {
       hasPlaySettings: metadata !== undefined,
       songSpeed: metadata?.songSpeed,
       jumpDistance: metadata?.jumpDistance,
-      leftSaberColor: replayColor(metadata?.leftSaberColor),
-      rightSaberColor: replayColor(metadata?.rightSaberColor),
+      leftSaberColor,
+      rightSaberColor,
+      // TA currently records the player's two gameplay colors. Use those for
+      // the corresponding environment channels as well, which is the closest
+      // representation available without inventing colors absent from the
+      // stream. ChroViewer's replay-color resolver applies these to notes,
+      // sabers, trails, mapped lights, and boosted light events.
+      environmentColor0: useSaberColorsForEnvironment ? leftSaberColor : undefined,
+      environmentColor1: useSaberColorsForEnvironment ? rightSaberColor : undefined,
+      environmentColor0Boost: useSaberColorsForEnvironment ? leftSaberColor : undefined,
+      environmentColor1Boost: useSaberColorsForEnvironment ? rightSaberColor : undefined,
+      supportsEnvironmentColorBoost:
+        useSaberColorsForEnvironment && leftSaberColor !== undefined && rightSaberColor !== undefined,
     },
     poses: [],
     heights: [],
