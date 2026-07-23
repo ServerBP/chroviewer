@@ -6,7 +6,6 @@ import { nitro } from 'nitro/vite';
 import { defineConfig } from 'vite';
 
 const securityHeaders = {
-  'content-security-policy': "frame-ancestors 'self' https://scoresaber.com https://beatsaver.com",
   'referrer-policy': 'strict-origin-when-cross-origin',
   'x-content-type-options': 'nosniff',
 };
@@ -18,7 +17,7 @@ export default defineConfig({
       preset: 'node-server',
       compressPublicAssets: { gzip: true, brotli: true },
       routeRules: {
-        '/**': { headers: securityHeaders },
+        '/**': { cors: true, headers: securityHeaders },
         '/assets/**': {
           headers: { 'cache-control': 'public, max-age=31536000, immutable' },
         },

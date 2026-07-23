@@ -19,6 +19,10 @@ overlay may update the iframe's query string with history.replaceState and the n
 volume is applied without reloading the iframe, map, audio, or renderer.
 Example: iframe.contentWindow.history.replaceState(null, '', '?liveSource=ta&playerId=123&masterVolume=0.4')
 
+Cross-origin embeds can update audio without reloading by posting a message to the
+viewer iframe:
+{ type: 'beatkhana:viewer-settings', masterVolume: 0.4, hitsoundVolume: 0.8 }
+
 TA IFRAME SYNCHRONISATION
 TA viewers on the same origin announce their platform ID, map hash, available replay
 range, and playback clock to one another. Viewers with the same map hash rendezvous at

@@ -180,6 +180,28 @@ export function ViewerShell() {
       window.removeEventListener('popstate', applyMasterVolumeFromLocation);
     };
   }, [search.masterVolume, taLive]);
+  useEffect(() => {
+    if (!taLive) return;
+
+    function applyEmbeddedViewerSettings(event: MessageEvent) {
+      if (event.source !== window.parent || event.data?.type !== 'beatkhana:viewer-settings') return;
+      const masterVolume = Number(event.data.masterVolume);
+      const hitsoundVolume = Number(event.data.hitsoundVolume);
+      setSettings((current) => {
+        const nextMasterVolume =
+          Number.isFinite(masterVolume) && masterVolume >= 0 && masterVolume <= 1 ? masterVolume : current.masterVolume;
+        const nextHitsoundVolume =
+          Number.isFinite(hitsoundVolume) && hitsoundVolume >= 0 && hitsoundVolume <= 1
+            ? hitsoundVolume
+            : current.hitsoundVolume;
+        if (current.masterVolume === nextMasterVolume && current.hitsoundVolume === nextHitsoundVolume) return current;
+        return { ...current, masterVolume: nextMasterVolume, hitsoundVolume: nextHitsoundVolume };
+      });
+    }
+
+    window.addEventListener('message', applyEmbeddedViewerSettings);
+    return () => window.removeEventListener('message', applyEmbeddedViewerSettings);
+  }, [taLive]);
   const live = useLiveExperience({
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,
     appendReplayNoteEvents: session.appendLiveReplayNoteEvents,
