@@ -95,6 +95,8 @@ export function ViewerShell() {
   const effectiveSettingsRef = useRef(effectiveSettings);
   effectiveSettingsRef.current = effectiveSettings;
   const [error, setError] = useState('');
+  const [embeddedLights, setEmbeddedLights] = useState<LightshowMode | null>(null);
+  const authoritativeLights = embeddedLights ?? search.lights ?? null;
   const [lightshowMode, setLightshowMode] = useState<LightshowMode>(
     search.lightshow ?? search.lights ?? (settings.staticLights ? 'static' : 'full'),
   );
@@ -131,6 +133,7 @@ export function ViewerShell() {
   const session = useViewerSession({
     lightshowMode,
     lightshowModeRef,
+    authoritativeLightshowMode: authoritativeLights,
     setActivePanel,
     setError,
     setLightshowMode,
@@ -183,24 +186,35 @@ export function ViewerShell() {
   useEffect(() => {
     if (!taLive) return;
 
+    function isRecord(value: unknown): value is Record<string, unknown> {
+      return typeof value === 'object' && value !== null && !Array.isArray(value);
+    }
+
     function applyEmbeddedViewerSettings(event: MessageEvent) {
-      if (event.source !== window.parent || event.data?.type !== 'beatkhana:viewer-settings') return;
-      const masterVolume = Number(event.data.masterVolume);
-      const hitsoundVolume = Number(event.data.hitsoundVolume);
+      const data: unknown = event.data;
+      if (event.source !== window.parent || !isRecord(data) || data.type !== 'beatkhana:viewer-settings') return;
+      const masterVolume = Number(data.masterVolume);
+      const hitsoundVolume = Number(data.hitsoundVolume);
+      const settingsPatch = isRecord(data.settings) ? data.settings : {};
       setSettings((current) => {
-        const nextMasterVolume =
-          Number.isFinite(masterVolume) && masterVolume >= 0 && masterVolume <= 1 ? masterVolume : current.masterVolume;
-        const nextHitsoundVolume =
-          Number.isFinite(hitsoundVolume) && hitsoundVolume >= 0 && hitsoundVolume <= 1
-            ? hitsoundVolume
-            : current.hitsoundVolume;
-        if (current.masterVolume === nextMasterVolume && current.hitsoundVolume === nextHitsoundVolume) return current;
-        return { ...current, masterVolume: nextMasterVolume, hitsoundVolume: nextHitsoundVolume };
+        return sanitizeViewerSettings({
+          ...current,
+          ...settingsPatch,
+          ...(Number.isFinite(masterVolume) ? { masterVolume } : {}),
+          ...(Number.isFinite(hitsoundVolume) ? { hitsoundVolume } : {}),
+        });
       });
+      const lights = data.lights;
+      if (lights === 'full' || lights === 'static' || lights === 'none') {
+        setEmbeddedLights(lights);
+        session.applyAuthoritativeLightshowMode(lights);
+      }
     }
 
     window.addEventListener('message', applyEmbeddedViewerSettings);
-    return () => window.removeEventListener('message', applyEmbeddedViewerSettings);
+    return () => {
+      window.removeEventListener('message', applyEmbeddedViewerSettings);
+    };
   }, [taLive]);
   const live = useLiveExperience({
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,

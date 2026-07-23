@@ -36,6 +36,49 @@ lightshow=full-lightshow      Show only the full lightshow and hide gameplay obj
 graphicsQuality=none|low|medium|high
 renderScale=0.5..1.5          Internal rendering resolution multiplier.
 
+SABERS AND TRAILS
+preferReplayColors=true|false
+customColors=true|false
+leftColor=%23rrggbb            URL-encoded #rrggbb left saber color.
+rightColor=%23rrggbb           URL-encoded #rrggbb right saber color.
+showSabers=true|false
+saberScale=0.25..3
+saberBladeLength=0.1..2
+saberBladeThickness=0.001..0.03
+saberCoreThickness=0.0005..0.02
+saberCoreInset=0..0.2
+showSaberTrails=true|false
+replayTrailShape=flag|rectangle
+replayTrailLength=0.02..1.5
+replayTrailThinness=0..0.95
+replayTrailSamples=2..128
+replayTrailFade=0.1..5
+replayTrailOpacity=0..2
+replayTrailMotionThreshold=0.0001..0.02
+saberGripLength=0.02..0.3
+saberGripThickness=0.002..0.03
+saberGuardSize=0.005..0.08
+saberGuardThickness=0.0005..0.01
+saberCollarSize=0.002..0.04
+saberCollarThickness=0.0005..0.01
+saberCollarSpacing=0..0.2
+saberRingCount=0..5
+saberRingSize=0.002..0.03
+saberRingThickness=0.001..0.02
+saberRingSpacing=0..0.04
+saberPommelLength=0.002..0.05
+saberPommelThickness=0.002..0.03
+saberXOffset=-0.25..0.25
+saberYOffset=-0.25..0.25
+saberZOffset=-0.25..0.25
+saberXRotation=-45..45
+saberYRotation=-45..45
+saberZRotation=-45..45
+
+Every saber parameter is validated with the same limits as the settings panel. Flat
+parameters override saved settings and may also be supplied inside the existing
+settings JSON query object.
+
 CAMERA
 camera=static|follow|first-person
 fov=60..120                   Replay camera field of view in degrees.

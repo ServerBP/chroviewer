@@ -28,6 +28,7 @@ type ViewerSources = ReturnType<typeof useViewerSources>;
 interface ViewerSessionOptions {
   lightshowMode: LightshowMode;
   lightshowModeRef: RefObject<LightshowMode>;
+  authoritativeLightshowMode?: LightshowMode | null;
   setActivePanel: Dispatch<SetStateAction<ViewerPanel>>;
   setError: (message: string) => void;
   setLightshowMode: Dispatch<SetStateAction<LightshowMode>>;
@@ -45,6 +46,7 @@ interface ViewerSessionOptions {
 export function useViewerSession({
   lightshowMode,
   lightshowModeRef,
+  authoritativeLightshowMode = null,
   setActivePanel,
   setError,
   setLightshowMode,
@@ -95,12 +97,12 @@ export function useViewerSession({
   }, [settings.previewHitLine]);
 
   useEffect(() => {
-    const mode: LightshowMode = settings.staticLights ? 'static' : 'full';
+    const mode: LightshowMode = authoritativeLightshowMode ?? (settings.staticLights ? 'static' : 'full');
     if (isForcedLightshowMode(lightshowModeRef.current) && mode === 'full') return;
     lightshowModeRef.current = mode;
     setLightshowMode(mode);
     viewerRef.current?.view.setLightshowMode(mode);
-  }, [settings.staticLights]);
+  }, [authoritativeLightshowMode, settings.staticLights]);
 
   useEffect(() => {
     viewerRef.current?.view.setReplayCameraSettings(settings);

@@ -17,7 +17,48 @@ export interface RouterContext {
   queryClient: QueryClient;
 }
 
+const replaySaberSearchKeys = [
+  'preferReplayColors',
+  'customColors',
+  'leftColor',
+  'rightColor',
+  'showSabers',
+  'saberScale',
+  'saberBladeLength',
+  'saberBladeThickness',
+  'saberCoreThickness',
+  'saberCoreInset',
+  'showSaberTrails',
+  'replayTrailShape',
+  'replayTrailLength',
+  'replayTrailThinness',
+  'replayTrailSamples',
+  'replayTrailFade',
+  'replayTrailOpacity',
+  'replayTrailMotionThreshold',
+  'saberGripLength',
+  'saberGripThickness',
+  'saberGuardSize',
+  'saberGuardThickness',
+  'saberCollarSize',
+  'saberCollarThickness',
+  'saberCollarSpacing',
+  'saberRingCount',
+  'saberRingSize',
+  'saberRingThickness',
+  'saberRingSpacing',
+  'saberPommelLength',
+  'saberPommelThickness',
+  'saberXOffset',
+  'saberYOffset',
+  'saberZOffset',
+  'saberXRotation',
+  'saberYRotation',
+  'saberZRotation',
+] as const;
+
 const searchKeyAliases: Record<string, string> = {
+  ...Object.fromEntries(replaySaberSearchKeys.map((key) => [key.toLowerCase(), key])),
   map: 'map',
   replayurl: 'replayUrl',
   scoreid: 'scoreId',
@@ -79,6 +120,15 @@ export function parseUrlSearch(search: string) {
     const entry = [...searchParams].find(([key]) => aliases.includes(key.toLowerCase()));
     if (entry !== undefined) parsed[canonical] = entry[1];
   }
+  const nestedSettings =
+    typeof parsed.settings === 'object' && parsed.settings !== null && !Array.isArray(parsed.settings)
+      ? { ...(parsed.settings as Record<string, unknown>) }
+      : {};
+  for (const key of replaySaberSearchKeys) {
+    if (parsed[key] === undefined) continue;
+    nestedSettings[key] = parsed[key];
+  }
+  if (Object.keys(nestedSettings).length > 0) parsed.settings = nestedSettings;
   return parsed;
 }
 
