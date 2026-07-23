@@ -19,7 +19,8 @@ export function useLiveExperience(options: LiveExperienceOptions) {
   const runtimeRef = useRef<LiveRuntime | null>(null);
   const [state, setState] = useState<LiveExperienceState>(initialLiveState);
   const playerId = options.target?.playerId;
-  const playerQuery = useQuery(scoreSaberPlayerQueryOptions(playerId));
+  const profileOptional = options.target?.source === 'ta';
+  const playerQuery = useQuery(scoreSaberPlayerQueryOptions(profileOptional ? undefined : playerId));
 
   const unlockAudio = useCallback(async () => {
     const runtime = runtimeRef.current;
@@ -103,11 +104,10 @@ export function useLiveExperience(options: LiveExperienceOptions) {
 
   useLiveConnection(options.target, optionsRef, runtimeRef, setState);
 
-  const profileOptional = options.target?.source === 'ta';
   let player = playerQuery.data ?? null;
   if (player === null && playerId !== undefined && playerQuery.isError && !profileOptional) {
     player = { id: playerId, name: playerId, avatar: '', country: '' };
   }
-  const playerProfilePending = playerId !== undefined && playerQuery.isPending;
+  const playerProfilePending = !profileOptional && playerId !== undefined && playerQuery.isPending;
   return { ...state, player, playerProfilePending, sendChatMessage, unlockAudio };
 }
