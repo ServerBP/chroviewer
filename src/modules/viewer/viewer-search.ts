@@ -153,6 +153,61 @@ export function renderPerformanceForSearch(search: ViewerSearch): RenderPerforma
   };
 }
 
+function finiteNumber(value: unknown, minimum: number, maximum: number) {
+  const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN;
+  return Number.isFinite(number) && number >= minimum && number <= maximum ? number : undefined;
+}
+
+function finiteInteger(value: unknown, minimum: number, maximum: number) {
+  const number = finiteNumber(value, minimum, maximum);
+  return number !== undefined && Number.isInteger(number) ? number : undefined;
+}
+
+export function updateRenderPerformance(
+  current: RenderPerformanceOptions,
+  values: Record<string, unknown>,
+): RenderPerformanceOptions {
+  let next =
+    values.qualityPreset === 'broadcast'
+      ? { ...BROADCAST_RENDER_PERFORMANCE }
+      : values.qualityPreset === '' || values.qualityPreset === null
+        ? { ...DEFAULT_RENDER_PERFORMANCE }
+        : { ...current };
+  const maxFps = finiteInteger(values.maxFps, 1, 240);
+  const msaaSamples = finiteInteger(values.msaaSamples, 0, 8);
+  const mirrorResolution = finiteInteger(values.mirrorResolution, 0, 4096);
+  const mirrorMsaaSamples = finiteInteger(values.mirrorMsaaSamples, 0, 8);
+  const postBloomWidth = finiteInteger(values.postBloomWidth, 64, 2048);
+  const bloomFogSize = finiteInteger(values.bloomFogSize, 64, 1024);
+  const mirrorQuality = values.mirrorQuality ?? values.graphicsQuality;
+  if (maxFps !== undefined) next.maxFps = maxFps;
+  if (msaaSamples !== undefined) next.msaaSamples = msaaSamples;
+  if (mirrorQuality === 'none' || mirrorQuality === 'low' || mirrorQuality === 'medium' || mirrorQuality === 'high') {
+    next.mirrorResolution = mirrorResolutionForQuality(mirrorQuality);
+  }
+  if (mirrorResolution !== undefined) next.mirrorResolution = mirrorResolution;
+  if (mirrorMsaaSamples !== undefined) next.mirrorMsaaSamples = mirrorMsaaSamples;
+  if (postBloomWidth !== undefined) next.postBloomWidth = postBloomWidth;
+  if (bloomFogSize !== undefined) next.bloomFogSize = bloomFogSize;
+
+  if ('outputWidth' in values || 'outputHeight' in values) {
+    const outputWidth = finiteInteger(values.outputWidth, 64, 7680);
+    const outputHeight = finiteInteger(values.outputHeight, 64, 4320);
+    next =
+      outputWidth === undefined || outputHeight === undefined
+        ? { ...next, outputWidth: undefined, outputHeight: undefined }
+        : { ...next, outputWidth, outputHeight };
+  }
+  return next;
+}
+
+export function replaceRenderPerformance(values: Record<string, unknown>): RenderPerformanceOptions {
+  return updateRenderPerformance(DEFAULT_RENDER_PERFORMANCE, {
+    qualityPreset: '',
+    ...values,
+  });
+}
+
 export function isRemoteSourceUrl(value: string) {
   return remoteSourceUrlSchema.safeParse(value).success;
 }

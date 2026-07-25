@@ -49,7 +49,9 @@ export class PlanarMirror {
   readonly mesh: Mesh;
   readonly reflectionTexture: { value: Texture };
 
-  private readonly target: WebGLRenderTarget | null;
+  private target: WebGLRenderTarget | null = null;
+  private targetResolution = 0;
+  private targetSamples = 0;
   private readonly black = blackTexture();
   private readonly mirrorCamera = new PerspectiveCamera();
   private readonly clearColorTmp = new Color();
@@ -77,22 +79,35 @@ export class PlanarMirror {
   ) {
     const size = options.resolution ?? mirrorTextureSize(quality.mirrorQuality);
     const disabled = options.resolution === undefined ? quality.mirrorQuality === 'none' : size === 0;
-    this.target = disabled
-      ? null
-      : new WebGLRenderTarget(size, size, {
-          format: RGBAFormat,
-          depthBuffer: true,
-          stencilBuffer: true,
-          samples: options.msaaSamples ?? (quality.mirrorQuality === 'high' ? 2 : 0),
-          ...MULTISAMPLE_DEPTH_STENCIL_RESOLVE_OPTIONS,
-        });
-    this.reflectionTexture = { value: this.target?.texture ?? this.black };
+    this.reflectionTexture = { value: this.black };
+    this.setPerformance(disabled ? 0 : size, options.msaaSamples ?? (quality.mirrorQuality === 'high' ? 2 : 0));
     this.reflectionLayers = quality.mirrorQuality === 'low' ? MEDIUM_REFLECTION_LAYERS : HIGH_REFLECTION_LAYERS;
     this.mesh = new Mesh(new PlaneGeometry(width, length));
     this.mesh.rotateX(-Math.PI / 2);
     this.mesh.layers.set(MAIN_ONLY_LAYER);
     this.mirrorCamera.matrixAutoUpdate = false;
     this.mirrorCamera.matrixWorldAutoUpdate = false;
+  }
+
+  setPerformance(resolution?: number, msaaSamples?: number) {
+    const nextResolution = resolution ?? this.targetResolution;
+    const nextSamples = msaaSamples ?? this.targetSamples;
+    if (nextResolution === this.targetResolution && nextSamples === this.targetSamples) return false;
+    this.target?.dispose();
+    this.targetResolution = nextResolution;
+    this.targetSamples = nextSamples;
+    this.target =
+      nextResolution === 0
+        ? null
+        : new WebGLRenderTarget(nextResolution, nextResolution, {
+            format: RGBAFormat,
+            depthBuffer: true,
+            stencilBuffer: true,
+            samples: nextSamples,
+            ...MULTISAMPLE_DEPTH_STENCIL_RESOLVE_OPTIONS,
+          });
+    this.reflectionTexture.value = this.target?.texture ?? this.black;
+    return true;
   }
 
   updateMaterials(scene: Scene) {

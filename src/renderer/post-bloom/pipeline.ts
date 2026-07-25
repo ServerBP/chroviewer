@@ -136,7 +136,7 @@ export class PostBloomPipeline {
   private readonly compositeMaterial = passMaterial(POST_BLOOM_COMPOSITE_FRAG, this.compositeUniforms);
 
   constructor(
-    private readonly textureWidth = POST_BLOOM_TEXTURE_WIDTH,
+    private textureWidth = POST_BLOOM_TEXTURE_WIDTH,
     msaaSamples = POST_BLOOM_SCENE_SAMPLES,
   ) {
     this.sceneTarget.samples = msaaSamples;
@@ -158,6 +158,17 @@ export class PostBloomPipeline {
 
   setScreenDisplacementEnabled(enabled: boolean) {
     this.screenDisplacementEnabled = enabled;
+  }
+
+  setPerformance(textureWidth: number, msaaSamples: number) {
+    if (this.textureWidth !== textureWidth) {
+      this.textureWidth = textureWidth;
+      this.setSize(this.sceneTarget.width, this.sceneTarget.height);
+    }
+    if (this.sceneTarget.samples !== msaaSamples) {
+      this.sceneTarget.samples = msaaSamples;
+      this.sceneTarget.dispose();
+    }
   }
 
   render(renderer: WebGLRenderer, scene: Scene, camera: Camera, displacementActive = true) {

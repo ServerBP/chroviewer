@@ -24,7 +24,11 @@ export class RendererLifecycle {
   private contextLost = false;
   private renderScale = 1;
 
-  constructor(private readonly performance: RenderPerformanceOptions = DEFAULT_RENDER_PERFORMANCE) {}
+  private performance: RenderPerformanceOptions;
+
+  constructor(performance: RenderPerformanceOptions = DEFAULT_RENDER_PERFORMANCE) {
+    this.performance = { ...performance };
+  }
 
   onContextLost?: () => void;
   onContextRestored?: () => void;
@@ -67,6 +71,19 @@ export class RendererLifecycle {
     this.renderScale = scale;
     this.applyPixelRatio();
     this.resize();
+  }
+
+  setPerformance(performance: RenderPerformanceOptions) {
+    const outputChanged =
+      performance.outputWidth !== this.performance.outputWidth ||
+      performance.outputHeight !== this.performance.outputHeight;
+    this.performance = { ...performance };
+    this.nextFrameAt = 0;
+    if (outputChanged) {
+      this.width = -1;
+      this.height = -1;
+      this.resize();
+    }
   }
 
   private applyPixelRatio() {

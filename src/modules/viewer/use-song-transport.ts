@@ -24,10 +24,21 @@ interface UseSongTransportOptions {
   settingsRef: RefObject<ViewerSettings>;
 }
 
+interface RetainedAudioSource {
+  audioData: ArrayBuffer | null;
+  hitsoundEvents: HitsoundEvent[];
+  onAudioDecodeError: () => void;
+  songBpm: number;
+}
+
 export function useSongTransport({ lightshowModeRef, settings, settingsRef }: UseSongTransportOptions) {
   const clockRef = useRef<SongClock | null>(null);
   const autoplayRef = useRef(false);
   const loadGenerationRef = useRef(0);
+  const audioSwitchGenerationRef = useRef(0);
+  const audioActiveRef = useRef(false);
+  const audioProcessingEnabledRef = useRef(settings.masterVolume > 0);
+  const retainedAudioRef = useRef<RetainedAudioSource | null>(null);
   const songBpmRef = useRef(120);
   const [duration, setDuration] = useState(0);
   const [time, setTime] = useState(0);
@@ -58,21 +69,10 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
   }, [settings.audioOffsetMs]);
 
   useEffect(() => {
-    if (settings.masterVolume > 0) return;
-    const current = clockRef.current;
-    if (current === null) return;
-    const time = current.currentTime();
-    const rate = current.getRate();
-    const wasPlaying = current.isPlaying();
-    const silent = createSilentClock(current.duration, songBpmRef.current);
-    silent.setRate(rate);
-    silent.setAudioOffset(settings.audioOffsetMs / 1000);
-    silent.seek(time);
-    if (wasPlaying) silent.play();
-    clockRef.current = silent;
-    current.dispose();
-    hitsoundsRef.current.disable();
-    setAudioBlocked(false);
+    const enabled = settings.masterVolume > 0;
+    if (enabled === audioProcessingEnabledRef.current) return;
+    audioProcessingEnabledRef.current = enabled;
+    void setAudioProcessingEnabled(enabled);
   }, [settings.masterVolume]);
 
   useEffect(() => {
@@ -134,6 +134,9 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
 
   function clear() {
     loadGenerationRef.current++;
+    audioSwitchGenerationRef.current++;
+    audioActiveRef.current = false;
+    retainedAudioRef.current = null;
     hitsounds.clear();
     disposeClock();
     autoplayRef.current = false;
@@ -146,7 +149,14 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
 
   async function load(options: LoadSongOptions) {
     const generation = ++loadGenerationRef.current;
+    audioSwitchGenerationRef.current++;
     songBpmRef.current = options.songBpm;
+    retainedAudioRef.current = {
+      audioData: options.audioData,
+      hitsoundEvents: options.hitsoundEvents,
+      onAudioDecodeError: options.onAudioDecodeError,
+      songBpm: options.songBpm,
+    };
     let clock: SongClock;
     let audioDecodeFailed = false;
     const audioData = options.audioEnabled ? options.audioData : null;
@@ -169,19 +179,93 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
       clock.dispose();
       return null;
     }
+    const audioStillEnabled = settingsRef.current.masterVolume > 0;
+    if (!audioStillEnabled && audioData !== null && !audioDecodeFailed) {
+      clock.dispose();
+      clock = createSilentClock(options.fallbackDuration, options.songBpm);
+    }
+    audioActiveRef.current = audioStillEnabled && audioData !== null && !audioDecodeFailed;
     disposeClock();
     if (audioDecodeFailed) options.onAudioDecodeError();
     clock.setAudioOffset(settingsRef.current.audioOffsetMs / 1000);
     clock.setRate(playbackRate);
+    clock.setVolume(
+      settingsRef.current.masterMuted || settingsRef.current.songMuted
+        ? 0
+        : settingsRef.current.masterVolume * settingsRef.current.songVolume,
+    );
     clockRef.current = clock;
     autoplayRef.current = false;
-    hitsounds.load(options.audioEnabled ? options.hitsoundEvents : []);
+    hitsounds.load(audioActiveRef.current ? options.hitsoundEvents : []);
     setDuration(clock.duration);
     setTime(0);
     setStarted(false);
     setAudioBlocked(false);
     setPlaying(false);
     return clock;
+  }
+
+  async function setAudioProcessingEnabled(enabled: boolean) {
+    const generation = ++audioSwitchGenerationRef.current;
+    const current = clockRef.current;
+    if (!enabled) {
+      hitsoundsRef.current.disable();
+      setAudioBlocked(false);
+      if (current === null || !audioActiveRef.current) return;
+      const silent = createSilentClock(current.duration, songBpmRef.current);
+      copyClockState(current, silent);
+      clockRef.current = silent;
+      audioActiveRef.current = false;
+      current.dispose();
+      return;
+    }
+
+    if (current === null || audioActiveRef.current) return;
+    const source = retainedAudioRef.current;
+    if (source?.audioData === null || source?.audioData === undefined) return;
+    const currentSettings = settingsRef.current;
+    const result = await createAudioClock({
+      audioData: source.audioData,
+      songBpm: source.songBpm,
+      volume:
+        currentSettings.masterMuted || currentSettings.songMuted
+          ? 0
+          : currentSettings.masterVolume * currentSettings.songVolume,
+    });
+    if (
+      generation !== audioSwitchGenerationRef.current ||
+      retainedAudioRef.current !== source ||
+      settingsRef.current.masterVolume === 0
+    ) {
+      if (result.isOk()) result.value.dispose();
+      return;
+    }
+    if (result.isErr()) {
+      source.onAudioDecodeError();
+      return;
+    }
+    const previous = clockRef.current;
+    if (previous === null) {
+      result.value.dispose();
+      return;
+    }
+    copyClockState(previous, result.value);
+    clockRef.current = result.value;
+    audioActiveRef.current = true;
+    previous.dispose();
+    setDuration(result.value.duration);
+    hitsoundsRef.current.load(source.hitsoundEvents);
+    hitsoundsRef.current.seek(result.value.currentTime());
+    if (result.value.isPlaying() && settingsRef.current.hitsounds) hitsoundsRef.current.resume();
+  }
+
+  function copyClockState(source: SongClock, target: SongClock) {
+    const time = source.currentTime();
+    const wasPlaying = source.isPlaying();
+    target.setRate(source.getRate());
+    target.setAudioOffset(settingsRef.current.audioOffsetMs / 1000);
+    target.seek(time);
+    if (wasPlaying) target.play();
   }
 
   function play({ autoplay = false }: { autoplay?: boolean } = {}) {

@@ -286,11 +286,9 @@ export function useViewerSession({
       const replayEnd = sources.replayRef.current?.poses.at(-1)?.time ?? 0;
       const fallbackDuration = Math.max(songBpmTimeToSeconds(data.endBeat, sources.songBpm) + 1, replayEnd);
       const audioEnabled = settings.masterVolume > 0;
-      const audioData = audioEnabled ? sources.audioDataRef.current : null;
-      if (!audioEnabled) sources.audioDataRef.current = null;
       clock = await transport.load({
         audioEnabled,
-        audioData,
+        audioData: sources.audioDataRef.current,
         fallbackDuration,
         hitsoundEvents,
         onAudioDecodeError() {

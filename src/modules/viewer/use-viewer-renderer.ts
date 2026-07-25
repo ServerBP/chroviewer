@@ -47,6 +47,8 @@ export function useViewerRenderer({
   const t = useTranslations('viewer');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerRef = useRef<ViewerHandle | null>(null);
+  const performanceRef = useRef(performance);
+  performanceRef.current = performance;
   const initialEnvironmentLoadedRef = useRef(false);
   const [environmentLoading, setEnvironmentLoading] = useState(true);
   const [viewerReady, setViewerReady] = useState(false);
@@ -63,7 +65,8 @@ export function useViewerRenderer({
       const canvas = canvasRef.current;
       if (effect.signal.aborted || canvas === null) return;
       const active = activeSelectionRef.current;
-      const lifecycle = new RendererLifecycle(performance);
+      const initialPerformance = performanceRef.current;
+      const lifecycle = new RendererLifecycle(initialPerformance);
       lifecycle.attach(canvas);
       lifecycle.setRenderScale(settings.renderScale);
       const finishInitialEnvironmentLoad = () => {
@@ -71,7 +74,11 @@ export function useViewerRenderer({
         initialEnvironmentLoadedRef.current = true;
         setEnvironmentLoading(false);
       };
-      const view = new MapView({ mirrorQuality: settings.graphicsQuality }, finishInitialEnvironmentLoad, performance);
+      const view = new MapView(
+        { mirrorQuality: settings.graphicsQuality },
+        finishInitialEnvironmentLoad,
+        initialPerformance,
+      );
       lifecycle.setView(view);
       view.setLightshowMode(active === null ? 'static' : lightshowModeRef.current);
       view.setReplayCameraSettings(settings);
@@ -107,17 +114,17 @@ export function useViewerRenderer({
         setError(`${fallback}: ${environmentResult.error.message}`);
       }
 
-      function restoreActiveView(selection: ActiveSelection, clock: SongClock) {
+      function restoreActiveView(selection: ActiveSelection) {
         view.setMap(
           selection.data,
           colorOverride(settingsRef.current, selection.mapColorScheme, replayRef.current?.metadata),
         );
         view.setReplay(replayRef.current, hitScoreVisualizerForSettings(settingsRef.current, replayRef.current));
-        view.setBeatSource(() => clock.currentBeat());
+        view.setBeatSource(() => clockRef.current?.currentBeat() ?? 0);
       }
 
       const clock = clockRef.current;
-      if (active !== null && clock !== null) restoreActiveView(active, clock);
+      if (active !== null && clock !== null) restoreActiveView(active);
     }
 
     queueMicrotask(() => {
@@ -129,8 +136,14 @@ export function useViewerRenderer({
       cleanup?.();
       cleanup = null;
     };
+  }, [settings.graphicsQuality]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (viewer === null) return;
+    viewer.lifecycle.setPerformance(performance);
+    viewer.view.setRenderPerformance(performance);
   }, [
-    settings.graphicsQuality,
     performance.maxFps,
     performance.msaaSamples,
     performance.mirrorResolution,

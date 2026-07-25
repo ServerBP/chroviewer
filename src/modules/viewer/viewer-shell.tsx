@@ -16,7 +16,7 @@ import {
 import { useTranslations } from 'use-intl';
 
 import type { LightshowMode } from '../../core/lighting/basic-light';
-import { loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
+import { DEFAULT_VIEWER_SETTINGS, loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
 import { replayLightshowMode } from '../live/live-replay';
@@ -45,7 +45,7 @@ import { useViewerControls } from './use-viewer-controls';
 import { useViewerSession } from './use-viewer-session';
 import { useViewerShare } from './use-viewer-share';
 import { useViewerSources } from './use-viewer-sources';
-import { renderPerformanceForSearch } from './viewer-search';
+import { renderPerformanceForSearch, replaceRenderPerformance, updateRenderPerformance } from './viewer-search';
 import { quantizedBeatAt } from './viewer-timeline';
 import type { ViewerPanel } from './viewer-types';
 
@@ -53,6 +53,95 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 
 import { cn } from '@/lib/utils';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function dynamicSettingsPatch(values: Record<string, unknown>) {
+  const performanceKeys = new Set([
+    'qualityPreset',
+    'maxFps',
+    'msaaSamples',
+    'mirrorQuality',
+    'mirrorResolution',
+    'mirrorMsaaSamples',
+    'postBloomWidth',
+    'bloomFogSize',
+    'outputWidth',
+    'outputHeight',
+    'screenDisplacement',
+    // Keep the legacy query parameter live without rebuilding the entire scene.
+    // It now controls only the mirror target, just like mirrorQuality.
+    'graphicsQuality',
+  ]);
+  const patch = Object.fromEntries(Object.entries(values).filter(([key]) => !performanceKeys.has(key)));
+  return {
+    ...(values.qualityPreset === '' || values.qualityPreset === null
+      ? {
+          renderScale: DEFAULT_VIEWER_SETTINGS.renderScale,
+          replayTrailSamples: DEFAULT_VIEWER_SETTINGS.replayTrailSamples,
+          screenDisplacementEffects: DEFAULT_VIEWER_SETTINGS.screenDisplacementEffects,
+        }
+      : {}),
+    ...(values.qualityPreset === 'broadcast'
+      ? { renderScale: 0.85, replayTrailSamples: 12, screenDisplacementEffects: false }
+      : {}),
+    ...patch,
+    ...('screenDisplacement' in values ? { screenDisplacementEffects: values.screenDisplacement } : {}),
+  };
+}
+
+function dynamicLocationValues() {
+  const values: Record<string, unknown> = {};
+  const settingKeys = new Map(Object.keys(DEFAULT_VIEWER_SETTINGS).map((key) => [key.toLowerCase(), key]));
+  const performanceKeys = new Map(
+    [
+      'qualityPreset',
+      'maxFps',
+      'msaaSamples',
+      'mirrorQuality',
+      'mirrorResolution',
+      'mirrorMsaaSamples',
+      'postBloomWidth',
+      'bloomFogSize',
+      'outputWidth',
+      'outputHeight',
+      'screenDisplacement',
+    ].map((key) => [key.toLowerCase(), key]),
+  );
+  const aliases = new Map([
+    ['camera', 'replayCamera'],
+    ['fov', 'replayCameraFov'],
+  ]);
+  for (const [rawKey, rawValue] of new URLSearchParams(window.location.search)) {
+    const lower = rawKey.toLowerCase();
+    const key = performanceKeys.get(lower) ?? settingKeys.get(lower) ?? aliases.get(lower);
+    if (key === undefined) continue;
+    const defaultValue = DEFAULT_VIEWER_SETTINGS[key as keyof typeof DEFAULT_VIEWER_SETTINGS];
+    values[key] =
+      key === 'screenDisplacement'
+        ? rawValue.toLowerCase() === 'true'
+        : typeof defaultValue === 'number'
+          ? Number(rawValue)
+          : typeof defaultValue === 'boolean'
+            ? rawValue.toLowerCase() === 'true'
+            : rawValue;
+  }
+  return values;
+}
+
+function replaceDynamicLocation(values: Record<string, unknown>) {
+  const url = new URL(window.location.href);
+  for (const [rawKey, value] of Object.entries(values)) {
+    const key = rawKey === 'screenDisplacementEffects' ? 'screenDisplacement' : rawKey;
+    if (value === undefined || value === null || value === '') url.searchParams.delete(key);
+    else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      url.searchParams.set(key, String(value));
+    }
+  }
+  window.history.replaceState(window.history.state, '', url);
+}
 
 export function ViewerShell() {
   const router = useRouter();
@@ -63,7 +152,7 @@ export function ViewerShell() {
   const partyActive = search.party !== undefined;
   const hideUI = search.hideUI === true;
   const taLiveSource = search.liveSource === 'ta';
-  const performance = useMemo(() => renderPerformanceForSearch(search), [search]);
+  const [performance, setPerformance] = useState(() => renderPerformanceForSearch(search));
   const [settings, setSettings] = useState(() => {
     const saved = loadViewerSettings();
     const broadcastSettings =
@@ -186,33 +275,38 @@ export function ViewerShell() {
   useEffect(() => {
     if (!taLive) return;
 
-    function applyMasterVolumeFromLocation() {
-      const entry = [...new URLSearchParams(window.location.search)].find(
-        ([key]) => key.toLowerCase() === 'mastervolume',
-      );
-      if (entry === undefined) return;
-      const masterVolume = Number(entry[1]);
-      if (!Number.isFinite(masterVolume) || masterVolume < 0 || masterVolume > 1) return;
-      setSettings((current) => (current.masterVolume === masterVolume ? current : { ...current, masterVolume }));
+    let lastSearch = '';
+    function applySettingsFromLocation() {
+      if (window.location.search === lastSearch) return;
+      lastSearch = window.location.search;
+      const values = dynamicLocationValues();
+      setPerformance(replaceRenderPerformance(values));
+      setSettings((current) => sanitizeViewerSettings({ ...current, ...dynamicSettingsPatch(values) }));
+      const lights = [...new URLSearchParams(window.location.search)].find(
+        ([key]) => key.toLowerCase() === 'lights',
+      )?.[1];
+      if (lights === 'full' || lights === 'static' || lights === 'none') {
+        setEmbeddedLights(lights);
+        session.applyAuthoritativeLightshowMode(lights);
+      } else if (values.qualityPreset === 'broadcast') {
+        setEmbeddedLights('static');
+        session.applyAuthoritativeLightshowMode('static');
+      }
     }
 
-    applyMasterVolumeFromLocation();
+    applySettingsFromLocation();
     // A same-origin overlay can update the iframe URL with history.replaceState.
     // replaceState emits no browser event, so a small TA-only poll makes the
     // query parameter a live control without reloading the renderer or map.
-    const interval = window.setInterval(applyMasterVolumeFromLocation, 200);
-    window.addEventListener('popstate', applyMasterVolumeFromLocation);
+    const interval = window.setInterval(applySettingsFromLocation, 200);
+    window.addEventListener('popstate', applySettingsFromLocation);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener('popstate', applyMasterVolumeFromLocation);
+      window.removeEventListener('popstate', applySettingsFromLocation);
     };
-  }, [search.masterVolume, taLive]);
+  }, [taLive]);
   useEffect(() => {
     if (!taLive) return;
-
-    function isRecord(value: unknown): value is Record<string, unknown> {
-      return typeof value === 'object' && value !== null && !Array.isArray(value);
-    }
 
     function applyEmbeddedViewerSettings(event: MessageEvent) {
       const data: unknown = event.data;
@@ -220,10 +314,19 @@ export function ViewerShell() {
       const masterVolume = Number(data.masterVolume);
       const hitsoundVolume = Number(data.hitsoundVolume);
       const settingsPatch = isRecord(data.settings) ? data.settings : {};
+      const performancePatch = isRecord(data.performance) ? data.performance : settingsPatch;
+      replaceDynamicLocation({
+        ...settingsPatch,
+        ...performancePatch,
+        ...(Number.isFinite(masterVolume) ? { masterVolume } : {}),
+        ...(Number.isFinite(hitsoundVolume) ? { hitsoundVolume } : {}),
+        ...(typeof data.lights === 'string' ? { lights: data.lights } : {}),
+      });
+      setPerformance((current) => updateRenderPerformance(current, performancePatch));
       setSettings((current) => {
         return sanitizeViewerSettings({
           ...current,
-          ...settingsPatch,
+          ...dynamicSettingsPatch(settingsPatch),
           ...(Number.isFinite(masterVolume) ? { masterVolume } : {}),
           ...(Number.isFinite(hitsoundVolume) ? { hitsoundVolume } : {}),
         });

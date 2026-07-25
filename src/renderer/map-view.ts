@@ -294,6 +294,13 @@ export class MapView implements RenderView {
     this.mapObjects.setScreenDisplacementEffects(enabled);
   }
 
+  setRenderPerformance(performance: RenderPerformanceOptions) {
+    this.pipeline.setCaptureSize(performance.bloomFogSize);
+    this.postBloom.setPerformance(performance.postBloomWidth, performance.msaaSamples);
+    const mirrorChanged = this.mirror.setPerformance(performance.mirrorResolution, performance.mirrorMsaaSamples);
+    if (mirrorChanged) this.mirror.updateMaterials(this.scene);
+  }
+
   setPreviewNotesLookAtPlayer(enabled: boolean) {
     this.mapObjects.setPreviewNotesLookAtPlayer(enabled);
   }

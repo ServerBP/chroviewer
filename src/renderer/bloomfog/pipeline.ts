@@ -197,8 +197,10 @@ export class BloomfogPipeline {
   private cachedAutoExposureLimit = Number.NaN;
   private cacheValid = false;
   private disposed = false;
+  private captureSize: number;
 
   constructor(captureSize = BLOOMFOG_CAPTURE_SIZE) {
+    this.captureSize = captureSize;
     const layout = bloomfogPyramidLayout(captureSize);
     this.raw = renderTarget(captureSize, captureSize);
     this.downs = layout.levels.map(({ width, height }) => renderTarget(width, height));
@@ -295,6 +297,26 @@ export class BloomfogPipeline {
     this.fsMesh = new Mesh(fullscreenTriangle(), this.downsampleMaterial);
     this.fsMesh.frustumCulled = false;
     this.passScene.add(this.fsMesh);
+  }
+
+  setCaptureSize(captureSize: number) {
+    if (captureSize === this.captureSize) return;
+    this.captureSize = captureSize;
+    const layout = bloomfogPyramidLayout(captureSize);
+    this.raw.setSize(captureSize, captureSize);
+    this.prepass.setSize(captureSize, captureSize);
+    while (this.downs.length > layout.levels.length) this.downs.pop()?.dispose();
+    while (this.ups.length > layout.levels.length) this.ups.pop()?.dispose();
+    while (this.downs.length < layout.levels.length) this.downs.push(renderTarget(1, 1));
+    while (this.ups.length < layout.levels.length) this.ups.push(renderTarget(1, 1));
+    layout.levels.forEach((level, index) => {
+      this.downs[index]?.setSize(level.width, level.height);
+      this.ups[index]?.setSize(level.width, level.height);
+    });
+    this.upsampleUniforms._SampleScale.value = layout.sampleScale;
+    this.finalUpsampleUniforms._SampleScale.value = layout.sampleScale;
+    this.finalUpsampleUniforms._GlobalIntensityTex.value = this.downs.at(-1)?.texture ?? this.raw.texture;
+    this.invalidate();
   }
 
   private ensureCapacity(count: number) {
