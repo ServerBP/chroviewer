@@ -17,6 +17,7 @@ import {
 } from '../../core/viewer-settings';
 import { resolveEnvironmentId } from '../../renderer/environment/environment-catalog';
 import { EnvironmentLoadAborted, type EnvironmentLoadFailure } from '../../renderer/environment/environment-error';
+import type { RenderPerformanceOptions } from '../../renderer/render-performance';
 import type { useSongTransport } from './use-song-transport';
 import { useViewerRenderer } from './use-viewer-renderer';
 import type { useViewerSources } from './use-viewer-sources';
@@ -41,6 +42,7 @@ interface ViewerSessionOptions {
     'audioDataRef' | 'pendingSharedViewRef' | 'replayRef' | 'rows' | 'scoreSaberLeaderboards' | 'songBpm'
   >;
   transport: Pick<SongTransport, 'clockRef' | 'load' | 'play' | 'seek' | 'setHitsoundEvents'>;
+  performance: RenderPerformanceOptions;
 }
 
 export function useViewerSession({
@@ -56,6 +58,7 @@ export function useViewerSession({
   settingsRef,
   sources,
   transport,
+  performance,
 }: ViewerSessionOptions) {
   const t = useTranslations('viewer');
   const activeSelectionRef = useRef<ActiveSelection | null>(null);
@@ -69,6 +72,7 @@ export function useViewerSession({
     replayRef: sources.replayRef,
     settings,
     settingsRef,
+    performance,
     setError,
   });
 
@@ -281,8 +285,12 @@ export function useViewerSession({
     if (clock === null) {
       const replayEnd = sources.replayRef.current?.poses.at(-1)?.time ?? 0;
       const fallbackDuration = Math.max(songBpmTimeToSeconds(data.endBeat, sources.songBpm) + 1, replayEnd);
+      const audioEnabled = settings.masterVolume > 0;
+      const audioData = audioEnabled ? sources.audioDataRef.current : null;
+      if (!audioEnabled) sources.audioDataRef.current = null;
       clock = await transport.load({
-        audioData: sources.audioDataRef.current,
+        audioEnabled,
+        audioData,
         fallbackDuration,
         hitsoundEvents,
         onAudioDecodeError() {
@@ -300,7 +308,7 @@ export function useViewerSession({
     }
 
     viewer.view.setSongDuration(clock.duration);
-    viewer.view.setBeatSource(() => clock.currentBeat());
+    viewer.view.setBeatSource(() => transport.clockRef.current?.currentBeat() ?? 0);
     setSelectedKey(row.key);
     return true;
   }

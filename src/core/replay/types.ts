@@ -182,7 +182,16 @@ export interface Replay {
   pauses: ReplayPauseEvent[];
   walls: ReplayWallEvent[];
   hsvConfig?: Uint8Array;
+  hsvProfile?: string;
   legacyScoreSaber?: LegacyScoreSaberData;
+  liveHistoryBase?: {
+    scoringNotes: number;
+    misses: number;
+    badCuts: number;
+    bombCuts: number;
+    wallsHit: number;
+    maxCombo: number;
+  };
 }
 
 export function replayMapHash(replay: Replay) {

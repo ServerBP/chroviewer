@@ -27,6 +27,7 @@ import {
   type Texture,
   type WebGLRenderer,
   WebGLRenderTarget,
+  type IUniform,
 } from 'three';
 
 import type { EnvironmentBackgroundGradient } from '../environment/environment-runtime';
@@ -59,6 +60,15 @@ export interface FogUniforms {
   _CustomFogHeightFogStartY: { value: number };
   _CustomFogHeightFogHeight: { value: number };
 }
+
+type BloomfogSampleUniforms = ShaderMaterial['uniforms'] & {
+  _SourceTex: IUniform<Texture>;
+  _BloomTex: IUniform<Texture>;
+  _SourceTexelSize: IUniform<Vector2>;
+  _SampleScale: IUniform<number>;
+  _CombineSrc: IUniform<number>;
+  _CombineDst: IUniform<number>;
+};
 
 const MASK_X = [
   0, 0, 11, 27, 44, 65, 87, 109, 134, 156, 180, 201, 219, 236, 250, 255, 255, 255, 250, 236, 220, 201, 180, 157, 134,
@@ -113,15 +123,13 @@ function passMaterial(fragmentShader: string, uniforms: ShaderMaterial['uniforms
   });
 }
 
-const layout = bloomfogPyramidLayout();
-
 export class BloomfogPipeline {
   readonly fogUniforms: FogUniforms;
 
-  private readonly raw = renderTarget(BLOOMFOG_CAPTURE_SIZE, BLOOMFOG_CAPTURE_SIZE);
-  private readonly downs = layout.levels.map(({ width, height }) => renderTarget(width, height));
-  private readonly ups = layout.levels.map(({ width, height }) => renderTarget(width, height));
-  private readonly prepass = renderTarget(BLOOMFOG_CAPTURE_SIZE, BLOOMFOG_CAPTURE_SIZE);
+  private readonly raw: WebGLRenderTarget;
+  private readonly downs: WebGLRenderTarget[];
+  private readonly ups: WebGLRenderTarget[];
+  private readonly prepass: WebGLRenderTarget;
 
   private readonly captureScene = new Scene();
   private readonly passScene = new Scene();
@@ -170,27 +178,14 @@ export class BloomfogPipeline {
   };
   private readonly cachedGradientCamera = new Float64Array(32);
   private readonly nextGradientCamera = new Float64Array(32);
-  private readonly downsampleUniforms = {
-    _SourceTex: { value: this.raw.texture },
-    _SourceTexelSize: { value: new Vector2() },
+  private readonly downsampleUniforms: {
+    _SourceTex: IUniform<Texture>;
+    _SourceTexelSize: IUniform<Vector2>;
   };
-  private readonly upsampleUniforms = {
-    _SourceTex: { value: this.raw.texture },
-    _BloomTex: { value: this.raw.texture },
-    _SourceTexelSize: { value: new Vector2() },
-    _SampleScale: { value: layout.sampleScale },
-    _CombineSrc: { value: 1 },
-    _CombineDst: { value: 1 },
-  };
-  private readonly finalUpsampleUniforms = {
-    _SourceTex: { value: this.raw.texture },
-    _BloomTex: { value: this.raw.texture },
-    _SourceTexelSize: { value: new Vector2() },
-    _SampleScale: { value: layout.sampleScale },
-    _CombineSrc: { value: 1 },
-    _CombineDst: { value: 1 },
-    _GlobalIntensityTex: { value: this.downs.at(-1)?.texture ?? this.raw.texture },
-    _AutoExposureLimit: { value: GAME_FOG_PARAMS.autoExposureLimit },
+  private readonly upsampleUniforms: BloomfogSampleUniforms;
+  private readonly finalUpsampleUniforms: BloomfogSampleUniforms & {
+    _GlobalIntensityTex: IUniform<Texture>;
+    _AutoExposureLimit: IUniform<number>;
   };
 
   private readonly clearColorTmp = new Color();
@@ -203,7 +198,34 @@ export class BloomfogPipeline {
   private cacheValid = false;
   private disposed = false;
 
-  constructor() {
+  constructor(captureSize = BLOOMFOG_CAPTURE_SIZE) {
+    const layout = bloomfogPyramidLayout(captureSize);
+    this.raw = renderTarget(captureSize, captureSize);
+    this.downs = layout.levels.map(({ width, height }) => renderTarget(width, height));
+    this.ups = layout.levels.map(({ width, height }) => renderTarget(width, height));
+    this.prepass = renderTarget(captureSize, captureSize);
+    this.downsampleUniforms = {
+      _SourceTex: { value: this.raw.texture },
+      _SourceTexelSize: { value: new Vector2() },
+    };
+    this.upsampleUniforms = {
+      _SourceTex: { value: this.raw.texture },
+      _BloomTex: { value: this.raw.texture },
+      _SourceTexelSize: { value: new Vector2() },
+      _SampleScale: { value: layout.sampleScale },
+      _CombineSrc: { value: 1 },
+      _CombineDst: { value: 1 },
+    };
+    this.finalUpsampleUniforms = {
+      _SourceTex: { value: this.raw.texture },
+      _BloomTex: { value: this.raw.texture },
+      _SourceTexelSize: { value: new Vector2() },
+      _SampleScale: { value: layout.sampleScale },
+      _CombineSrc: { value: 1 },
+      _CombineDst: { value: 1 },
+      _GlobalIntensityTex: { value: this.downs.at(-1)?.texture ?? this.raw.texture },
+      _AutoExposureLimit: { value: GAME_FOG_PARAMS.autoExposureLimit },
+    };
     new TextureLoader().load(`${import.meta.env.BASE_URL}environments/textures/bloomfog-alpha-mask.png`, (texture) => {
       if (this.disposed) {
         texture.dispose();

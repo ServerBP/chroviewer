@@ -28,6 +28,7 @@ import {
   POST_BLOOM_BASE_COLOR_BOOST_THRESHOLD,
   POST_BLOOM_INTENSITY,
   POST_BLOOM_SCENE_SAMPLES,
+  POST_BLOOM_TEXTURE_WIDTH,
   postBloomLayout,
   postBloomUpsampleWeights,
 } from './math';
@@ -134,8 +135,11 @@ export class PostBloomPipeline {
   private readonly upsampleMaterial = passMaterial(POST_BLOOM_UPSAMPLE_TENT_FRAG, this.upsampleUniforms);
   private readonly compositeMaterial = passMaterial(POST_BLOOM_COMPOSITE_FRAG, this.compositeUniforms);
 
-  constructor() {
-    this.sceneTarget.samples = POST_BLOOM_SCENE_SAMPLES;
+  constructor(
+    private readonly textureWidth = POST_BLOOM_TEXTURE_WIDTH,
+    msaaSamples = POST_BLOOM_SCENE_SAMPLES,
+  ) {
+    this.sceneTarget.samples = msaaSamples;
     this.passMesh = new Mesh(fullscreenTriangle(), this.prefilterMaterial);
     this.passMesh.frustumCulled = false;
     this.passScene.add(this.passMesh);
@@ -144,7 +148,7 @@ export class PostBloomPipeline {
 
   setSize(width: number, height: number) {
     this.screenDisplacementTarget.setSize(width, height);
-    this.layout = postBloomLayout(width, height);
+    this.layout = postBloomLayout(width, height, this.textureWidth);
     this.upsampleUniforms._SampleScale.value = this.layout.sampleScale;
     this.layout.levels.forEach((level, index) => {
       this.downs[index]?.setSize(level.width, level.height);

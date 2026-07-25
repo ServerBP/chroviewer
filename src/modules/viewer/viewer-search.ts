@@ -2,6 +2,12 @@ import * as z from 'zod/mini';
 
 import type { SharedViewerSettings } from '../../core/share-link';
 import { viewerSettingsPatchSchema } from '../../core/viewer-settings';
+import {
+  BROADCAST_RENDER_PERFORMANCE,
+  DEFAULT_RENDER_PERFORMANCE,
+  mirrorResolutionForQuality,
+  type RenderPerformanceOptions,
+} from '../../renderer/render-performance';
 
 export type ViewerShareSource =
   | { type: 'map'; mapKey: string; difficultyIndex?: number }
@@ -37,6 +43,13 @@ const mapSourceSchema = z.union([mapKeySchema, remoteSourceUrlSchema]);
 const nonnegativeNumberSchema = z.number().check(z.nonnegative());
 const unitNumberSchema = z.number().check(z.minimum(0), z.maximum(1));
 const renderScaleSchema = z.number().check(z.minimum(0.5), z.maximum(1.5));
+const maxFpsSchema = z.int().check(z.minimum(1), z.maximum(240));
+const msaaSamplesSchema = z.int().check(z.minimum(0), z.maximum(8));
+const mirrorResolutionSchema = z.int().check(z.minimum(0), z.maximum(4096));
+const postBloomWidthSchema = z.int().check(z.minimum(64), z.maximum(2048));
+const bloomFogSizeSchema = z.int().check(z.minimum(64), z.maximum(1024));
+const outputWidthSchema = z.int().check(z.minimum(64), z.maximum(7680));
+const outputHeightSchema = z.int().check(z.minimum(64), z.maximum(4320));
 const fovSchema = z.number().check(z.minimum(60), z.maximum(120));
 const audioOffsetSchema = z.int().check(z.minimum(-1000), z.maximum(1000));
 const difficultyIndexSchema = z.int().check(z.nonnegative());
@@ -59,8 +72,19 @@ export const viewerSearchSchema = z.pipe(
     songVolume: z.catch(z.optional(unitNumberSchema), undefined),
     hitsoundVolume: z.catch(z.optional(unitNumberSchema), undefined),
     hitsounds: z.catch(z.optional(z.boolean()), undefined),
+    qualityPreset: z.catch(z.optional(z.literal('broadcast')), undefined),
+    maxFps: z.catch(z.optional(maxFpsSchema), undefined),
     renderScale: z.catch(z.optional(renderScaleSchema), undefined),
     graphicsQuality: z.catch(z.optional(z.enum(['none', 'low', 'medium', 'high'])), undefined),
+    mirrorQuality: z.catch(z.optional(z.enum(['none', 'low', 'medium', 'high'])), undefined),
+    mirrorResolution: z.catch(z.optional(mirrorResolutionSchema), undefined),
+    mirrorMsaaSamples: z.catch(z.optional(msaaSamplesSchema), undefined),
+    msaaSamples: z.catch(z.optional(msaaSamplesSchema), undefined),
+    postBloomWidth: z.catch(z.optional(postBloomWidthSchema), undefined),
+    bloomFogSize: z.catch(z.optional(bloomFogSizeSchema), undefined),
+    screenDisplacement: z.catch(z.optional(z.boolean()), undefined),
+    outputWidth: z.catch(z.optional(outputWidthSchema), undefined),
+    outputHeight: z.catch(z.optional(outputHeightSchema), undefined),
     camera: z.catch(z.optional(z.enum(['static', 'follow', 'first-person'])), undefined),
     fov: z.catch(z.optional(fovSchema), undefined),
     audioOffsetMs: z.catch(z.optional(audioOffsetSchema), undefined),
@@ -108,6 +132,26 @@ export const viewerSearchSchema = z.pipe(
 );
 
 export type ViewerSearch = z.infer<typeof viewerSearchSchema>;
+
+export function renderPerformanceForSearch(search: ViewerSearch): RenderPerformanceOptions {
+  const preset = search.qualityPreset === 'broadcast' ? BROADCAST_RENDER_PERFORMANCE : DEFAULT_RENDER_PERFORMANCE;
+  const mirrorQuality = search.mirrorQuality ?? search.graphicsQuality;
+  const outputSize =
+    search.outputWidth === undefined || search.outputHeight === undefined
+      ? {}
+      : { outputWidth: search.outputWidth, outputHeight: search.outputHeight };
+  return {
+    ...preset,
+    ...(mirrorQuality === undefined ? {} : { mirrorResolution: mirrorResolutionForQuality(mirrorQuality) }),
+    ...(search.maxFps === undefined ? {} : { maxFps: search.maxFps }),
+    ...(search.msaaSamples === undefined ? {} : { msaaSamples: search.msaaSamples }),
+    ...(search.mirrorResolution === undefined ? {} : { mirrorResolution: search.mirrorResolution }),
+    ...(search.mirrorMsaaSamples === undefined ? {} : { mirrorMsaaSamples: search.mirrorMsaaSamples }),
+    ...(search.postBloomWidth === undefined ? {} : { postBloomWidth: search.postBloomWidth }),
+    ...(search.bloomFogSize === undefined ? {} : { bloomFogSize: search.bloomFogSize }),
+    ...outputSize,
+  };
+}
 
 export function isRemoteSourceUrl(value: string) {
   return remoteSourceUrlSchema.safeParse(value).success;

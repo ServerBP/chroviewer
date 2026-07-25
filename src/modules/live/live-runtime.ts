@@ -11,7 +11,14 @@ export const reconnectDelays = [500, 1000, 2000, 4000, 8000, 10_000];
 export const maxBufferedPackets = 240;
 
 const retainedHistorySeconds = 30;
-const taRetainedHistorySeconds = 90;
+const taRetainedHistorySeconds = 15;
+const maxRetainedPoseFrames = 1800;
+
+function retainLatestBefore<T>(events: T[], cutoff: number, time: (event: T) => number) {
+  let remove = 0;
+  while (remove + 1 < events.length && time(events[remove + 1] as T) < cutoff) remove++;
+  if (remove > 0) events.splice(0, remove);
+}
 
 export interface LiveRuntime {
   bufferedPackets: ReplayStreamPacket[];
@@ -116,6 +123,7 @@ export function resetLiveStream(runtime: LiveRuntime) {
   runtime.lastReplaySequence = 0n;
   runtime.latestFrameTime = 0;
   runtime.latestSongTime = 0;
+  runtime.lastPruneAt = 0;
   runtime.mapLoaded = false;
   runtime.pendingPauseEvents = [];
   runtime.playbackAttemptPending = false;
@@ -164,14 +172,51 @@ export function increasePlaybackDelay(runtime: LiveRuntime) {
 
 export function pruneLiveReplay(runtime: LiveRuntime, time: number) {
   const replay = runtime.replay;
-  if (replay === null || time - runtime.lastPruneAt < 2) return;
-  // TA startup buffering must retain the first frame so playback begins where
-  // this viewer actually joined, rather than at the newest buffered frame.
-  if (runtime.taLive && !runtime.playbackStarted) return;
+  if (replay === null || (time - runtime.lastPruneAt < 2 && replay.poses.length <= maxRetainedPoseFrames)) return;
   runtime.lastPruneAt = time;
   const cutoff = time - (runtime.taLive ? taRetainedHistorySeconds : retainedHistorySeconds);
+  if (cutoff > 0) {
+    let poseIndex = 0;
+    while (poseIndex + 1 < replay.poses.length && (replay.poses[poseIndex + 1]?.time ?? 0) < cutoff) poseIndex++;
+    if (poseIndex > 0) replay.poses.splice(0, poseIndex);
+  }
+  if (replay.poses.length > maxRetainedPoseFrames) {
+    replay.poses.splice(0, replay.poses.length - maxRetainedPoseFrames);
+  }
   if (cutoff <= 0) return;
-  let poseIndex = 0;
-  while (poseIndex + 1 < replay.poses.length && (replay.poses[poseIndex + 1]?.time ?? 0) < cutoff) poseIndex++;
-  if (poseIndex > 0) replay.poses.splice(0, poseIndex);
+  const base = (replay.liveHistoryBase ??= {
+    scoringNotes: 0,
+    misses: 0,
+    badCuts: 0,
+    bombCuts: 0,
+    wallsHit: 0,
+    maxCombo: 0,
+  });
+  let noteCount = 0;
+  while (noteCount < replay.notes.length && (replay.notes[noteCount]?.time ?? 0) < cutoff) {
+    const eventType = replay.notes[noteCount]?.eventType;
+    if (eventType !== undefined && eventType >= 1 && eventType <= 3) base.scoringNotes++;
+    if (eventType === 2) base.badCuts++;
+    if (eventType === 3) base.misses++;
+    if (eventType === 4) base.bombCuts++;
+    noteCount++;
+  }
+  if (noteCount > 0) replay.notes.splice(0, noteCount);
+  let wallCount = 0;
+  while (wallCount < replay.walls.length && (replay.walls[wallCount]?.time ?? 0) < cutoff) wallCount++;
+  if (wallCount > 0) {
+    base.wallsHit += wallCount;
+    replay.walls.splice(0, wallCount);
+  }
+  for (const combo of replay.combos) {
+    if (combo.time >= cutoff) break;
+    base.maxCombo = Math.max(base.maxCombo, combo.combo);
+  }
+  retainLatestBefore(replay.scores, cutoff, (event) => event.time);
+  retainLatestBefore(replay.combos, cutoff, (event) => event.time);
+  retainLatestBefore(replay.multipliers, cutoff, (event) => event.time);
+  retainLatestBefore(replay.energies, cutoff, (event) => event.time);
+  retainLatestBefore(replay.heights, cutoff, (event) => event.time);
+  const retainedPause = replay.pauses.findIndex((event) => event.time >= cutoff || event.duration === 0n);
+  replay.pauses.splice(0, retainedPause < 0 ? replay.pauses.length : retainedPause);
 }

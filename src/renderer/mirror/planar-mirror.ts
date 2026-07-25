@@ -69,18 +69,23 @@ export class PlanarMirror {
   private readonly excludedObjects = new Set<Mesh>();
   private readonly reflectionLayers: number;
 
-  constructor(quality: QualitySettings, width: number, length: number) {
-    const size = mirrorTextureSize(quality.mirrorQuality);
-    this.target =
-      quality.mirrorQuality === 'none'
-        ? null
-        : new WebGLRenderTarget(size, size, {
-            format: RGBAFormat,
-            depthBuffer: true,
-            stencilBuffer: true,
-            samples: quality.mirrorQuality === 'high' ? 2 : 0,
-            ...MULTISAMPLE_DEPTH_STENCIL_RESOLVE_OPTIONS,
-          });
+  constructor(
+    quality: QualitySettings,
+    width: number,
+    length: number,
+    options: { resolution?: number; msaaSamples?: number } = {},
+  ) {
+    const size = options.resolution ?? mirrorTextureSize(quality.mirrorQuality);
+    const disabled = options.resolution === undefined ? quality.mirrorQuality === 'none' : size === 0;
+    this.target = disabled
+      ? null
+      : new WebGLRenderTarget(size, size, {
+          format: RGBAFormat,
+          depthBuffer: true,
+          stencilBuffer: true,
+          samples: options.msaaSamples ?? (quality.mirrorQuality === 'high' ? 2 : 0),
+          ...MULTISAMPLE_DEPTH_STENCIL_RESOLVE_OPTIONS,
+        });
     this.reflectionTexture = { value: this.target?.texture ?? this.black };
     this.reflectionLayers = quality.mirrorQuality === 'low' ? MEDIUM_REFLECTION_LAYERS : HIGH_REFLECTION_LAYERS;
     this.mesh = new Mesh(new PlaneGeometry(width, length));

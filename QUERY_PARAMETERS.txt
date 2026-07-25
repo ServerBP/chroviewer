@@ -33,8 +33,26 @@ fallback. No parent-page coordinator is required.
 LIGHTING AND PERFORMANCE
 lights=full|static|none       Full mapped lights, fixed static lights, or no mapped lights.
 lightshow=full-lightshow      Show only the full lightshow and hide gameplay objects.
+qualityPreset=broadcast       Apply the optimized broadcast defaults listed below.
+maxFps=1..240                 Maximum render frame rate. Broadcast default: 60.
 graphicsQuality=none|low|medium|high
+mirrorQuality=none|low|medium|high
+                              Mirror-only alias for graphicsQuality.
+mirrorResolution=0..4096      Mirror target size in pixels; 0 disables mirrors.
+mirrorMsaaSamples=0..8        Mirror render-target MSAA samples.
+msaaSamples=0..8              Main scene render-target MSAA samples.
+postBloomWidth=64..2048       Base width of the post-bloom pyramid.
+bloomFogSize=64..1024         Width and height of the bloom-fog capture target.
+screenDisplacement=true|false Enable wall screen-displacement rendering.
 renderScale=0.5..1.5          Internal rendering resolution multiplier.
+outputWidth=64..7680          Fixed base output width; requires outputHeight.
+outputHeight=64..4320         Fixed base output height; requires outputWidth.
+
+The broadcast preset uses maxFps=60, renderScale=0.85, msaaSamples=2,
+mirrorResolution=0, mirrorMsaaSamples=0, postBloomWidth=640,
+bloomFogSize=256, screenDisplacement=false, replayTrailSamples=12, and static
+lights. Any explicitly supplied setting above overrides the preset. Fixed output
+dimensions are multiplied by renderScale and the capped device pixel ratio.
 
 SABERS AND TRAILS
 preferReplayColors=true|false

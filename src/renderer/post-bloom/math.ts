@@ -9,15 +9,15 @@ export const POST_BLOOM_INTENSITY = 0.299;
 export const POST_BLOOM_BASE_COLOR_BOOST = 0.997;
 export const POST_BLOOM_BASE_COLOR_BOOST_THRESHOLD = 0;
 
-export function postBloomSize(viewWidth: number, viewHeight: number) {
+export function postBloomSize(viewWidth: number, viewHeight: number, textureWidth = POST_BLOOM_TEXTURE_WIDTH) {
   return {
-    width: POST_BLOOM_TEXTURE_WIDTH,
-    height: Math.max(1, Math.floor((POST_BLOOM_TEXTURE_WIDTH * Math.max(viewHeight, 1)) / Math.max(viewWidth, 1))),
+    width: textureWidth,
+    height: Math.max(1, Math.floor((textureWidth * Math.max(viewHeight, 1)) / Math.max(viewWidth, 1))),
   };
 }
 
-export function postBloomLayout(viewWidth: number, viewHeight: number) {
-  let { width, height } = postBloomSize(viewWidth, viewHeight);
+export function postBloomLayout(viewWidth: number, viewHeight: number, textureWidth = POST_BLOOM_TEXTURE_WIDTH) {
+  let { width, height } = postBloomSize(viewWidth, viewHeight, textureWidth);
   const passFloat = Math.log2(Math.max(width, height)) + Math.min(POST_BLOOM_RADIUS, 10) - 10;
   const unclampedPasses = Math.floor(passFloat);
   const passCount = Math.min(Math.max(unclampedPasses, 1), 16);

@@ -10,6 +10,7 @@ import { colorOverride, type ViewerSettings } from '../../core/viewer-settings';
 import { resolveEnvironmentId } from '../../renderer/environment/environment-catalog';
 import { EnvironmentLoadAborted } from '../../renderer/environment/environment-error';
 import type { MapView } from '../../renderer/map-view';
+import type { RenderPerformanceOptions } from '../../renderer/render-performance';
 import type { RendererLifecycle } from '../../renderer/renderer-lifecycle';
 import type { ActiveSelection } from './viewer-types';
 
@@ -25,6 +26,7 @@ interface ViewerRendererOptions {
   replayRef: RefObject<Replay | null>;
   settings: ViewerSettings;
   settingsRef: RefObject<ViewerSettings>;
+  performance: RenderPerformanceOptions;
   setError: (message: string) => void;
 }
 
@@ -39,6 +41,7 @@ export function useViewerRenderer({
   replayRef,
   settings,
   settingsRef,
+  performance,
   setError,
 }: ViewerRendererOptions) {
   const t = useTranslations('viewer');
@@ -60,7 +63,7 @@ export function useViewerRenderer({
       const canvas = canvasRef.current;
       if (effect.signal.aborted || canvas === null) return;
       const active = activeSelectionRef.current;
-      const lifecycle = new RendererLifecycle();
+      const lifecycle = new RendererLifecycle(performance);
       lifecycle.attach(canvas);
       lifecycle.setRenderScale(settings.renderScale);
       const finishInitialEnvironmentLoad = () => {
@@ -68,7 +71,7 @@ export function useViewerRenderer({
         initialEnvironmentLoadedRef.current = true;
         setEnvironmentLoading(false);
       };
-      const view = new MapView({ mirrorQuality: settings.graphicsQuality }, finishInitialEnvironmentLoad);
+      const view = new MapView({ mirrorQuality: settings.graphicsQuality }, finishInitialEnvironmentLoad, performance);
       lifecycle.setView(view);
       view.setLightshowMode(active === null ? 'static' : lightshowModeRef.current);
       view.setReplayCameraSettings(settings);
@@ -126,7 +129,17 @@ export function useViewerRenderer({
       cleanup?.();
       cleanup = null;
     };
-  }, [settings.graphicsQuality]);
+  }, [
+    settings.graphicsQuality,
+    performance.maxFps,
+    performance.msaaSamples,
+    performance.mirrorResolution,
+    performance.mirrorMsaaSamples,
+    performance.postBloomWidth,
+    performance.bloomFogSize,
+    performance.outputWidth,
+    performance.outputHeight,
+  ]);
 
   return { canvasRef, environmentLoading, viewerReady, viewerRef };
 }

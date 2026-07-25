@@ -19,6 +19,7 @@ import type { LightshowMode } from '../../core/lighting/basic-light';
 import { loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
+import { replayLightshowMode } from '../live/live-replay';
 import type { LiveTarget } from '../live/live-types';
 import { LiveViewerPanel } from '../live/live-viewer-panel';
 import { useLiveExperience } from '../live/use-live-experience';
@@ -44,6 +45,7 @@ import { useViewerControls } from './use-viewer-controls';
 import { useViewerSession } from './use-viewer-session';
 import { useViewerShare } from './use-viewer-share';
 import { useViewerSources } from './use-viewer-sources';
+import { renderPerformanceForSearch } from './viewer-search';
 import { quantizedBeatAt } from './viewer-timeline';
 import type { ViewerPanel } from './viewer-types';
 
@@ -60,10 +62,22 @@ export function ViewerShell() {
   const partyT = useTranslations('watchParty');
   const partyActive = search.party !== undefined;
   const hideUI = search.hideUI === true;
+  const taLiveSource = search.liveSource === 'ta';
+  const performance = useMemo(() => renderPerformanceForSearch(search), [search]);
   const [settings, setSettings] = useState(() => {
     const saved = loadViewerSettings();
+    const broadcastSettings =
+      search.qualityPreset === 'broadcast'
+        ? {
+            graphicsQuality: 'none' as const,
+            renderScale: 0.85,
+            replayTrailSamples: 12,
+            screenDisplacementEffects: false,
+          }
+        : {};
     return sanitizeViewerSettings({
       ...saved,
+      ...broadcastSettings,
       ...search.settings,
       ...(search.lightshow === 'full-lightshow' ? { staticLights: false } : {}),
       ...(search.masterVolume === undefined ? {} : { masterVolume: search.masterVolume }),
@@ -72,10 +86,14 @@ export function ViewerShell() {
       ...(search.hitsounds === undefined ? {} : { hitsounds: search.hitsounds }),
       ...(search.renderScale === undefined ? {} : { renderScale: search.renderScale }),
       ...(search.graphicsQuality === undefined ? {} : { graphicsQuality: search.graphicsQuality }),
+      ...(search.mirrorQuality === undefined ? {} : { graphicsQuality: search.mirrorQuality }),
+      ...(search.screenDisplacement === undefined ? {} : { screenDisplacementEffects: search.screenDisplacement }),
       ...(search.camera === undefined ? {} : { replayCamera: search.camera }),
       ...(search.fov === undefined ? {} : { replayCameraFov: search.fov }),
       ...(search.audioOffsetMs === undefined ? {} : { audioOffsetMs: search.audioOffsetMs }),
-      ...(search.liveSource === 'ta' ? { preferReplayColors: true } : {}),
+      ...(search.liveSource === 'ta'
+        ? { preferReplayColors: true, preferReplayEnvironment: true, preferReplayHsvProfile: true }
+        : {}),
     });
   });
   const settingsRef = useRef(settings);
@@ -96,9 +114,10 @@ export function ViewerShell() {
   effectiveSettingsRef.current = effectiveSettings;
   const [error, setError] = useState('');
   const [embeddedLights, setEmbeddedLights] = useState<LightshowMode | null>(null);
-  const authoritativeLights = embeddedLights ?? search.lights ?? null;
+  const presetLights = search.qualityPreset === 'broadcast' ? 'static' : null;
+  const authoritativeLights = embeddedLights ?? search.lights ?? presetLights;
   const [lightshowMode, setLightshowMode] = useState<LightshowMode>(
-    search.lightshow ?? search.lights ?? (settings.staticLights ? 'static' : 'full'),
+    search.lightshow ?? search.lights ?? presetLights ?? (settings.staticLights ? 'static' : 'full'),
   );
   const lightshowModeRef = useRef(lightshowMode);
   const transport = useSongTransport({
@@ -120,6 +139,10 @@ export function ViewerShell() {
   const liveChatInputRef = useRef<HTMLTextAreaElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const sources = useViewerSources({
+    // TA owns the map/replay lifecycle. Keeping generic remote sources disabled
+    // also prevents hidden leaderboard/profile/replay requests from conflicting
+    // query parameters while an embedded TA viewer is running.
+    remoteSourcesEnabled: !taLiveSource,
     setError,
     setSettings,
     onClearViewer() {
@@ -143,6 +166,7 @@ export function ViewerShell() {
     settingsRef: effectiveSettingsRef,
     sources,
     transport,
+    performance,
   });
   const liveTarget: LiveTarget | null =
     search.playerId === undefined
@@ -220,7 +244,12 @@ export function ViewerShell() {
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,
     appendReplayNoteEvents: session.appendLiveReplayNoteEvents,
     hasLiveMap: (hash) => sources.hasLiveMap(hash),
-    loadLiveReplay: (hash, replay) => sources.loadLiveReplay(hash, replay),
+    loadLiveReplay: (hash, replay) => {
+      if (taLiveSource && embeddedLights === null && search.lights === undefined) {
+        session.applyAuthoritativeLightshowMode(replayLightshowMode(replay));
+      }
+      return sources.loadLiveReplay(hash, replay);
+    },
     selectedKey: session.selectedKey,
     target: liveTarget,
     transport,

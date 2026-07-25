@@ -6,11 +6,22 @@ import { nitro } from 'nitro/vite';
 import { defineConfig } from 'vite';
 
 const securityHeaders = {
+  'access-control-allow-headers': '*',
+  'access-control-allow-methods': '*',
+  'access-control-allow-origin': '*',
+  'access-control-expose-headers': '*',
+  'access-control-max-age': '86400',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'x-content-type-options': 'nosniff',
 };
 
 export default defineConfig({
+  server: {
+    cors: true,
+  },
+  preview: {
+    cors: true,
+  },
   plugins: [
     tanstackStart({ rsc: { enabled: true } }),
     nitro({

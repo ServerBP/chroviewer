@@ -1,5 +1,6 @@
 import { Result } from 'better-result';
 
+import { parseHitScoreVisualizerProfile } from '../../core/replay/hit-score-visualizer-profile';
 import { applyScoreSaberReplayExtension } from '../../core/replay/parse-scoresaber';
 import type {
   Replay,
@@ -203,8 +204,25 @@ export function appendLivePause(replay: Replay, event: ReplayPauseEvent) {
 export function applyLiveReplayExtensions(replay: Replay, extensions: ReplayExtension[], append: boolean) {
   for (const extension of extensions) {
     const result = Result.try(() => {
+      if (extension.id === 'ta.hsv-profile' && extension.version === 1) {
+        const profile = new TextDecoder('utf-8', { fatal: true }).decode(extension.payload);
+        if (parseHitScoreVisualizerProfile(profile).isErr()) throw new Error('invalid TA HSV profile');
+        replay.hsvProfile = profile;
+        return;
+      }
       applyScoreSaberReplayExtension(replay, extension.id, extension.version, extension.payload, append);
     });
     if (result.isErr()) console.warn(`ignoring live replay extension ${extension.id}`, result.error);
+  }
+}
+
+export function replayLightshowMode(replay: Replay) {
+  switch (replay.metadata.environmentEffectsFilterPreset) {
+    case 1:
+      return 'static' as const;
+    case 10:
+      return 'none' as const;
+    default:
+      return 'full' as const;
   }
 }

@@ -1,6 +1,7 @@
 import { Color, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
 
 import { nextRenderDeadline } from './render-frame-pacing';
+import { DEFAULT_RENDER_PERFORMANCE, type RenderPerformanceOptions } from './render-performance';
 import { effectivePixelRatio } from './render-scale';
 
 export interface RenderView {
@@ -22,6 +23,8 @@ export class RendererLifecycle {
   private height = -1;
   private contextLost = false;
   private renderScale = 1;
+
+  constructor(private readonly performance: RenderPerformanceOptions = DEFAULT_RENDER_PERFORMANCE) {}
 
   onContextLost?: () => void;
   onContextRestored?: () => void;
@@ -100,8 +103,8 @@ export class RendererLifecycle {
   private resize() {
     if (!this.renderer || !this.canvas) return;
     const parent = this.canvas.parentElement;
-    const width = parent?.clientWidth ?? innerWidth;
-    const height = parent?.clientHeight ?? innerHeight;
+    const width = this.performance.outputWidth ?? parent?.clientWidth ?? innerWidth;
+    const height = this.performance.outputHeight ?? parent?.clientHeight ?? innerHeight;
     if (width === this.width && height === this.height) return;
     this.width = width;
     this.height = height;
@@ -116,7 +119,7 @@ export class RendererLifecycle {
     if (this.contextLost || document.hidden) return;
     this.scheduleFrame();
     if (!this.renderer) return;
-    const nextFrameAt = nextRenderDeadline(timestamp, this.nextFrameAt);
+    const nextFrameAt = nextRenderDeadline(timestamp, this.nextFrameAt, this.performance.maxFps);
     if (nextFrameAt === null) return;
     this.nextFrameAt = nextFrameAt;
     if (this.view) this.view.render(this.renderer);

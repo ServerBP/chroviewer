@@ -33,6 +33,10 @@ interface HitScoreVisualizerSettings {
 export function hitScoreVisualizerForSettings(settings: HitScoreVisualizerSettings, replay: Replay | null) {
   const replayConfig = decodeHitScoreVisualizer(replay?.hsvConfig);
   if (settings.preferReplayHsvProfile && replayConfig !== null) return replayConfig;
+  if (settings.preferReplayHsvProfile && replay?.hsvProfile !== undefined) {
+    const profile = parseHitScoreVisualizerProfile(replay.hsvProfile);
+    if (profile.isOk()) return profile.value;
+  }
   if (settings.overrideHsvProfile) {
     const profile = parseHitScoreVisualizerProfile(settings.hsvProfile);
     if (profile.isOk()) return profile.value;
@@ -42,7 +46,10 @@ export function hitScoreVisualizerForSettings(settings: HitScoreVisualizerSettin
 
 export function buildReplayTimeline(
   replay: Replay,
-  hitScoreVisualizer = decodeHitScoreVisualizer(replay.hsvConfig),
+  hitScoreVisualizer = hitScoreVisualizerForSettings(
+    { overrideHsvProfile: false, preferReplayHsvProfile: true, hsvProfile: '' },
+    replay,
+  ),
 ): ReplayTimeline {
   return {
     ...buildReplayScoreTimeline(replay),

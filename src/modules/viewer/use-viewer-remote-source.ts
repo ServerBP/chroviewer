@@ -52,6 +52,7 @@ function sourceDownloadUrl(value: string) {
 
 interface UseViewerRemoteSourceOptions {
   beginSourceRequest: () => number;
+  enabled: boolean;
   isSourceRequestCurrent: (requestId: number) => boolean;
   mapIdentity: MapIdentity | null;
   loadSourceFiles: (
@@ -69,6 +70,7 @@ interface UseViewerRemoteSourceOptions {
 
 export function useViewerRemoteSource({
   beginSourceRequest,
+  enabled,
   isSourceRequestCurrent,
   mapIdentity,
   loadSourceFiles,
@@ -332,6 +334,7 @@ export function useViewerRemoteSource({
   }
 
   async function runRemoteSourceCommand(command: RemoteSourceCommand) {
+    if (!enabled) return Result.ok(undefined);
     switch (command.type) {
       case 'lookup':
         return loadLookupSource(command.requestId, command.lookup);
@@ -372,9 +375,9 @@ export function useViewerRemoteSource({
 
   const mapHash = mapIdentity?.hash;
   const { data: scoreSaberLeaderboards = [] } = useQuery({
-    queryKey: ['scoresaber', 'leaderboards', mapHash],
+    queryKey: ['scoresaber', 'leaderboards', enabled, mapHash],
     queryFn:
-      mapHash === undefined
+      !enabled || mapHash === undefined
         ? skipToken
         : async ({ signal }): Promise<ScoreSaberLeaderboard[]> => {
             const result = await fetchScoreSaberLeaderboards(mapHash, { signal });
@@ -384,18 +387,21 @@ export function useViewerRemoteSource({
   });
 
   function loadLookup(lookup: MapLookup) {
+    if (!enabled) return;
     const requestId = beginSourceRequest();
     pendingSharedViewRef.current = null;
     sourceMutation.mutate({ type: 'lookup', lookup, requestId });
   }
 
   function loadSource(source: ViewerSource) {
+    if (!enabled) return;
     const requestId = beginSourceRequest();
     pendingSharedViewRef.current = null;
     sourceMutation.mutate({ type: 'input', input: sourceInput, source, requestId });
   }
 
   useEffect(() => {
+    if (!enabled) return;
     if (search.replayUrl !== undefined) {
       const requestId = beginSourceRequest();
       const sharedSettings = search.settings;
@@ -441,7 +447,7 @@ export function useViewerRemoteSource({
     };
     setSourceInput(search.map);
     sourceMutation.mutate({ type: 'shared-map', mapSource: search.map, requestId });
-  }, []);
+  }, [enabled]);
 
   return {
     loadLookup,

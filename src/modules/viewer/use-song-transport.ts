@@ -8,6 +8,7 @@ import type { ViewerSettings } from '../../core/viewer-settings';
 import { useHitsoundPlayback } from './use-hitsound-playback';
 
 interface LoadSongOptions {
+  audioEnabled: boolean;
   audioData: ArrayBuffer | null;
   fallbackDuration: number;
   hitsoundEvents: HitsoundEvent[];
@@ -27,6 +28,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
   const clockRef = useRef<SongClock | null>(null);
   const autoplayRef = useRef(false);
   const loadGenerationRef = useRef(0);
+  const songBpmRef = useRef(120);
   const [duration, setDuration] = useState(0);
   const [time, setTime] = useState(0);
   const [started, setStarted] = useState(false);
@@ -42,6 +44,8 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     settingsRef,
     volume: settings.masterMuted ? 0 : settings.masterVolume * settings.hitsoundVolume,
   });
+  const hitsoundsRef = useRef(hitsounds);
+  hitsoundsRef.current = hitsounds;
 
   useEffect(() => {
     clockRef.current?.setVolume(
@@ -52,6 +56,24 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
   useEffect(() => {
     clockRef.current?.setAudioOffset(settings.audioOffsetMs / 1000);
   }, [settings.audioOffsetMs]);
+
+  useEffect(() => {
+    if (settings.masterVolume > 0) return;
+    const current = clockRef.current;
+    if (current === null) return;
+    const time = current.currentTime();
+    const rate = current.getRate();
+    const wasPlaying = current.isPlaying();
+    const silent = createSilentClock(current.duration, songBpmRef.current);
+    silent.setRate(rate);
+    silent.setAudioOffset(settings.audioOffsetMs / 1000);
+    silent.seek(time);
+    if (wasPlaying) silent.play();
+    clockRef.current = silent;
+    current.dispose();
+    hitsoundsRef.current.disable();
+    setAudioBlocked(false);
+  }, [settings.masterVolume]);
 
   useEffect(() => {
     let interval: number | null = null;
@@ -124,9 +146,10 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
 
   async function load(options: LoadSongOptions) {
     const generation = ++loadGenerationRef.current;
+    songBpmRef.current = options.songBpm;
     let clock: SongClock;
     let audioDecodeFailed = false;
-    const audioData = options.audioData;
+    const audioData = options.audioEnabled ? options.audioData : null;
     if (audioData === null) {
       clock = createSilentClock(options.fallbackDuration, options.songBpm);
     } else {
@@ -152,7 +175,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     clock.setRate(playbackRate);
     clockRef.current = clock;
     autoplayRef.current = false;
-    hitsounds.load(options.hitsoundEvents);
+    hitsounds.load(options.audioEnabled ? options.hitsoundEvents : []);
     setDuration(clock.duration);
     setTime(0);
     setStarted(false);
@@ -171,7 +194,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
       hitsounds.seek(0);
       setTime(0);
     }
-    if (settings.hitsounds) hitsounds.resume();
+    if (settings.masterVolume > 0 && settings.hitsounds) hitsounds.resume();
     clock.play();
     const nextPlaying = clock.isPlaying();
     setStarted(true);
@@ -231,7 +254,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
   }
 
   function setHitsoundEvents(events: HitsoundEvent[]) {
-    hitsounds.load(events);
+    hitsounds.load(settingsRef.current.masterVolume > 0 ? events : []);
     hitsounds.seek(clockRef.current?.currentTime() ?? 0);
   }
 

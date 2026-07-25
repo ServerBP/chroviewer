@@ -223,7 +223,7 @@ export function createTaLiveSync(platformId: string) {
 
   function applyPendingSync(snapshot: TaLiveSyncSnapshot, actions: TaLiveSyncActions, now: number) {
     const directive = pendingSync;
-    if (directive === null || directive.mapHash !== snapshot.mapHash) return false;
+    if (directive?.mapHash !== snapshot.mapHash) return false;
     const currentTime = snapshot.currentTime;
     actions.setHolding(now < directive.playAt);
 

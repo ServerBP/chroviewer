@@ -8,9 +8,9 @@ export const BLOOMFOG_PYRAMID_WEIGHTS_PARAM = 0.997;
 export const BLOOMFOG_FIRST_UPSAMPLE_BRIGHTNESS = 1.198;
 export const BLOOMFOG_FINAL_UPSAMPLE_BRIGHTNESS = 0.251;
 
-export function bloomfogPyramidLayout() {
-  let width = BLOOMFOG_CAPTURE_SIZE / 2;
-  let height = BLOOMFOG_CAPTURE_SIZE / 2;
+export function bloomfogPyramidLayout(captureSize = BLOOMFOG_CAPTURE_SIZE) {
+  let width = captureSize / 2;
+  let height = captureSize / 2;
   const passFloat = Math.log2(Math.max(width, height)) + Math.min(BLOOMFOG_RADIUS, 10) - 10;
   const unclampedPasses = Math.floor(passFloat);
   const passCount = Math.min(Math.max(unclampedPasses, 1), 16);

@@ -38,6 +38,7 @@ import {
 } from './mirror/planar-mirror';
 import { PostBloomPipeline } from './post-bloom/pipeline';
 import { DEFAULT_QUALITY } from './quality';
+import { DEFAULT_RENDER_PERFORMANCE, type RenderPerformanceOptions } from './render-performance';
 import type { RenderView } from './renderer-lifecycle';
 import type { ReplayCameraMode } from './replay/replay-camera';
 import { ReplayView } from './replay/replay-view';
@@ -91,10 +92,14 @@ export class MapView implements RenderView {
   constructor(
     quality = DEFAULT_QUALITY,
     private readonly onEnvironmentLoadSettled: () => void = () => undefined,
+    performance: RenderPerformanceOptions = DEFAULT_RENDER_PERFORMANCE,
   ) {
-    this.pipeline = new BloomfogPipeline();
-    this.postBloom = new PostBloomPipeline();
-    this.mirror = new PlanarMirror(quality, 6, 400);
+    this.pipeline = new BloomfogPipeline(performance.bloomFogSize);
+    this.postBloom = new PostBloomPipeline(performance.postBloomWidth, performance.msaaSamples);
+    this.mirror = new PlanarMirror(quality, 6, 400, {
+      resolution: performance.mirrorResolution,
+      msaaSamples: performance.mirrorMsaaSamples,
+    });
     this.camera.position.set(...fixedCameraPosition(DEFAULT_REPLAY_CAMERA_SETTINGS.previewCameraDistance));
     this.scene.matrixAutoUpdate = false;
     this.scene.matrixWorldAutoUpdate = false;

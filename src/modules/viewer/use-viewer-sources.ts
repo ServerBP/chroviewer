@@ -11,13 +11,20 @@ import { useViewerFileSource } from './use-viewer-file-source';
 import { useViewerRemoteSource } from './use-viewer-remote-source';
 
 interface UseViewerSourcesOptions {
+  remoteSourcesEnabled?: boolean;
   setError: (message: string) => void;
   setSettings: Dispatch<SetStateAction<ViewerSettings>>;
   onClearViewer: () => void;
   onMapLoaded: () => void;
 }
 
-export function useViewerSources({ setError, setSettings, onClearViewer, onMapLoaded }: UseViewerSourcesOptions) {
+export function useViewerSources({
+  remoteSourcesEnabled = true,
+  setError,
+  setSettings,
+  onClearViewer,
+  onMapLoaded,
+}: UseViewerSourcesOptions) {
   const [sourceChoices, setSourceChoices] = useState<MapLookup[]>([]);
   const [liveDownloadProgress, setLiveDownloadProgress] = useState<DownloadProgress>(null);
   const liveMapCache = useRef(new LiveMapCache());
@@ -31,6 +38,7 @@ export function useViewerSources({ setError, setSettings, onClearViewer, onMapLo
   });
   const remote = useViewerRemoteSource({
     beginSourceRequest: files.beginSourceRequest,
+    enabled: remoteSourcesEnabled,
     isSourceRequestCurrent: files.isSourceRequestCurrent,
     mapIdentity: files.mapIdentity,
     loadSourceFiles: files.loadSourceFiles,

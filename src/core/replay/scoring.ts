@@ -135,6 +135,10 @@ function buildReplayStateIndex(replay: Replay): ReplayStateIndex {
   const misses = new Uint32Array(replay.notes.length + 1);
   const badCuts = new Uint32Array(replay.notes.length + 1);
   const bombCuts = new Uint32Array(replay.notes.length + 1);
+  scoringNotes[0] = replay.liveHistoryBase?.scoringNotes ?? 0;
+  misses[0] = replay.liveHistoryBase?.misses ?? 0;
+  badCuts[0] = replay.liveHistoryBase?.badCuts ?? 0;
+  bombCuts[0] = replay.liveHistoryBase?.bombCuts ?? 0;
   for (let index = 0; index < replay.notes.length; index++) {
     const eventType = replay.notes[index]?.eventType;
     const next = index + 1;
@@ -146,6 +150,7 @@ function buildReplayStateIndex(replay: Replay): ReplayStateIndex {
   }
 
   const maxCombos = new Float64Array(replay.combos.length + 1);
+  maxCombos[0] = replay.liveHistoryBase?.maxCombo ?? 0;
   for (let index = 0; index < replay.combos.length; index++) {
     maxCombos[index + 1] = Math.max(maxCombos[index] ?? 0, replay.combos[index]?.combo ?? 0);
   }
@@ -177,7 +182,7 @@ function replayStateAt(replay: Replay, stateIndex: ReplayStateIndex, time: numbe
     misses: stateIndex.misses[noteCount] ?? 0,
     badCuts: stateIndex.badCuts[noteCount] ?? 0,
     bombCuts: stateIndex.bombCuts[noteCount] ?? 0,
-    wallsHit: wallCount,
+    wallsHit: (replay.liveHistoryBase?.wallsHit ?? 0) + wallCount,
   };
 }
 

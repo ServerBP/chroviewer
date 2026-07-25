@@ -96,6 +96,11 @@ export function useHitsoundPlayback({
     indexRef.current = 0;
   }
 
+  function disable() {
+    clear();
+    player.dispose();
+  }
+
   function load(events: HitsoundEvent[]) {
     eventsRef.current = events;
     timeRef.current = 0;
@@ -115,6 +120,7 @@ export function useHitsoundPlayback({
 
   return {
     clear,
+    disable,
     load,
     resume,
     seek,
