@@ -98,7 +98,6 @@ function unityStencilOp(value: number) {
 export function createEnvironmentMaterial(
   data: EnvironmentMaterialData,
   context: EnvironmentMaterialContext,
-  environmentId?: string,
 ): EnvironmentMaterialInstance | null {
   const color = materialColor(data);
   let material: Material;
@@ -266,10 +265,10 @@ export function createEnvironmentMaterial(
     if (cullMode === 1) material.side = BackSide;
     if (cullMode === 2) material.side = FrontSide;
   }
-  const disableDepthWrite = environmentId === 'WeaveEnvironment' && isParametricSliceBillboard;
+  const isParametricGlow = isParametricSliceBillboard || data.shader === 'ChroMapper/Parametric Box Fake Glow';
   material.depthWrite =
     data.family === 'depthOnly' ||
-    (!disableDepthWrite &&
+    (!isParametricGlow &&
       !isTransparentLight &&
       data.family !== 'stencil' &&
       data.family !== 'rain' &&

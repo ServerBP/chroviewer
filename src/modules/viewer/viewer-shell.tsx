@@ -217,7 +217,9 @@ export function ViewerShell() {
   const [activePanel, setActivePanel] = useState<ViewerPanel>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
-  const [liveChatOpen, setLiveChatOpen] = useState(false);
+  const [liveChatOpen, setLiveChatOpen] = useState(
+    () => !settings.liveChatCollapsed && window.matchMedia('(min-width: 40rem)').matches,
+  );
   const [mobileMapCollapseRequest, setMobileMapCollapseRequest] = useState(0);
   const [mobileViewport, setMobileViewport] = useState({
     chatHeight: 'min(44dvh, 20.4rem)',
@@ -246,6 +248,7 @@ export function ViewerShell() {
     lightshowMode,
     lightshowModeRef,
     authoritativeLightshowMode: authoritativeLights,
+    skipInitialMenuEnvironment: search.map !== undefined || search.scoreId !== undefined,
     setActivePanel,
     setError,
     setLightshowMode,
@@ -411,7 +414,9 @@ export function ViewerShell() {
     sources.mapMeta !== null &&
     (!partyActive || (partyMapMatchesSource && (partyIsHost || party.serverState?.mapRevealed === true)));
   useEffect(() => {
-    setLiveChatOpen(!taLive && window.matchMedia('(min-width: 40rem)').matches);
+    setLiveChatOpen(
+      !taLive && !settingsRef.current.liveChatCollapsed && window.matchMedia('(min-width: 40rem)').matches,
+    );
   }, [search.matchId, search.party, search.playerId, search.roomId, search.tournamentId, taLive]);
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -461,6 +466,7 @@ export function ViewerShell() {
       event.preventDefault();
       setChromeVisible(true);
       setLiveChatOpen(true);
+      setSettings((current) => ({ ...current, liveChatCollapsed: false }));
       setMobileMapCollapseRequest((request) => request + 1);
       window.requestAnimationFrame(() => liveChatInputRef.current?.focus());
     }
@@ -706,6 +712,7 @@ export function ViewerShell() {
           aria-hidden="true"
           onPointerDown={() => {
             setLiveChatOpen(false);
+            setSettings((current) => ({ ...current, liveChatCollapsed: true }));
           }}
         />
       )}
@@ -746,7 +753,9 @@ export function ViewerShell() {
             'fixed left-3 top-3 z-30 flex max-h-[calc(100dvh-1.5rem)] flex-col items-start gap-2 transition duration-200 max-sm:left-2 max-sm:top-2 max-sm:max-h-[calc(100dvh-1rem)]',
             remoteActive &&
               'h-[calc(100dvh-1.5rem)] max-sm:!left-0 max-sm:!top-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:gap-0',
-            !chromeVisible && 'pointer-events-none -translate-y-2 opacity-0',
+            !chromeVisible &&
+              (!showMapCard || !settings.keepMapInfoVisible) &&
+              'pointer-events-none -translate-y-2 opacity-0',
           )}
         >
           {(showMapCard || (partyActive && partyIsHost)) && (
@@ -785,36 +794,44 @@ export function ViewerShell() {
                   onSettingsClick={toggleSettings}
                 />
               )}
-              {partyActive && partyIsHost && <WatchPartyControls party={party} />}
+              {partyActive && partyIsHost && (
+                <div className={chromeVisible ? 'contents' : 'hidden'}>
+                  <WatchPartyControls party={party} />
+                </div>
+              )}
             </div>
           )}
-          {liveActive ? (
-            <LiveViewerPanel
-              chatEnabled={!taLive}
-              chatInputRef={liveChatInputRef}
-              chatOpen={liveChatOpen}
-              live={live}
-              onChatOpenChange={(open) => {
-                setLiveChatOpen(open);
-                if (open) setMobileMapCollapseRequest((request) => request + 1);
-              }}
-            />
-          ) : partyActive ? (
-            <WatchPartyPanel
-              chatInputRef={liveChatInputRef}
-              chatOpen={liveChatOpen}
-              party={party}
-              onLeave={() => {
-                void router.navigate({ to: '/', search: {}, replace: true });
-              }}
-              onChatOpenChange={(open) => {
-                setLiveChatOpen(open);
-                if (open) setMobileMapCollapseRequest((request) => request + 1);
-              }}
-            />
-          ) : (
-            sources.replayPlayer !== null && <ReplayPlayerCard player={sources.replayPlayer} />
-          )}
+          <div className={chromeVisible ? 'contents' : 'hidden'}>
+            {liveActive ? (
+              <LiveViewerPanel
+                chatEnabled={!taLive}
+                chatInputRef={liveChatInputRef}
+                chatOpen={liveChatOpen}
+                live={live}
+                onChatOpenChange={(open) => {
+                  setLiveChatOpen(open);
+                  setSettings((current) => ({ ...current, liveChatCollapsed: !open }));
+                  if (open) setMobileMapCollapseRequest((request) => request + 1);
+                }}
+              />
+            ) : partyActive ? (
+              <WatchPartyPanel
+                chatInputRef={liveChatInputRef}
+                chatOpen={liveChatOpen}
+                party={party}
+                onLeave={() => {
+                  void router.navigate({ to: '/', search: {}, replace: true });
+                }}
+                onChatOpenChange={(open) => {
+                  setLiveChatOpen(open);
+                  setSettings((current) => ({ ...current, liveChatCollapsed: !open }));
+                  if (open) setMobileMapCollapseRequest((request) => request + 1);
+                }}
+              />
+            ) : (
+              sources.replayPlayer !== null && <ReplayPlayerCard player={sources.replayPlayer} />
+            )}
+          </div>
         </div>
       )}
 

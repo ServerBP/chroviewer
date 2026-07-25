@@ -178,7 +178,7 @@ export function buildEnvironmentScene(
   const geometries = new Map(Object.entries(data.meshes).map(([name, mesh]) => [name, createGeometry(mesh)]));
   const materials = new Map<string, EnvironmentMaterialInstance>();
   for (const [name, materialData] of Object.entries(data.materials)) {
-    const material = createEnvironmentMaterial(materialData, materialContext, data.id);
+    const material = createEnvironmentMaterial(materialData, materialContext);
     if (material !== null) materials.set(name, material);
   }
   const materialInstances = new Set([...materials.values()].map((instance) => instance.material));
@@ -218,7 +218,7 @@ export function buildEnvironmentScene(
       const materialData = data.materials[name];
       if (material === undefined || materialData === undefined) return [];
       if (!controlledObjects.has(index)) return [material];
-      const instance = createEnvironmentMaterial(materialData, materialContext, data.id);
+      const instance = createEnvironmentMaterial(materialData, materialContext);
       if (instance === null) return [];
       materialInstances.add(instance.material);
       return [instance];

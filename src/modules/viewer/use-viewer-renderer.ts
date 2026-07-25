@@ -27,6 +27,7 @@ interface ViewerRendererOptions {
   settings: ViewerSettings;
   settingsRef: RefObject<ViewerSettings>;
   performance: RenderPerformanceOptions;
+  skipInitialMenuEnvironment: boolean;
   setError: (message: string) => void;
 }
 
@@ -42,6 +43,7 @@ export function useViewerRenderer({
   settings,
   settingsRef,
   performance,
+  skipInitialMenuEnvironment,
   setError,
 }: ViewerRendererOptions) {
   const t = useTranslations('viewer');
@@ -97,6 +99,10 @@ export function useViewerRenderer({
       };
 
       const initialLoad = !initialEnvironmentLoadedRef.current;
+      if (initialLoad && skipInitialMenuEnvironment && active === null) {
+        finishInitialEnvironmentLoad();
+        return;
+      }
       if (initialLoad) setEnvironmentLoading(true);
       const environmentResult = await view.setEnvironment(
         active?.environmentId ??

@@ -142,7 +142,7 @@ export class MapObjectRenderer {
     scale: this.scale,
   };
   private readonly noodleObjectTransform = new NoodleObjectTransform();
-  private readonly wallEdgeScale: [number, number] = [1, 1];
+  private readonly wallEdgeScale: [number, number, number] = [1, 1, 1];
   private readonly noteLookStates = new Map<NoteInstance, NoteLookState>();
 
   private data: MapRenderData | null = null;
@@ -605,7 +605,10 @@ export class MapObjectRenderer {
       const noodle = sampleNoodleRenderObject(wall, data.noodle, now, duration, context, data.leftHanded);
       const movementBeat = noodleMovementBeat(wall, now, noodle, duration);
       if (!noodleObjectVisible(wall, now, movementBeat, noodle)) continue;
-      const reveal = wallSpawnScale(wall, movementBeat, data.movementStateAt?.(now).halfJumpDurationInBeats);
+      const reveal =
+        wall.durationBeats !== undefined && wall.durationBeats < 0
+          ? 1
+          : wallSpawnScale(wall, movementBeat, data.movementStateAt?.(now).halfJumpDurationInBeats);
       if (reveal === 0) continue;
       if ((noodle.dissolve ?? 1) <= 0) continue;
       const transform = wallTransform(wall, wallAheadDistance(wall, wall.pullBeat, movementBeat), reveal);
@@ -632,10 +635,11 @@ export class MapObjectRenderer {
         wall.worldRotation,
         preJumpPosition,
       );
-      let obstacleEdgeScale: readonly [number, number] | undefined;
-      if (data.legacyNoodleV2Semantics) {
+      let obstacleEdgeScale: Rgb | undefined;
+      if (wall.legacyPrefabScaling === true) {
         this.wallEdgeScale[0] = Math.abs(this.scale.x);
         this.wallEdgeScale[1] = Math.abs(this.scale.y);
+        this.wallEdgeScale[2] = Math.abs(this.scale.z);
         obstacleEdgeScale = this.wallEdgeScale;
       }
       this.wallRootMatrix.copy(this.matrix);
