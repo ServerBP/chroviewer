@@ -1,8 +1,7 @@
 import { Result } from 'better-result';
 import type { ZodType } from 'zod';
 
-import { env } from '../env';
-import { corsProxyUrl } from './cors-proxy';
+import { serverSourceUrl } from './server-source-url';
 import { SourceError, sourceError } from './source-error';
 import type { DownloadProgressHandler, FetchRequest, SourceResult } from './source-types';
 
@@ -46,9 +45,7 @@ async function responseArrayBuffer(response: Response, onProgress?: DownloadProg
 
 async function sourceResponse(url: string, options: SourceRequestOptions): Promise<SourceResult<Response>> {
   const requestUrl =
-    options.request === undefined && typeof window !== 'undefined'
-      ? corsProxyUrl(url, env.VITE_CORS_PROXY_URL, window.location.origin)
-      : url;
+    options.request === undefined && typeof window !== 'undefined' ? serverSourceUrl(url, window.location.origin) : url;
   const result = await Result.tryPromise({
     try: () => (options.request ?? fetch)(requestUrl, { signal: options.signal }),
     catch: (cause) =>

@@ -61,7 +61,7 @@ The default BeatSaver, ScoreSaber and BeatLeader endpoints work without an `.env
 VITE_ENABLED_SOURCES=beatsaver,scoresaber,beatleader
 ```
 
-Browser requests to remote source APIs, replay files and map downloads use the read-only CORS proxy configured by `VITE_CORS_PROXY_URL`. Its default is `https://c.prox.artemis.shyyluna.dev`. The target URL is encoded as a path; for example, `https://scoresaber.com/api/v2/scores` becomes `https://c.prox.artemis.shyyluna.dev/https/scoresaber.com/api/v2/scores`. Relative and same-origin requests bypass the proxy.
+Browser requests for remote source API data, replay files and map downloads are fetched through ChroViewer's same-origin `/api/source` server endpoint. The endpoint accepts public HTTPS sources, validates redirects and streams the response without caching, so no external CORS proxy is required.
 
 ## Checks
 
