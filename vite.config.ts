@@ -14,6 +14,8 @@ const sourceFrameAncestors = {
 };
 
 const beatKhanaFrameAncestors = [
+  'http://localhost:*',
+  'http://localhost:1420',
   'https://beatkhana.com',
   'https://*.beatkhana.com',
   // CSP wildcard host sources do not reliably cover nested subdomains such as
