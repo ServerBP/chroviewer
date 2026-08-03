@@ -68,6 +68,7 @@ const searchKeyAliases: Record<string, string> = {
   beat: 'beat',
   autoplay: 'autoplay',
   hideui: 'hideUI',
+  disablegameui: 'disableGameUI',
   lightshow: 'lightshow',
   lights: 'lights',
   mastervolume: 'masterVolume',

@@ -246,6 +246,7 @@ export function ViewerShell() {
     },
   });
   const session = useViewerSession({
+    disableGameUI: search.disableGameUI === true,
     lightshowMode,
     lightshowModeRef,
     authoritativeLightshowMode: authoritativeLights,

@@ -82,6 +82,7 @@ export class ReplayView {
   private replay: Replay | null = null;
   private hasSampledReplayPose = false;
   private lightshowMode: LightshowMode = 'full';
+  private gameUIEnabled = true;
 
   constructor(
     camera: PerspectiveCamera,
@@ -213,7 +214,7 @@ export class ReplayView {
     this.lightshowMode = mode;
     const forced = isForcedLightshowMode(mode);
     this.root.visible = !forced && this.hasPoses;
-    this.gameplayHud.setEnabled(!forced);
+    this.gameplayHud.setEnabled(this.gameUIEnabled && !forced);
     if (forced) {
       this.clearTrails();
     }
@@ -225,7 +226,7 @@ export class ReplayView {
     this.replay = replay;
     this.hasSampledReplayPose = false;
     this.gameplayHud.setReplay(replay, hitScoreVisualizer);
-    this.gameplayHud.setEnabled(!isForcedLightshowMode(this.lightshowMode));
+    this.gameplayHud.setEnabled(this.gameUIEnabled && !isForcedLightshowMode(this.lightshowMode));
     this.clearTrails();
     this.cameraController.reset();
     this.root.visible = !isForcedLightshowMode(this.lightshowMode) && this.hasPoses;
@@ -236,6 +237,11 @@ export class ReplayView {
 
   setHitScoreVisualizer(hitScoreVisualizer: HitScoreVisualizerConfig | null) {
     this.gameplayHud.setHitScoreVisualizer(hitScoreVisualizer);
+  }
+
+  setGameUIEnabled(enabled: boolean) {
+    this.gameUIEnabled = enabled;
+    this.gameplayHud.setEnabled(enabled && !isForcedLightshowMode(this.lightshowMode));
   }
 
   setMapHasNotes(hasMapNotes: boolean) {

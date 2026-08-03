@@ -27,6 +27,7 @@ type SongTransport = ReturnType<typeof useSongTransport>;
 type ViewerSources = ReturnType<typeof useViewerSources>;
 
 interface ViewerSessionOptions {
+  disableGameUI: boolean;
   lightshowMode: LightshowMode;
   lightshowModeRef: RefObject<LightshowMode>;
   authoritativeLightshowMode?: LightshowMode | null;
@@ -54,6 +55,7 @@ interface ViewerSessionOptions {
 }
 
 export function useViewerSession({
+  disableGameUI,
   lightshowMode,
   lightshowModeRef,
   authoritativeLightshowMode = null,
@@ -109,6 +111,10 @@ export function useViewerSession({
   useEffect(() => {
     viewerRef.current?.view.setPreviewHitLine(settings.previewHitLine);
   }, [settings.previewHitLine]);
+
+  useEffect(() => {
+    viewerRef.current?.view.setGameUIEnabled(!disableGameUI);
+  }, [disableGameUI, viewerReady]);
 
   useEffect(() => {
     const mode: LightshowMode = authoritativeLightshowMode ?? (settings.staticLights ? 'static' : 'full');

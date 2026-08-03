@@ -6,6 +6,8 @@ LIVE SOURCE
 liveSource=ta                 Use TournamentAssistant live replay packets.
 playerId=<platform id>        Platform ID whose live play should be watched.
 hideUI=true                   Hide all cards, controls, settings, errors, and overlays.
+disableGameUI=true            Hide the in-game HUD: health, combo, score, rank, accuracy,
+                              multiplier, song progress, and hit-score visualizer.
 
 AUDIO
 masterVolume=0..1             Overall output level. Multiplies song and hitsound volume.
