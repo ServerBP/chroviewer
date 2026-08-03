@@ -345,24 +345,36 @@ export function useViewerSession({
     }
   }
 
-  async function applyPendingView(row: DifficultyRow, beat: number | undefined) {
+  async function applyPendingView(row: DifficultyRow, beat: number | undefined, startSeconds?: number) {
     await selectDifficulty(row, beat);
     const clock = transport.clockRef.current;
     if (clock === null) return;
-    transport.seek(songBpmTimeToSeconds(beat ?? 0, sources.songBpm));
+    const requested = startSeconds ?? songBpmTimeToSeconds(beat ?? 0, sources.songBpm);
+    transport.seek(requested >= clock.duration ? 0 : requested);
   }
 
   useEffect(() => {
     const pending = sources.pendingSharedViewRef.current;
     if (!viewerReady || pending === null || sources.rows.length === 0 || sources.songBpm <= 0) return;
     const indexedRow = pending.difficultyIndex === undefined ? undefined : sources.rows[pending.difficultyIndex];
+    const requestedCharacteristic = pending.characteristic?.toLowerCase();
+    const requestedRow = sources.rows.find(
+      (candidate) =>
+        candidate.infoDifficulty !== undefined &&
+        (pending.difficultyRank === undefined ||
+          difficultyRank(candidate.infoDifficulty.difficulty) === pending.difficultyRank) &&
+        (requestedCharacteristic === undefined ||
+          candidate.infoDifficulty.characteristic.toLowerCase() === requestedCharacteristic ||
+          `solo${candidate.infoDifficulty.characteristic.toLowerCase()}` === requestedCharacteristic),
+    );
     const row =
+      (requestedRow?.difficulty === undefined ? undefined : requestedRow) ??
       (indexedRow?.difficulty === undefined ? undefined : indexedRow) ??
       sources.rows.find((candidate) => sources.replayRef.current !== null && candidate.replayMatch === true) ??
       sources.rows.find((candidate) => candidate.difficulty !== undefined);
     if (row === undefined) return;
     sources.pendingSharedViewRef.current = null;
-    void applyPendingView(row, pending.beat).then(() => {
+    void applyPendingView(row, pending.beat, pending.startSeconds).then(() => {
       if (pending.autoplay === true) transport.play({ autoplay: true });
     });
   }, [sources.rows, sources.songBpm, viewerReady]);

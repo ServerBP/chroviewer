@@ -17,6 +17,7 @@ import {
   fetchBeatLeaderLeaderboards,
   fetchBeatLeaderReplayFile,
   fetchBeatLeaderReplayMetadata,
+  fetchTopBeatLeaderScore,
 } from '../../sources/beatleader/provider';
 import { fetchBeatSaverHash, fetchBeatSaverMap } from '../../sources/beatsaver/provider';
 import { requestArrayBuffer } from '../../sources/http';
@@ -24,6 +25,7 @@ import {
   fetchScoreSaberLeaderboards,
   fetchScoreSaberReplayFile,
   fetchScoreSaberReplayMetadata,
+  fetchTopScoreSaberScore,
   lookupScoreSaber,
   scoreSaberReference,
 } from '../../sources/scoresaber/provider';
@@ -46,6 +48,15 @@ type RemoteSourceCommand = { requestId: number } & (
   | { type: 'lookup'; lookup: MapLookup }
   | { type: 'input'; input: string; source: ViewerSource }
   | { type: 'shared-map'; mapSource: string }
+  | {
+      type: 'shared-preview';
+      mapSource: string;
+      previewSource: 'map' | 'scoresaber' | 'beatleader';
+      difficulty?: number;
+      characteristic?: string;
+      startSeconds?: number;
+      autoplay?: boolean;
+    }
   | { type: 'shared-replay'; replayUrl: string; beat?: number; autoplay?: boolean }
   | { type: 'shared-score'; scoreId: string; beat?: number; autoplay?: boolean }
   | { type: 'shared-beatleader'; scoreId: string; beat?: number; autoplay?: boolean }
@@ -317,6 +328,67 @@ export function useViewerRemoteSource({
     });
   }
 
+  async function loadSharedPreview(
+    requestId: number,
+    command: Extract<RemoteSourceCommand, { type: 'shared-preview' }>,
+  ) {
+    if (!isViewerSourceEnabled('beatsaver')) return disabledSource('beatsaver');
+    if (isRemoteSourceUrl(command.mapSource)) return loadSharedMap(requestId, command.mapSource);
+    return Result.gen(async function* () {
+      const map = yield* Result.await(fetchBeatSaverMap(command.mapSource, downloadOptions('beatsaver', requestId)));
+      if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
+      const pending = {
+        autoplay: command.autoplay,
+        startSeconds: command.startSeconds,
+        difficultyRank: command.difficulty,
+        characteristic: command.characteristic,
+      };
+      if (command.previewSource === 'map') {
+        pendingSharedViewRef.current = pending;
+        yield* Result.await(
+          loadSourceFiles(requestId, map.files, null, { identity: { key: map.key, hash: map.hash } }),
+        );
+        return Result.ok(undefined);
+      }
+
+      const characteristic = command.characteristic?.toLowerCase();
+      const matches = (candidate: ScoreSaberLeaderboard | BeatLeaderLeaderboard) =>
+        (command.difficulty === undefined || candidate.difficulty === command.difficulty) &&
+        (characteristic === undefined ||
+          candidate.gameMode.toLowerCase() === characteristic ||
+          candidate.gameMode.toLowerCase() === `solo${characteristic}`);
+      if (command.previewSource === 'scoresaber') {
+        if (!isViewerSourceEnabled('scoresaber')) return disabledSource('scoresaber');
+        const leaderboards = yield* Result.await(fetchScoreSaberLeaderboards(map.hash));
+        const leaderboard = leaderboards.find(matches);
+        if (leaderboard === undefined) {
+          return Result.err(
+            new SourceError({
+              message: 'No score available for use',
+              source: 'scoresaber',
+              operation: 'load-top-score',
+            }),
+          );
+        }
+        const scoreId = yield* Result.await(fetchTopScoreSaberScore(leaderboard.id));
+        yield* Result.await(loadScoreSaberScore(requestId, scoreId, pending));
+        return Result.ok(undefined);
+      }
+
+      if (!isViewerSourceEnabled('beatleader')) return disabledSource('beatleader');
+      const leaderboards = yield* Result.await(fetchBeatLeaderLeaderboards(map.hash));
+      const leaderboard = leaderboards.find(matches);
+      if (leaderboard === undefined) {
+        return Result.err(
+          new SourceError({ message: 'No score available for use', source: 'beatleader', operation: 'load-top-score' }),
+        );
+      }
+      const scoreId = yield* Result.await(fetchTopBeatLeaderScore(leaderboard.id));
+      yield* Result.await(loadBeatLeaderScore(requestId, scoreId, pending));
+      return Result.ok(undefined);
+    });
+  }
+
   async function loadLink(requestId: number, link: string) {
     const linkUrl = link.trim();
     if (!isRemoteSourceUrl(linkUrl)) {
@@ -432,6 +504,8 @@ export function useViewerRemoteSource({
         return loadSourceInput(command.requestId, command.input, command.source);
       case 'shared-map':
         return loadSharedMap(command.requestId, command.mapSource);
+      case 'shared-preview':
+        return loadSharedPreview(command.requestId, command);
       case 'shared-replay':
         return loadReplayUrl(command.requestId, command.replayUrl, {
           beat: command.beat,
@@ -563,13 +637,26 @@ export function useViewerRemoteSource({
     if (sharedSettings !== undefined) {
       setSettings((current) => applySharedViewerSettings(current, sharedSettings));
     }
-    pendingSharedViewRef.current = {
-      autoplay: search.autoplay,
-      difficultyIndex: search.difficulty,
-      beat: search.beat,
-    };
     setSourceInput(search.map);
-    sourceMutation.mutate({ type: 'shared-map', mapSource: search.map, requestId });
+    if (search.previewSource !== undefined) {
+      sourceMutation.mutate({
+        type: 'shared-preview',
+        mapSource: search.map,
+        previewSource: search.previewSource,
+        difficulty: search.previewDifficulty,
+        characteristic: search.previewCharacteristic,
+        startSeconds: search.previewStartSeconds,
+        autoplay: search.autoplay,
+        requestId,
+      });
+    } else {
+      pendingSharedViewRef.current = {
+        autoplay: search.autoplay,
+        difficultyIndex: search.difficulty,
+        beat: search.beat,
+      };
+      sourceMutation.mutate({ type: 'shared-map', mapSource: search.map, requestId });
+    }
   }, [enabled]);
 
   return {

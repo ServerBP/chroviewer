@@ -286,9 +286,10 @@ export function ViewerShell() {
   useFavicon(faviconPlatform);
   const liveActive = liveTarget !== null;
   const taLive = liveTarget?.source === 'ta';
+  const embeddedSource = taLive || search.previewSource !== undefined;
   const remoteActive = liveActive || partyActive;
   useEffect(() => {
-    if (!taLive) return;
+    if (!embeddedSource) return;
 
     let lastSearch = '';
     function applySettingsFromLocation() {
@@ -319,14 +320,15 @@ export function ViewerShell() {
       window.clearInterval(interval);
       window.removeEventListener('popstate', applySettingsFromLocation);
     };
-  }, [taLive]);
+  }, [embeddedSource]);
   useEffect(() => {
-    if (!taLive) return;
+    if (!embeddedSource) return;
 
     function applyEmbeddedViewerSettings(event: MessageEvent) {
       const data: unknown = event.data;
       if (event.source !== window.parent || !isRecord(data) || data.type !== 'beatkhana:viewer-settings') return;
       const masterVolume = Number(data.masterVolume);
+      const songVolume = Number(data.songVolume);
       const hitsoundVolume = Number(data.hitsoundVolume);
       const settingsPatch = isRecord(data.settings) ? data.settings : {};
       const performancePatch = isRecord(data.performance) ? data.performance : settingsPatch;
@@ -334,6 +336,7 @@ export function ViewerShell() {
         ...settingsPatch,
         ...performancePatch,
         ...(Number.isFinite(masterVolume) ? { masterVolume } : {}),
+        ...(Number.isFinite(songVolume) ? { songVolume } : {}),
         ...(Number.isFinite(hitsoundVolume) ? { hitsoundVolume } : {}),
         ...(typeof data.lights === 'string' ? { lights: data.lights } : {}),
       });
@@ -343,6 +346,7 @@ export function ViewerShell() {
           ...current,
           ...dynamicSettingsPatch(settingsPatch),
           ...(Number.isFinite(masterVolume) ? { masterVolume } : {}),
+          ...(Number.isFinite(songVolume) ? { songVolume } : {}),
           ...(Number.isFinite(hitsoundVolume) ? { hitsoundVolume } : {}),
         });
       });
@@ -357,7 +361,13 @@ export function ViewerShell() {
     return () => {
       window.removeEventListener('message', applyEmbeddedViewerSettings);
     };
-  }, [taLive]);
+  }, [embeddedSource]);
+  useEffect(() => {
+    if (search.previewSource === undefined || !transport.ended || transport.duration <= 0) return;
+    const requestedStart = search.previewStartSeconds ?? 0;
+    transport.seek(requestedStart >= transport.duration ? 0 : requestedStart);
+    transport.play({ autoplay: true });
+  }, [search.previewSource, search.previewStartSeconds, transport.duration, transport.ended]);
   const live = useLiveExperience({
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,
     appendReplayNoteEvents: session.appendLiveReplayNoteEvents,

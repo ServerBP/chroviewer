@@ -24,6 +24,9 @@ export interface PendingSharedView {
   autoplay?: boolean;
   difficultyIndex?: number;
   beat?: number;
+  startSeconds?: number;
+  difficultyRank?: number;
+  characteristic?: string;
 }
 
 export interface LoadedSourceContext {

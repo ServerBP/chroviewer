@@ -87,6 +87,10 @@ const leaderboardDifficultiesSchema = z.array(
   }),
 ) satisfies z.ZodType<LeaderboardDifficultyContract[]>;
 
+const leaderboardScoresSchema = z.object({
+  data: z.array(z.object({ id: z.int().nonnegative(), hasReplay: z.boolean() })),
+});
+
 const scoreSchema = z.object({
   leaderboard: z.object({
     difficulty: z.object({
@@ -226,6 +230,31 @@ export async function fetchScoreSaberLeaderboards(
       gameMode,
     })),
   );
+}
+
+export async function fetchTopScoreSaberScore(leaderboardId: number, options: ResolveOptions = {}) {
+  const scores = await requestJson(
+    `${env.VITE_SCORESABER_API_URL}/api/v2/leaderboards/${leaderboardId}/scores?limit=1`,
+    leaderboardScoresSchema,
+    {
+      ...options,
+      source: 'scoresaber',
+      label: `ScoreSaber leaderboard ${leaderboardId}`,
+      operation: 'load-top-score',
+    },
+  );
+  return scores.andThen(({ data }) => {
+    const score = data.find((candidate) => candidate.hasReplay);
+    return score === undefined
+      ? Result.err(
+          new SourceError({
+            message: 'No score available for use',
+            source: 'scoresaber',
+            operation: 'load-top-score',
+          }),
+        )
+      : Result.ok(String(score.id));
+  });
 }
 
 function replayMetadata(score: ScoreContract, requestedScoreId: string) {

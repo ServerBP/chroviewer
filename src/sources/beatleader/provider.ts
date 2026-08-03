@@ -174,11 +174,43 @@ const leaderboardsResponseSchema = z
     return items;
   });
 
+const leaderboardScoresSchema = z.object({
+  scores: z
+    .array(z.object({ id: z.number().int().nonnegative() }))
+    .nullable()
+    .optional(),
+});
+
 export async function fetchBeatLeaderLeaderboards(hash: string, options: ResolveOptions = {}) {
   return requestJson(`${env.VITE_BEATLEADER_API_URL}/leaderboards/hash/${hash}`, leaderboardsResponseSchema, {
     ...options,
     source: 'beatleader',
     label: `BeatLeader leaderboards for ${hash}`,
     operation: 'load-leaderboards',
+  });
+}
+
+export async function fetchTopBeatLeaderScore(leaderboardId: string, options: ResolveOptions = {}) {
+  const response = await requestJson(
+    `${env.VITE_BEATLEADER_API_URL}/leaderboard/${leaderboardId}?page=1&count=1&sortBy=rank&order=asc`,
+    leaderboardScoresSchema,
+    {
+      ...options,
+      source: 'beatleader',
+      label: `BeatLeader leaderboard ${leaderboardId}`,
+      operation: 'load-top-score',
+    },
+  );
+  return response.andThen(({ scores }) => {
+    const score = scores?.[0];
+    return score === undefined
+      ? Result.err(
+          new SourceError({
+            message: 'No score available for use',
+            source: 'beatleader',
+            operation: 'load-top-score',
+          }),
+        )
+      : Result.ok(String(score.id));
   });
 }

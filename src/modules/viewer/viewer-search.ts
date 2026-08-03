@@ -66,6 +66,10 @@ export const viewerSearchSchema = z.pipe(
     scoreIdBL: z.catch(z.optional(scoreIdSchema), undefined),
     difficulty: z.catch(z.optional(difficultyIndexSchema), undefined),
     beat: z.catch(z.optional(nonnegativeNumberSchema), undefined),
+    previewSource: z.catch(z.optional(z.enum(['map', 'scoresaber', 'beatleader'])), undefined),
+    previewDifficulty: z.catch(z.optional(difficultyIndexSchema), undefined),
+    previewCharacteristic: z.catch(z.optional(z.string().check(z.minLength(1), z.maxLength(64))), undefined),
+    previewStartSeconds: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     autoplay: z.catch(z.optional(z.boolean()), undefined),
     hideUI: z.catch(z.optional(z.boolean()), undefined),
     lightshow: z.catch(z.optional(z.literal('full-lightshow')), undefined),
@@ -109,6 +113,10 @@ export const viewerSearchSchema = z.pipe(
         scoreIdBL: undefined,
         difficulty: undefined,
         beat: undefined,
+        previewSource: undefined,
+        previewDifficulty: undefined,
+        previewCharacteristic: undefined,
+        previewStartSeconds: undefined,
         autoplay: undefined,
         playerId: undefined,
         tournamentId: undefined,
@@ -127,12 +135,25 @@ export const viewerSearchSchema = z.pipe(
         scoreIdBL: undefined,
         difficulty: undefined,
         beat: undefined,
+        previewSource: undefined,
+        previewDifficulty: undefined,
+        previewCharacteristic: undefined,
+        previewStartSeconds: undefined,
       };
     }
     if (search.replayUrl !== undefined)
       return { ...search, map: undefined, scoreId: undefined, scoreIdBL: undefined, difficulty: undefined };
     if (search.scoreId !== undefined) return { ...search, map: undefined, scoreIdBL: undefined, difficulty: undefined };
     if (search.scoreIdBL !== undefined) return { ...search, map: undefined, scoreId: undefined, difficulty: undefined };
+    if (search.previewSource !== undefined && search.map === undefined) {
+      return {
+        ...search,
+        previewSource: undefined,
+        previewDifficulty: undefined,
+        previewCharacteristic: undefined,
+        previewStartSeconds: undefined,
+      };
+    }
     return search;
   }),
 );
