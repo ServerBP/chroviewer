@@ -13,7 +13,18 @@ const sourceFrameAncestors = {
   beatleader: ['https://beatleader.com', 'https://beatleader.xyz'],
 };
 
-const beatKhanaFrameAncestors = ['https://beatkhana.com', 'https://*.beatkhana.com', 'https://*.shyyluna.dev'];
+const beatKhanaFrameAncestors = [
+  'https://beatkhana.com',
+  'https://*.beatkhana.com',
+  // CSP wildcard host sources do not reliably cover nested subdomains such as
+  // view.replay.beatkhana.com, and every ancestor in a nested iframe chain
+  // must be allowed explicitly.
+  'https://view.beatkhana.com',
+  'https://view.replay.beatkhana.com',
+  'https://replay.beatkhana.com',
+  'https://*.replay.beatkhana.com',
+  'https://*.shyyluna.dev',
+];
 
 export default defineConfig(({ mode }) => {
   const enabledSources = enabledViewerSourcesSchema.parse(loadEnv(mode, process.cwd(), 'VITE_').VITE_ENABLED_SOURCES);
