@@ -17,6 +17,7 @@ interface UseViewerShareOptions {
   liveTarget?: LiveTarget;
   mapIdentity: MapIdentity | null;
   scoreId: string | null;
+  scoreIdBL: string | null;
   selectedDifficultyIndex: number;
   settings: ViewerSettings;
   sourceLink: ViewerSourceLink | null;
@@ -29,6 +30,7 @@ export function useViewerShare({
   liveTarget,
   mapIdentity,
   scoreId,
+  scoreIdBL,
   selectedDifficultyIndex,
   settings,
   sourceLink,
@@ -60,6 +62,7 @@ export function useViewerShare({
           matchId: liveTarget.matchId,
         };
   if (source === null && scoreId !== null) source = { type: 'score', scoreId };
+  if (source === null && scoreIdBL !== null) source = { type: 'score-bl', scoreId: scoreIdBL };
   if (source === null && sourceLink !== null) {
     source =
       sourceLink.type === 'map'

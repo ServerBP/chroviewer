@@ -56,6 +56,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@tanstack/react-router@1.170.18": "patches/@tanstack%2Freact-router@1.170.18.patch",
+  },
   "packages": {
     "@apidevtools/json-schema-ref-parser": ["@apidevtools/json-schema-ref-parser@14.0.1", "", { "dependencies": { "@types/json-schema": "^7.0.15", "js-yaml": "^4.1.0" } }, "sha512-Oc96zvmxx1fqoSEdUmfmvvb59/KDOnUoJ7s2t7bISyAn0XEz57LCCw8k2Y4Pf3mwKaZLMciESALORLgfe2frCw=="],
 

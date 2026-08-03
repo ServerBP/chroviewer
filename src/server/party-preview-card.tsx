@@ -56,7 +56,7 @@ export function PartyPreviewCard({ playerName, images }: { playerName: string | 
       >
         {images.logo === null ? null : <img src={images.logo} width={38} height={38} />}
         <div style={{ display: 'flex', color: 'rgba(240,242,248,0.78)', fontSize: 27, fontWeight: 600 }}>
-          ScoreSaber Watch
+          ChroViewer
         </div>
       </div>
 

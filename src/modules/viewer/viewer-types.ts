@@ -1,6 +1,7 @@
 import type { InfoColorScheme, InfoDifficulty } from '../../core/beatmap/info';
 import type { Difficulty } from '../../core/beatmap/types';
 import type { MapRenderData } from '../../core/placement/map-render-data';
+import type { ConfigurableViewerSource } from '../../sources/source-types';
 
 export interface MapMeta {
   title: string;
@@ -42,4 +43,4 @@ export interface ActiveSelection {
 
 export type ViewerPanel = 'share' | 'shortcuts' | 'speed' | 'lights' | 'camera' | 'volume' | null;
 
-export type ViewerSource = 'beatsaver' | 'link' | 'scoresaber';
+export type ViewerSource = ConfigurableViewerSource | 'link';

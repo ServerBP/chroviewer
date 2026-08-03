@@ -1,5 +1,6 @@
 import { Result } from 'better-result';
 
+import { isBeatLeaderReplay, parseBeatLeaderReplay } from '../../replay/parse-beatleader';
 import { parseScoreSaberReplay } from '../../replay/parse-scoresaber';
 import { parseInfo } from '../info';
 import { parseDifficulty } from '../parse';
@@ -10,11 +11,13 @@ async function execute(request: WorkerRequest): Promise<WorkerSuccess> {
     return { id: request.id, ok: true, kind: request.kind, result: parseInfo(request.text) };
   }
   if (request.kind === 'replay') {
+    const bytes = new Uint8Array(request.data);
+    const replay = isBeatLeaderReplay(bytes) ? parseBeatLeaderReplay(bytes) : await parseScoreSaberReplay(bytes);
     return {
       id: request.id,
       ok: true,
       kind: request.kind,
-      result: await parseScoreSaberReplay(new Uint8Array(request.data)),
+      result: replay,
     };
   }
   return {

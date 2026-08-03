@@ -10,14 +10,14 @@ export const getPartyPreviewMetadata = createServerFn({ method: 'GET' })
     if (result.isErr()) {
       return {
         title: 'Join this watch party',
-        description: 'Watch Beat Saber together live on ScoreSaber Watch',
+        description: 'Watch Beat Saber together live on ChroViewer',
         playerName: null,
         avatarUrl: null,
       };
     }
     return {
       title: `Join ${result.value.name}'s watch party`,
-      description: 'Watch Beat Saber together live on ScoreSaber Watch',
+      description: 'Watch Beat Saber together live on ChroViewer',
       playerName: result.value.name,
       avatarUrl: result.value.avatar,
     };

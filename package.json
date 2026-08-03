@@ -76,5 +76,8 @@
     "typecheck": "tsc --noEmit",
     "check": "bun run format:check && bun run api:check && bun run proto:check && bun run typecheck && bun run lint && bun test && bun run build"
   },
-  "type": "module"
+  "type": "module",
+  "patchedDependencies": {
+    "@tanstack/react-router@1.170.18": "patches/@tanstack%2Freact-router@1.170.18.patch"
+  }
 }

@@ -40,7 +40,14 @@ interface ViewerSessionOptions {
   settingsRef: RefObject<ViewerSettings>;
   sources: Pick<
     ViewerSources,
-    'audioDataRef' | 'pendingSharedViewRef' | 'replayRef' | 'rows' | 'scoreSaberLeaderboards' | 'songBpm'
+    | 'audioDataRef'
+    | 'pendingSharedViewRef'
+    | 'replayRef'
+    | 'rows'
+    | 'scoreSaberLeaderboards'
+    | 'beatLeaderLeaderboards'
+    | 'songBpm'
+    | 'shareScoreIdBL'
   >;
   transport: Pick<SongTransport, 'clockRef' | 'load' | 'play' | 'seek' | 'setHitsoundEvents'>;
   performance: RenderPerformanceOptions;
@@ -425,18 +432,23 @@ export function useViewerSession({
       : selectedCharacteristic.startsWith('Solo')
         ? selectedCharacteristic
         : `Solo${selectedCharacteristic}`;
-  const scoreSaberLeaderboard =
+  const isBeatLeaderReplay =
+    sources.shareScoreIdBL !== null || sources.replayRef.current?.metadata.version.includes('BeatLeader') === true;
+  const leaderboardPlatform: 'scoresaber' | 'beatleader' = isBeatLeaderReplay ? 'beatleader' : 'scoresaber';
+  const leaderboard =
     selectedRow?.infoDifficulty === undefined || selectedGameMode === null
       ? undefined
-      : sources.scoreSaberLeaderboards.find(
-          (leaderboard) =>
-            leaderboard.difficulty === difficultyRank(selectedRow.infoDifficulty?.difficulty ?? '') &&
-            leaderboard.gameMode.toLowerCase() === selectedGameMode.toLowerCase(),
+      : (isBeatLeaderReplay ? sources.beatLeaderLeaderboards : sources.scoreSaberLeaderboards).find(
+          (candidate) =>
+            candidate.difficulty === difficultyRank(selectedRow.infoDifficulty?.difficulty ?? '') &&
+            candidate.gameMode.toLowerCase() === selectedGameMode.toLowerCase(),
         );
-  const scoreSaberUrl =
-    scoreSaberLeaderboard === undefined
+  const leaderboardUrl =
+    leaderboard === undefined
       ? null
-      : `https://scoresaber.com/leaderboard/${String(scoreSaberLeaderboard.id)}`;
+      : isBeatLeaderReplay
+        ? `https://beatleader.com/leaderboard/global/${leaderboard.id}`
+        : `https://scoresaber.com/leaderboard/${leaderboard.id}`;
 
   return {
     canvasRef,
@@ -450,7 +462,8 @@ export function useViewerSession({
     cycleLights,
     difficultyOptions,
     environmentLoading,
-    scoreSaberUrl,
+    leaderboardUrl,
+    leaderboardPlatform,
     selectDifficulty,
     selectedDifficultyIndex,
     selectedKey,

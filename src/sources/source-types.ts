@@ -2,6 +2,9 @@ import type { Result } from 'better-result';
 
 import type { SourceError } from './source-error';
 
+export type ConfigurableViewerSource = 'beatsaver' | 'scoresaber' | 'beatleader';
+export const configurableViewerSources: readonly ConfigurableViewerSource[] = ['beatsaver', 'scoresaber', 'beatleader'];
+
 export interface MapSourceFile {
   name: string;
   text: () => Promise<string>;
@@ -21,6 +24,12 @@ export interface MapLookup {
 
 export interface ScoreSaberLeaderboard {
   id: number;
+  difficulty: number;
+  gameMode: string;
+}
+
+export interface BeatLeaderLeaderboard {
+  id: string;
   difficulty: number;
   gameMode: string;
 }

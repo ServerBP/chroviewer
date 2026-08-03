@@ -57,8 +57,16 @@ interface ReplayStateIndex {
   scoringNotes: Uint32Array;
 }
 
+const defaultDefinition: ScoreDefinition = {
+  center: 15,
+  beforeMin: 0,
+  beforeMax: 70,
+  afterMin: 0,
+  afterMax: 30,
+  fixed: 0,
+};
 const definitions: Record<number, ScoreDefinition> = {
-  3: { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 0, afterMax: 30, fixed: 0 },
+  3: defaultDefinition,
   4: { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 },
   5: { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 0, afterMax: 30, fixed: 0 },
   6: { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 0, afterMax: 0, fixed: 0 },
@@ -82,10 +90,19 @@ function roundToEven(value: number) {
   return lower % 2 === 0 ? lower : lower + 1;
 }
 
-function cutScore(note: ReplayNoteEvent): CutScore | undefined {
-  if (note.eventType !== 1) return undefined;
+function scoreDefinition(note: ReplayNoteEvent) {
   const definition = definitions[(note.noteId.scoringType ?? 1) + 2];
-  if (definition === undefined) return undefined;
+  return definition ?? defaultDefinition;
+}
+
+export function replayNoteMaximumScore(note: ReplayNoteEvent) {
+  const definition = scoreDefinition(note);
+  return definition.beforeMax + definition.afterMax + definition.center + definition.fixed;
+}
+
+export function replayCutScore(note: ReplayNoteEvent): CutScore | undefined {
+  if (note.eventType !== 1) return undefined;
+  const definition = scoreDefinition(note);
   const before = clamp(
     roundToEven(definition.beforeMax * note.beforeCutRating),
     definition.beforeMin,
@@ -193,7 +210,7 @@ export function buildReplayScoreTimeline(replay: Replay): ReplayScoreTimeline {
       kind: 'note',
       time: note.time,
       note,
-      cutScore: cutScore(note),
+      cutScore: replayCutScore(note),
       index,
     })),
     ...replay.walls.map<OrderedReplayTimelineEvent>((wall, index) => ({

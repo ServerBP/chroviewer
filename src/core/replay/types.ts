@@ -66,6 +66,10 @@ export interface ReplayMetadata {
   arcsHapticFeedback?: boolean;
   arcVisibility?: number;
   controllerOffsets?: ReplayControllerOffsets;
+  player?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface ReplayPose {

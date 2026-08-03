@@ -18,6 +18,7 @@ interface LiveViewerPanelProps {
   chatOpen: boolean;
   live: LiveExperience;
   onChatOpenChange: (open: boolean) => void;
+  playerId: string;
 }
 
 export function LiveViewerPanel({
@@ -26,8 +27,28 @@ export function LiveViewerPanel({
   chatOpen,
   live,
   onChatOpenChange,
+  playerId,
 }: LiveViewerPanelProps) {
   const t = useTranslations('live');
+  const watchUrl =
+    window.location.hostname === 'chroviewer.com'
+      ? `https://watch.scoresaber.com/?${new URLSearchParams({ playerId }).toString()}`
+      : undefined;
+  const disabledPrompt =
+    watchUrl === undefined
+      ? undefined
+      : t.rich('chat.watch', {
+          scoresaber: (chunks) => (
+            <a
+              className="text-primary underline underline-offset-2"
+              href={watchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {chunks}
+            </a>
+          ),
+        });
 
   if (!chatEnabled && live.player === null && !live.playerProfilePending) return null;
 
@@ -49,18 +70,15 @@ export function LiveViewerPanel({
         <div className="shrink-0">
           <LivePlayerCard live={live} />
         </div>
-        {chatEnabled && <LiveChat inputRef={chatInputRef} live={live} open={chatOpen} onToggle={toggleChat} />}
-      </div>
-
-      <div
-        className={cn(
-          'bg-card/92 fixed inset-x-0 bottom-[var(--live-keyboard-inset)] z-40 hidden flex-col pr-[env(safe-area-inset-right)] pb-[var(--live-safe-area-bottom)] pl-[env(safe-area-inset-left)] max-sm:flex',
-          chatOpen &&
-            'animate-in slide-in-from-bottom-4 fade-in h-[calc(var(--live-mobile-chat-height)+env(safe-area-inset-bottom))] duration-300',
+        {chatEnabled && (
+          <LiveChat
+            disabledPrompt={disabledPrompt}
+            inputRef={chatInputRef}
+            live={live}
+            open={chatOpen}
+            onToggle={toggleChat}
+          />
         )}
-      >
-        <LivePlayerCard live={live} />
-        {chatEnabled && <LiveChat inputRef={chatInputRef} live={live} open={chatOpen} onToggle={toggleChat} />}
       </div>
 
       {chatEnabled && (

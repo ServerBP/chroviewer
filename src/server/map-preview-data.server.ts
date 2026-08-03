@@ -58,10 +58,13 @@ const mapPreviewSchema = z.object({
   versions: z.tuple([mapPreviewVersionSchema], mapPreviewVersionSchema),
 }) satisfies z.ZodType<MapPreviewData>;
 
+const mapTimeoutMs = 4_000;
+
 export function fetchMapPreviewData(mapKey: string) {
   return requestJson(`${env.VITE_BEATSAVER_API_URL}/maps/id/${mapKey}`, mapPreviewSchema, {
     source: 'beatsaver',
     label: `BeatSaver map ${mapKey}`,
     operation: 'load-map-preview',
+    signal: AbortSignal.timeout(mapTimeoutMs),
   });
 }

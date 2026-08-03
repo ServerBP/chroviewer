@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 
+import { Result } from 'better-result';
+
 import { firstHitsoundAfter, HitsoundPlayer, type HitsoundEvent } from '../../core/clock/hitsounds';
 import type { SongClock } from '../../core/clock/song-clock';
+import { loadCustomHitsound } from '../../core/hitsound-storage';
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
-import type { ViewerSettings } from '../../core/viewer-settings';
+import type { HitsoundPreset, ViewerSettings } from '../../core/viewer-settings';
 
 interface HitsoundPlaybackOptions {
   audioOffset: number;
@@ -11,6 +14,9 @@ interface HitsoundPlaybackOptions {
   lightshowModeRef: RefObject<LightshowMode>;
   settingsRef: RefObject<ViewerSettings>;
   volume: number;
+  hitsoundPreset: HitsoundPreset;
+  customGoodHitsound: string | null;
+  customBadHitsound: string | null;
 }
 
 export function useHitsoundPlayback({
@@ -19,6 +25,9 @@ export function useHitsoundPlayback({
   lightshowModeRef,
   settingsRef,
   volume,
+  hitsoundPreset,
+  customGoodHitsound,
+  customBadHitsound,
 }: HitsoundPlaybackOptions) {
   const [player] = useState(() => new HitsoundPlayer());
   const eventsRef = useRef<HitsoundEvent[]>([]);
@@ -28,6 +37,66 @@ export function useHitsoundPlayback({
   useEffect(() => {
     player.setVolume(volume);
   }, [player, volume]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void player.setBuffers(null, null);
+
+    void (async () => {
+      let goodBuffer: ArrayBuffer | null = null;
+      let badBuffer: ArrayBuffer | null = null;
+
+      if (hitsoundPreset === 'custom') {
+        const [goodResult, badResult] = await Promise.all([
+          customGoodHitsound === null ? Result.ok(null) : loadCustomHitsound('good'),
+          customBadHitsound === null ? Result.ok(null) : loadCustomHitsound('bad'),
+        ]);
+        if (controller.signal.aborted) return;
+        if (goodResult.isErr()) {
+          console.warn(goodResult.error);
+          return;
+        }
+        if (badResult.isErr()) {
+          console.warn(badResult.error);
+          return;
+        }
+        goodBuffer = goodResult.value;
+        badBuffer = badResult.value;
+      } else if (hitsoundPreset !== 'default') {
+        const response = await Result.tryPromise({
+          try: () => fetch(`${import.meta.env.BASE_URL}hitsounds/${hitsoundPreset}.wav`, { signal: controller.signal }),
+          catch: (cause) => new Error(`Hitsound preset ${hitsoundPreset} could not be loaded`, { cause }),
+        });
+        if (controller.signal.aborted) return;
+        if (response.isErr()) {
+          console.warn(response.error);
+          return;
+        }
+        if (!response.value.ok) {
+          console.warn(
+            new Error(`Hitsound preset ${hitsoundPreset} could not be loaded (${String(response.value.status)})`),
+          );
+          return;
+        }
+        const buffer = await Result.tryPromise({
+          try: () => response.value.arrayBuffer(),
+          catch: (cause) => new Error(`Hitsound preset ${hitsoundPreset} could not be read`, { cause }),
+        });
+        if (buffer.isErr()) {
+          console.warn(buffer.error);
+          return;
+        }
+        goodBuffer = buffer.value;
+      }
+
+      if (controller.signal.aborted) return;
+      const updated = await player.setBuffers(goodBuffer, badBuffer);
+      if (updated.isErr()) console.warn(updated.error);
+    })();
+    return () => {
+      controller.abort();
+    };
+  }, [player, hitsoundPreset, customGoodHitsound, customBadHitsound]);
 
   useEffect(() => {
     player.stop();
@@ -55,8 +124,11 @@ export function useHitsoundPlayback({
           const events = eventsRef.current;
           let index = indexRef.current;
           if (currentTime > timeRef.current) {
-            timeRef.current = currentTime - 1e-6;
-            index = firstHitsoundAfter(events, timeRef.current - scaledAudioOffset);
+            const nextTime = currentTime - 1e-6;
+            if (nextTime > timeRef.current) {
+              timeRef.current = nextTime;
+              index = firstHitsoundAfter(events, timeRef.current - scaledAudioOffset);
+            }
           }
           while (index < events.length) {
             const event = events[index];

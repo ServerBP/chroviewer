@@ -38,7 +38,8 @@ interface MapSummaryCardProps {
   coverUrl: string | null;
   mapKey: string | null;
   mapHash: string | null;
-  scoreSaberUrl: string | null;
+  leaderboardUrl: string | null;
+  leaderboardPlatform: 'scoresaber' | 'beatleader' | null;
   options: DifficultyOption[];
   selectedKey: string;
   settingsOpen: boolean;
@@ -60,7 +61,8 @@ export function MapSummaryCard({
   coverUrl,
   mapKey,
   mapHash,
-  scoreSaberUrl,
+  leaderboardUrl,
+  leaderboardPlatform,
   options,
   selectedKey,
   settingsOpen,
@@ -217,18 +219,18 @@ export function MapSummaryCard({
               </a>
             </Button>
           )}
-          {scoreSaberUrl !== null && (
+          {leaderboardUrl !== null && leaderboardPlatform !== null && (
             <Button className="size-5" variant="ghost" size="icon-sm" asChild>
               <a
-                href={scoreSaberUrl}
+                href={leaderboardUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={t('openScoreSaber')}
-                title={t('openScoreSaber')}
+                aria-label={leaderboardPlatform === 'beatleader' ? t('openBeatLeader') : t('openScoreSaber')}
+                title={leaderboardPlatform === 'beatleader' ? t('openBeatLeader') : t('openScoreSaber')}
               >
                 <img
                   className="block size-4 shrink-0 object-contain"
-                  src={`${import.meta.env.BASE_URL}scoresaber.svg`}
+                  src={`${import.meta.env.BASE_URL}${leaderboardPlatform}.svg`}
                   alt=""
                 />
               </a>

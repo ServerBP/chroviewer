@@ -33,6 +33,7 @@
       "sendFailed": "That message was not sent. Check it and try again",
       "sending": "Sending",
       "signIn": "Sign in to ScoreSaber to chat",
+      "watch": "Watch on <scoresaber>ScoreSaber</scoresaber> to chat",
       "transcript": "Chat messages",
       "unknown": "Unknown",
       "you": "You"
@@ -111,10 +112,15 @@
       "audioOffset": "Audio offset",
       "audioOffsetDescription": "Shifts the song and hitsounds together. Negative values play them earlier; positive values play them later.",
       "autoHideControls": "Auto-hide controls",
+      "customBadHitsound": "Bad cut file",
+      "customGoodHitsound": "Good hit file",
+      "customHitsoundHelp": "Select a local audio file",
       "hitLine": "Hit line",
       "hitLineDescription": "Show the note hit position on the platform",
       "hitNotes": "Hit notes",
       "hitNotesDescription": "Remove notes when they reach the hit plane",
+      "hitsoundPreset": "Preset",
+      "hitsounds": "Hitsounds",
       "interface": "Interface",
       "keepMapInfoVisible": "Keep map info visible when controls are hidden",
       "mapCache": "Map cache",
@@ -124,6 +130,8 @@
       "milliseconds": "{value} ms",
       "playerFacingNotes": "Player-facing notes",
       "playerFacingNotesDescription": "Rotate notes toward the \"player's\" head",
+      "presetCustom": "Custom files",
+      "presetDefault": "Default",
       "reverseTimelineScroll": "Reverse timeline scrolling",
       "retryMapCache": "Try again",
       "startAudioCalibration": "Start",
@@ -242,6 +250,10 @@
     "waitingForHostStart": "Waiting for host to start map..."
   },
   "source": {
+    "beatleader": "BeatLeader",
+    "beatleaderInputLabel": "BeatLeader replay",
+    "beatleaderInputPlaceholder": "Score ID",
+    "invalidBeatLeaderScoreId": "Enter a BeatLeader score ID",
     "beatsaver": "BeatSaver",
     "beatsaverInputLabel": "BeatSaver map",
     "beatsaverInputPlaceholder": "Map key or URL",
@@ -249,7 +261,7 @@
     "invalidLink": "Enter a valid HTTPS link",
     "link": "Link",
     "linkInputLabel": "Map or ScoreSaber replay link",
-    "linkInputPlaceholder": "Map ZIP or replay .dat URL",
+    "linkInputPlaceholder": "Map ZIP or replay URL",
     "loadGroup": "Load a map or replay",
     "loadLink": "Load link",
     "loadMap": "Load map",
@@ -275,6 +287,7 @@
     "clickToUnmute": "Enable audio",
     "errors": {
       "audioDecode": "Audio could not be decoded; using silent playback",
+      "beatleaderReplayMapMismatch": "BeatLeader replay map hash does not match its score metadata",
       "copyMapInfo": "Could not copy map info",
       "copyShareLink": "Could not copy share link",
       "failedEnvironment": "Failed to load environment",
@@ -286,7 +299,8 @@
       "replayDifficultyMismatch": "ScoreSaber replay difficulty does not match its score metadata",
       "replayMapMismatch": "ScoreSaber replay map hash does not match its score metadata",
       "replayMissingHash": "ScoreSaber replay is missing a custom map hash",
-      "selectReplayDifficulty": "Select the difficulty and characteristic recorded by the replay"
+      "selectReplayDifficulty": "Select the difficulty and characteristic recorded by the replay",
+      "sourceDisabled": "This source is not enabled on this ChroViewer deployment"
     },
     "map": {
       "byAuthor": "by {author}",
@@ -298,6 +312,7 @@
       "mappedBy": "mapped by {mapper}",
       "openBeatSaver": "Open map on BeatSaver",
       "openScoreSaber": "Open leaderboard on ScoreSaber",
+      "openBeatLeader": "Open leaderboard on BeatLeader",
       "selectDifficulty": "Select difficulty"
     },
     "shortcuts": {

@@ -11,6 +11,7 @@ WORKDIR /app
 ARG BUILD_CACHE_SCOPE
 
 COPY package.json bun.lock ./
+COPY patches ./patches
 RUN --mount=type=cache,id=chroviewer-${BUILD_CACHE_SCOPE}-bun,target=/root/.bun/install/cache,sharing=locked \
     bun install --frozen-lockfile --ignore-scripts
 
@@ -23,13 +24,17 @@ COPY . .
 ARG BUILD_CACHE_SCOPE
 ARG VITE_BEATSAVER_API_URL=https://api.beatsaver.com
 ARG VITE_SCORESABER_API_URL=https://scoresaber.com
+ARG VITE_BEATLEADER_API_URL=https://api.beatleader.com
 ARG VITE_LUDUS_URL=https://ludus-1.scoresaber.com
 ARG VITE_TA_LIVE_SOCKET_URL=wss://server.tournamentassistant.net:8676
+ARG VITE_ENABLED_SOURCES=beatsaver,scoresaber,beatleader
 
 ENV NODE_ENV=production \
     VITE_BEATSAVER_API_URL=${VITE_BEATSAVER_API_URL} \
     VITE_SCORESABER_API_URL=${VITE_SCORESABER_API_URL} \
+    VITE_BEATLEADER_API_URL=${VITE_BEATLEADER_API_URL} \
     VITE_LUDUS_URL=${VITE_LUDUS_URL} \
+    VITE_ENABLED_SOURCES=${VITE_ENABLED_SOURCES} \
     VITE_TA_LIVE_SOCKET_URL=${VITE_TA_LIVE_SOCKET_URL}
 
 RUN --mount=type=cache,id=chroviewer-${BUILD_CACHE_SCOPE}-vite,target=/app/node_modules/.vite,sharing=locked \

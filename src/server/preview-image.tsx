@@ -320,10 +320,14 @@ function Chip({
 }
 
 function ReplayPreviewCard({
+  titleText = 'ScoreSaber Replay',
+  accentColor = '#ffde18',
   data,
   player,
   images,
 }: {
+  titleText?: string;
+  accentColor?: string;
   data: ReplayPreviewScore;
   player: ScoreSaberReplayPlayer | null;
   images: PreviewImages;
@@ -390,7 +394,7 @@ function ReplayPreviewCard({
           bottom: 0,
           display: 'flex',
           height: 6,
-          background: 'linear-gradient(90deg, #ffde18 0%, rgba(255,222,24,0.35) 52%, rgba(255,222,24,0) 88%)',
+          background: `linear-gradient(90deg, ${accentColor} 0%, ${accentColor}80 52%, ${accentColor}00 88%)`,
         }}
       />
 
@@ -413,7 +417,7 @@ function ReplayPreviewCard({
             fontWeight: 600,
           }}
         >
-          ScoreSaber Replay
+          {titleText}
         </div>
       </div>
 

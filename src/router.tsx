@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRouter, defaultParseSearch } from '@tanstack/react-router';
+import { AlertCircle, LoaderCircle } from 'lucide-react';
 
 import { createQueryClient } from './app/query-client';
 import { routeTree } from './routeTree.gen';
@@ -159,12 +160,46 @@ function appendSearchValue(searchParams: URLSearchParams, key: string, value: Ro
   searchParams.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
 }
 
+function PendingFallback() {
+  return (
+    <main className="flex h-dvh items-center justify-center bg-black text-white">
+      <LoaderCircle className="size-11 animate-spin" strokeWidth={1.75} aria-label="Loading" />
+    </main>
+  );
+}
+
+function ErrorFallback({ error }: { error: unknown }) {
+  return (
+    <main className="flex h-dvh flex-col items-center justify-center gap-4 bg-black text-white">
+      <AlertCircle className="size-11" strokeWidth={1.75} />
+      <span className="text-lg font-semibold tracking-wide">Something went wrong</span>
+      {error instanceof Error && error.message !== '' && (
+        <span className="max-w-[min(34rem,calc(100vw-1.5rem))] text-sm text-white/60">{error.message}</span>
+      )}
+      <button
+        className="rounded-full border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
+        type="button"
+        onClick={() => {
+          window.location.reload();
+        }}
+      >
+        Reload
+      </button>
+    </main>
+  );
+}
+
 export function getRouter() {
   const queryClient = createQueryClient();
 
   return createRouter({
     routeTree,
     context: { queryClient },
+    defaultErrorComponent: ErrorFallback,
+    defaultOnCatch: (error) => {
+      console.error(error);
+    },
+    defaultPendingComponent: PendingFallback,
     defaultPreload: 'intent',
     defaultPreloadDelay: 30,
     defaultViewTransition: false,

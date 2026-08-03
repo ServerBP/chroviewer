@@ -3,7 +3,7 @@ import { useFormatter, useTranslations } from 'use-intl';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Slider } from '@/components/ui/slider';
 
 interface PlaybackSpeedMenuProps {
   open: boolean;
@@ -12,23 +12,10 @@ interface PlaybackSpeedMenuProps {
   onPlaybackRateChange: (rate: number) => void;
 }
 
-const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
 export function PlaybackSpeedMenu({ open, playbackRate, onOpenChange, onPlaybackRateChange }: PlaybackSpeedMenuProps) {
   const format = useFormatter();
   const t = useTranslations('viewer.transport');
-
-  function selectPlaybackRate(value: string) {
-    switch (value) {
-      case '0.5':
-      case '0.75':
-      case '1':
-      case '1.25':
-      case '1.5':
-      case '2':
-        onPlaybackRateChange(Number(value));
-    }
-  }
+  const sliderValue = playbackRate === 0.01 ? 0 : playbackRate;
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -43,21 +30,26 @@ export function PlaybackSpeedMenu({ open, playbackRate, onOpenChange, onPlayback
           <Gauge />
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="center" sideOffset={12} className="w-28 p-1">
-        <ToggleGroup
-          className="flex w-full flex-col"
-          type="single"
-          orientation="vertical"
-          value={String(playbackRate)}
-          aria-label={t('playbackSpeed')}
-          onValueChange={selectPlaybackRate}
-        >
-          {playbackRates.map((rate) => (
-            <ToggleGroupItem className="w-full" key={rate} value={String(rate)}>
-              {t('speedValue', { speed: format.number(rate) })}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+      <PopoverContent side="top" align="center" sideOffset={12} className="w-56 p-3">
+        <div className="flex flex-col gap-2">
+          <span className="text-muted-foreground text-center text-xs font-medium tabular-nums">
+            {t('speedValue', {
+              speed: format.number(playbackRate, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            })}
+          </span>
+          <Slider
+            variant="notched"
+            orientation="horizontal"
+            notchDivisor={5}
+            min={0}
+            max={2}
+            step={0.05}
+            value={[sliderValue]}
+            onValueChange={([rate]) => {
+              onPlaybackRateChange(rate === 0 ? 0.01 : (rate ?? 1));
+            }}
+          />
+        </div>
       </PopoverContent>
     </Popover>
   );

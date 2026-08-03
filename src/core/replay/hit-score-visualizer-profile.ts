@@ -7,6 +7,7 @@ export const MAX_HSV_PROFILE_BYTES = 32 * 1024;
 
 const maxListItems = 32;
 const maxStringBytes = 512;
+const utf8Encoder = new TextEncoder();
 const latestSupportedMinor = 7;
 const displayModes = ['none', 'format', 'textonly', 'numeric', 'scoreontop', 'directions'] as const;
 const badCutTypes = ['all', 'wrongdirection', 'wrongcolor', 'bomb'] as const;
@@ -112,7 +113,7 @@ function validateList(values: readonly unknown[] | undefined, name: string) {
 }
 
 function validateText(value: string, name: string) {
-  return new TextEncoder().encode(value).length <= maxStringBytes
+  return utf8Encoder.encode(value).length <= maxStringBytes
     ? Result.ok(undefined)
     : Result.err(invalid(`${name} contains text longer than ${String(maxStringBytes)} bytes`));
 }
@@ -321,7 +322,7 @@ function readProfile(profile: Profile) {
 }
 
 export function parseHitScoreVisualizerProfile(text: string) {
-  if (new TextEncoder().encode(text).length > MAX_HSV_PROFILE_BYTES)
+  if (utf8Encoder.encode(text).length > MAX_HSV_PROFILE_BYTES)
     return Result.err(invalid(`profile is larger than ${String(MAX_HSV_PROFILE_BYTES / 1024)} KB`));
   const json = Result.try({
     try: (): unknown => JSON.parse(text),

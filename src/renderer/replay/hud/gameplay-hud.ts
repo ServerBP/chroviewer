@@ -188,6 +188,7 @@ export class ReplayGameplayHud {
     if (timeline === null) return;
     this.timeline = buildReplayTimeline(timeline.replay, timeline.hitScoreVisualizer);
     this.comboBreakTime = firstComboBreakTime(timeline.replay);
+    this.scoreHud.visible = timeline.replay.scores.length > 0;
     this.refreshDuration();
   }
 

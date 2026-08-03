@@ -20,6 +20,7 @@ const groupWindowMs = 5 * 60 * 1000;
 
 interface LiveChatProps {
   disabledPlaceholder?: string;
+  disabledPrompt?: ReactNode;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   live: ChatExperience;
   open: boolean;
@@ -27,7 +28,15 @@ interface LiveChatProps {
   renderMessageActions?: (message: LiveChatMessage) => ReactNode;
 }
 
-export function LiveChat({ disabledPlaceholder, inputRef, live, open, onToggle, renderMessageActions }: LiveChatProps) {
+export function LiveChat({
+  disabledPlaceholder,
+  disabledPrompt,
+  inputRef,
+  live,
+  open,
+  onToggle,
+  renderMessageActions,
+}: LiveChatProps) {
   const t = useTranslations('live');
   const [draft, setDraft] = useState('');
   const [newMessageCount, setNewMessageCount] = useState(0);
@@ -182,20 +191,26 @@ export function LiveChat({ disabledPlaceholder, inputRef, live, open, onToggle, 
               </Button>
             )}
             <InputGroup className="bg-background/75 h-auto min-h-10 items-end">
-              <InputGroupTextarea
-                ref={inputRef}
-                data-live-chat-input
-                rows={1}
-                value={draft}
-                disabled={!live.canChat}
-                placeholder={inputPlaceholder}
-                aria-label={t('chat.message')}
-                className="max-h-28 min-h-10 py-2.5"
-                onChange={(event) => {
-                  setDraft(Array.from(event.currentTarget.value).slice(0, messageLimit).join(''));
-                }}
-                onKeyDown={handleKeyDown}
-              />
+              {!live.canChat && disabledPrompt !== undefined ? (
+                <div className="text-muted-foreground flex min-h-10 flex-1 items-center px-3 py-2.5 text-sm opacity-50">
+                  {disabledPrompt}
+                </div>
+              ) : (
+                <InputGroupTextarea
+                  ref={inputRef}
+                  data-live-chat-input
+                  rows={1}
+                  value={draft}
+                  disabled={!live.canChat}
+                  placeholder={inputPlaceholder}
+                  aria-label={t('chat.message')}
+                  className="max-h-28 min-h-10 py-2.5"
+                  onChange={(event) => {
+                    setDraft(Array.from(event.currentTarget.value).slice(0, messageLimit).join(''));
+                  }}
+                  onKeyDown={handleKeyDown}
+                />
+              )}
               {characters >= 450 && (
                 <span
                   className={cn(

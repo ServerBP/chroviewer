@@ -7,12 +7,15 @@ import { viewerSearchSchema } from '../modules/viewer/viewer-search';
 import { getMapPreviewMetadata } from '../server/map-preview-metadata.functions';
 import { getPartyPreviewMetadata } from '../server/party-preview-metadata.functions';
 import { getReplayPreviewTitle } from '../server/replay-preview-metadata.functions';
+import { isViewerSourceEnabled } from '../sources/source-config';
 
 const requestOrigin = createIsomorphicFn()
   .server(() => getRequestUrl().origin)
   .client(() => window.location.origin);
 
-const defaultImage = 'https://scoresaber.com/ScoreSaber-iOS-Default-1024x1024@1x.png';
+// head() blocks route rendering on both server and client; a hung metadata
+// request must never hold the page hostage
+const headMetadataTimeoutMs = 6_000;
 
 export const Route = createFileRoute('/')({
   ssr: false,
@@ -21,14 +24,18 @@ export const Route = createFileRoute('/')({
     const partyPlayerId = match.search.party;
     if (partyPlayerId !== undefined) {
       const metadataResult = await Result.tryPromise({
-        try: () => getPartyPreviewMetadata({ data: { playerId: partyPlayerId } }),
+        try: () =>
+          getPartyPreviewMetadata({
+            data: { playerId: partyPlayerId },
+            signal: AbortSignal.timeout(headMetadataTimeoutMs),
+          }),
         catch: (cause) => cause,
       });
       const metadata = metadataResult.isOk()
         ? metadataResult.value
         : {
             title: 'Join this watch party',
-            description: 'Watch Beat Saber together live on ScoreSaber Watch',
+            description: 'Watch Beat Saber together live on ChroViewer',
             playerName: null,
             avatarUrl: null,
           };
@@ -59,9 +66,9 @@ export const Route = createFileRoute('/')({
     }
 
     const scoreId = match.search.scoreId;
-    if (scoreId !== undefined) {
+    if (scoreId !== undefined && isViewerSourceEnabled('scoresaber')) {
       const titleResult = await Result.tryPromise({
-        try: () => getReplayPreviewTitle({ data: { scoreId } }),
+        try: () => getReplayPreviewTitle({ data: { scoreId }, signal: AbortSignal.timeout(headMetadataTimeoutMs) }),
         catch: (cause) => cause,
       });
       const title = titleResult.isOk() ? titleResult.value : 'ScoreSaber Replay';
@@ -71,6 +78,7 @@ export const Route = createFileRoute('/')({
       return {
         meta: [
           { title },
+          { name: 'theme-color', content: '#facc15' },
           { property: 'og:title', content: title },
           { property: 'og:description', content: description },
           { name: 'description', content: description },
@@ -89,9 +97,9 @@ export const Route = createFileRoute('/')({
     }
 
     const mapKey = match.search.map?.match(/^[0-9a-f]{1,16}$/i)?.[0].toLowerCase();
-    if (mapKey !== undefined) {
+    if (mapKey !== undefined && isViewerSourceEnabled('beatsaver')) {
       const metadataResult = await Result.tryPromise({
-        try: () => getMapPreviewMetadata({ data: { mapKey } }),
+        try: () => getMapPreviewMetadata({ data: { mapKey }, signal: AbortSignal.timeout(headMetadataTimeoutMs) }),
         catch: (cause) => cause,
       });
       const metadata = metadataResult.isOk()
@@ -102,6 +110,8 @@ export const Route = createFileRoute('/')({
       return {
         meta: [
           { title: metadata.title },
+          { name: 'theme-color', content: '#514290' },
+          { property: 'og:site_name', content: 'BeatSaver' },
           { property: 'og:title', content: metadata.title },
           { property: 'og:description', content: metadata.description },
           { name: 'description', content: metadata.description },
@@ -119,21 +129,17 @@ export const Route = createFileRoute('/')({
       };
     }
 
+    const description = 'Preview Beat Saber maps and replays in your browser';
     return {
       meta: [
-        { title: 'ScoreSaber Watch' },
-        { property: 'og:site_name', content: 'ScoreSaber' },
-        { property: 'og:title', content: 'ScoreSaber Watch' },
-        { property: 'og:image', content: defaultImage },
-        { property: 'og:image:width', content: '1024' },
-        { property: 'og:image:height', content: '1024' },
-        { property: 'og:image:type', content: 'image/png' },
-        { property: 'og:image:alt', content: 'ScoreSaber logo' },
+        { title: 'ChroViewer' },
+        { property: 'og:site_name', content: 'ChroViewer' },
+        { property: 'og:title', content: 'ChroViewer' },
+        { property: 'og:description', content: description },
+        { name: 'description', content: description },
         { name: 'twitter:card', content: 'summary' },
-        { name: 'twitter:site', content: '@ScoreSaber' },
-        { name: 'twitter:title', content: 'ScoreSaber Watch' },
-        { name: 'twitter:image', content: defaultImage },
-        { name: 'twitter:image:alt', content: 'ScoreSaber logo' },
+        { name: 'twitter:title', content: 'ChroViewer' },
+        { name: 'twitter:description', content: description },
       ],
     };
   },

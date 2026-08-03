@@ -4,9 +4,11 @@ import { Result } from 'better-result';
 import { useTranslations } from 'use-intl';
 
 import { BeatmapParser } from '../../core/beatmap/worker/client';
+import { isBeatLeaderReplay } from '../../core/replay/parse-beatleader';
 import { applyLegacyScoreSaberMetadata, isScoreSaberReplay } from '../../core/replay/parse-scoresaber';
 import { replayMapHash, type Replay } from '../../core/replay/types';
 import { extractMapArchive } from '../../sources/archive';
+import { isViewerSourceEnabled } from '../../sources/source-config';
 import { SourceError, sourceError } from '../../sources/source-error';
 import type {
   BeatSaverMapSource,
@@ -27,6 +29,7 @@ export interface PendingSharedView {
 export interface LoadedSourceContext {
   identity?: MapIdentity;
   scoreId?: string;
+  scoreIdBL?: string;
   sourceLink?: ViewerSourceLink;
   player?: ScoreSaberReplayPlayer;
 }
@@ -76,6 +79,7 @@ export function useViewerFileSource({
   const [rows, setRows] = useState<DifficultyRow[]>([]);
   const [mapIdentity, setMapIdentity] = useState<MapIdentity | null>(null);
   const [shareScoreId, setShareScoreId] = useState<string | null>(null);
+  const [shareScoreIdBL, setShareScoreIdBL] = useState<string | null>(null);
   const [sourceLink, setSourceLink] = useState<ViewerSourceLink | null>(null);
   const [replayPlayer, setReplayPlayer] = useState<ScoreSaberReplayPlayer | null>(null);
 
@@ -106,6 +110,19 @@ export function useViewerFileSource({
   }
 
   async function parseReplay(data: ArrayBuffer, source: SourceError['source'] = 'local') {
+    const bytes = new Uint8Array(data);
+    if (
+      (isBeatLeaderReplay(bytes) && !isViewerSourceEnabled('beatleader')) ||
+      (isScoreSaberReplay(bytes) && !isViewerSourceEnabled('scoresaber'))
+    ) {
+      return Result.err(
+        new SourceError({
+          message: t('errors.sourceDisabled'),
+          source,
+          operation: 'validate-replay-source',
+        }),
+      );
+    }
     parserRef.current ??= new BeatmapParser();
     const parser = parserRef.current;
     return Result.tryPromise({
@@ -127,12 +144,22 @@ export function useViewerFileSource({
   ) {
     if (!isSourceRequestCurrent(requestId)) return Result.ok<DifficultyRow[]>([]);
     const source =
-      context.scoreId !== undefined ? 'scoresaber' : context.identity === undefined ? 'local' : 'beatsaver';
+      context.scoreId !== undefined
+        ? 'scoresaber'
+        : context.scoreIdBL !== undefined
+          ? 'beatleader'
+          : context.identity === undefined
+            ? 'local'
+            : 'beatsaver';
     setError('');
     replayRef.current = replay;
     setShareScoreId(context.scoreId ?? null);
+    setShareScoreIdBL(context.scoreIdBL ?? null);
     setSourceLink(context.sourceLink ?? null);
-    setReplayPlayer(context.player ?? null);
+    const fallbackPlayer = replay?.metadata.player
+      ? { id: replay.metadata.player.id, name: replay.metadata.player.name, avatar: '', country: '' }
+      : null;
+    setReplayPlayer(context.player ?? fallbackPlayer);
     setMapIdentity(null);
     onClearViewer();
     revokeCover();
@@ -190,6 +217,7 @@ export function useViewerFileSource({
     setRows([]);
     setMapIdentity(null);
     setShareScoreId(null);
+    setShareScoreIdBL(null);
     setSourceLink(null);
     setReplayPlayer(null);
     onClearViewer();
@@ -206,6 +234,7 @@ export function useViewerFileSource({
       pendingSharedViewRef.current = null;
       setMapIdentity(null);
       setShareScoreId(null);
+      setShareScoreIdBL(null);
       setSourceLink(null);
       const sourceFiles: MapSourceFile[] = [];
       let replay: Replay | null = null;
@@ -228,7 +257,7 @@ export function useViewerFileSource({
           const archive = yield* Result.await(extractMapArchive(new Uint8Array(data)));
           if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
           sourceFiles.push(...archive);
-        } else if (/\.dat$/i.test(file.name)) {
+        } else if (/\.(dat|bsor)$/i.test(file.name)) {
           const data = yield* Result.await(
             Result.tryPromise({
               try: () => file.arrayBuffer(),
@@ -241,7 +270,8 @@ export function useViewerFileSource({
             }),
           );
           if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
-          if (isScoreSaberReplay(new Uint8Array(data))) {
+          const bytes = new Uint8Array(data);
+          if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes)) {
             if (replay !== null) {
               return Result.err(
                 new SourceError({
@@ -309,6 +339,7 @@ export function useViewerFileSource({
     replayRef,
     rows,
     shareScoreId,
+    shareScoreIdBL,
     songBpm,
     sourceLink,
   };

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Globe2, Users } from 'lucide-react';
 import { useFormatter, useTranslations } from 'use-intl';
 
+import { beatLeaderPlayerQueryOptions } from '../../sources/beatleader/queries';
 import { scoreSaberPlayerQueryOptions } from '../../sources/scoresaber/queries';
 import type { ScoreSaberReplayPlayer } from '../../sources/source-types';
 import { CountryImage } from './country-image';
@@ -15,6 +16,7 @@ import { cn } from '@/lib/utils';
 interface ReplayPlayerCardProps {
   action?: ReactNode;
   liveViewerCount?: number | null;
+  platform?: 'scoresaber' | 'beatleader';
   player: ScoreSaberReplayPlayer;
   playerLabel?: string;
   resolvePlayer?: boolean;
@@ -24,6 +26,7 @@ interface ReplayPlayerCardProps {
 export function ReplayPlayerCard({
   action,
   liveViewerCount,
+  platform = 'scoresaber',
   player,
   playerLabel,
   resolvePlayer = false,
@@ -32,7 +35,8 @@ export function ReplayPlayerCard({
   const format = useFormatter();
   const t = useTranslations('replay');
   const live = liveViewerCount !== undefined;
-  const profile = useQuery(scoreSaberPlayerQueryOptions(!live || resolvePlayer ? player.id : undefined)).data ?? player;
+  const queryOptions = platform === 'beatleader' ? beatLeaderPlayerQueryOptions : scoreSaberPlayerQueryOptions;
+  const profile = useQuery(queryOptions(!live || resolvePlayer ? player.id : undefined)).data ?? player;
   const rank = !showRanks || profile.rank === undefined ? undefined : format.number(profile.rank, 'integer');
   const countryRank =
     !showRanks || profile.countryRank === undefined ? undefined : format.number(profile.countryRank, 'integer');
@@ -66,7 +70,11 @@ export function ReplayPlayerCard({
               <CardTitle className="min-w-0 truncate text-sm max-sm:text-xs">
                 <a
                   className="hover:text-muted-foreground transition-colors"
-                  href={`https://scoresaber.com/u/${profile.id}`}
+                  href={
+                    platform === 'beatleader'
+                      ? `https://beatleader.com/u/${profile.id}`
+                      : `https://scoresaber.com/u/${profile.id}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                 >

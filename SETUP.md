@@ -53,7 +53,13 @@ Vite prints the local URL when the server starts
 
 ## Environment
 
-The default ScoreSaber and BeatSaver endpoints work without an `.env` file. Copy `.env.example` to `.env` if you need to override them
+The default BeatSaver, ScoreSaber and BeatLeader endpoints work without an `.env` file. Copy `.env.example` to `.env` if you need to override them
+
+`VITE_ENABLED_SOURCES` controls which remote sources are available. It defaults to all three:
+
+```sh
+VITE_ENABLED_SOURCES=beatsaver,scoresaber,beatleader
+```
 
 ## Checks
 

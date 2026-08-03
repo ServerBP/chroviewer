@@ -1,6 +1,6 @@
 # ChroViewer
 
-Initially based on [ChroMapper's](https://github.com/Caeden117/ChroMapper) map previewer, ChroViewer is a browser based Beat Saber map and ScoreSaber replay viewer
+Initially based on [ChroMapper's](https://github.com/Caeden117/ChroMapper) map previewer, ChroViewer is a browser based Beat Saber map and replay viewer
 
 ## Getting Started
 
