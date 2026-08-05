@@ -943,14 +943,15 @@ export function ViewerShell() {
             onCopyTimeline={(target) => {
               void share.copyTimelineShareLink(target);
             }}
-            onPanelChange={setActivePanel}
+            onPanelOpenChange={(panel, open) => {
+              setActivePanel((current) => (open ? panel : current === panel ? null : current));
+            }}
             onPlaybackRateChange={(rate) => {
               transport.setPlaybackRate(rate);
             }}
             onLightshowModeChange={session.changeLightshowMode}
             onReplayCameraChange={(replayCamera) => {
               setSettings({ ...settings, replayCamera });
-              setActivePanel(null);
             }}
             onMasterVolumeChange={(masterVolume) => {
               if (settingsRef.current.masterVolume === 0 && masterVolume > 0) void transport.unlockAudio();

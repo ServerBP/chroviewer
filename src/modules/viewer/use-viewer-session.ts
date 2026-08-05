@@ -399,10 +399,10 @@ export function useViewerSession({
   function cycleLights() {
     const modes: LightshowMode[] = ['full-lightshow', 'full', 'static', 'none'];
     const next = modes[(modes.indexOf(lightshowMode) + 1) % modes.length] ?? 'full';
-    applyLightshowMode(next);
+    changeLightshowMode(next);
   }
 
-  function applyLightshowMode(mode: LightshowMode, updateSettings = true) {
+  function changeLightshowMode(mode: LightshowMode, updateSettings = true) {
     lightshowModeRef.current = mode;
     setLightshowMode(mode);
     viewerRef.current?.view.setLightshowMode(mode);
@@ -412,12 +412,7 @@ export function useViewerSession({
   }
 
   function applyAuthoritativeLightshowMode(mode: LightshowMode) {
-    applyLightshowMode(mode, false);
-  }
-
-  function changeLightshowMode(mode: LightshowMode) {
-    applyLightshowMode(mode);
-    setActivePanel(null);
+    changeLightshowMode(mode, false);
   }
 
   function cycleCamera() {

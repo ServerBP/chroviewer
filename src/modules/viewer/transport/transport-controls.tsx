@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 
@@ -53,7 +55,7 @@ interface TransportControlsProps {
   onNumeratorChange: (value: number) => void;
   onDenominatorChange: (value: number) => void;
   onCopyTimeline: (target: 'time' | 'beat') => void;
-  onPanelChange: (panel: TransportPanel | null) => void;
+  onPanelOpenChange: (panel: TransportPanel, open: boolean) => void;
   onPlaybackRateChange: (rate: number) => void;
   onLightshowModeChange: (mode: LightshowMode) => void;
   onReplayCameraChange: (camera: ViewerSettings['replayCamera']) => void;
@@ -97,7 +99,7 @@ export function TransportControls({
   onNumeratorChange,
   onDenominatorChange,
   onCopyTimeline,
-  onPanelChange,
+  onPanelOpenChange,
   onPlaybackRateChange,
   onLightshowModeChange,
   onReplayCameraChange,
@@ -113,6 +115,26 @@ export function TransportControls({
   const readOnly = mode !== 'playback';
   const beatStep = beatStepNumerator / beatStepDenominator;
   const displayBeat = quantizedBeatAt(time, songBpm, beatStep);
+  const closePanelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function changePanelHover(nextPanel: TransportPanel, hovered: boolean) {
+    if (closePanelTimerRef.current !== null) clearTimeout(closePanelTimerRef.current);
+    closePanelTimerRef.current = null;
+    if (hovered) {
+      onPanelOpenChange(nextPanel, true);
+      return;
+    }
+    closePanelTimerRef.current = setTimeout(() => {
+      onPanelOpenChange(nextPanel, false);
+    }, 200);
+  }
+
+  useEffect(
+    () => () => {
+      if (closePanelTimerRef.current !== null) clearTimeout(closePanelTimerRef.current);
+    },
+    [],
+  );
 
   return (
     <Card
@@ -182,7 +204,10 @@ export function TransportControls({
             open={panel === 'speed'}
             playbackRate={playbackRate}
             onOpenChange={(open) => {
-              onPanelChange(open ? 'speed' : null);
+              onPanelOpenChange('speed', open);
+            }}
+            onHoverChange={(hovered) => {
+              changePanelHover('speed', hovered);
             }}
             onPlaybackRateChange={onPlaybackRateChange}
           />
@@ -193,7 +218,10 @@ export function TransportControls({
         open={panel === 'lights'}
         mode={lightshowMode}
         onOpenChange={(open) => {
-          onPanelChange(open ? 'lights' : null);
+          onPanelOpenChange('lights', open);
+        }}
+        onHoverChange={(hovered) => {
+          changePanelHover('lights', hovered);
         }}
         onModeChange={onLightshowModeChange}
       />
@@ -202,7 +230,10 @@ export function TransportControls({
           open={panel === 'camera'}
           camera={replayCamera}
           onOpenChange={(open) => {
-            onPanelChange(open ? 'camera' : null);
+            onPanelOpenChange('camera', open);
+          }}
+          onHoverChange={(hovered) => {
+            changePanelHover('camera', hovered);
           }}
           onCameraChange={onReplayCameraChange}
         />
@@ -216,7 +247,10 @@ export function TransportControls({
         hitsounds={hitsounds}
         hitsoundVolume={hitsoundVolume}
         onOpenChange={(open) => {
-          onPanelChange(open ? 'volume' : null);
+          onPanelOpenChange('volume', open);
+        }}
+        onHoverChange={(hovered) => {
+          changePanelHover('volume', hovered);
         }}
         onMasterVolumeChange={onMasterVolumeChange}
         onSongVolumeChange={onSongVolumeChange}

@@ -1,8 +1,9 @@
-import { AudioWaveform, Music2, Slash, Volume2, type LucideIcon } from 'lucide-react';
+import { AudioWaveform, Music2, Slash, Volume1, Volume2, VolumeX, type LucideIcon } from 'lucide-react';
 import { useFormatter, useTranslations } from 'use-intl';
 
+import { TransportMenu } from './transport-menu';
+
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 
 interface VolumeMenuProps {
@@ -14,6 +15,7 @@ interface VolumeMenuProps {
   hitsounds: boolean;
   hitsoundVolume: number;
   onOpenChange: (open: boolean) => void;
+  onHoverChange: (hovered: boolean) => void;
   onMasterVolumeChange: (volume: number) => void;
   onSongVolumeChange: (volume: number) => void;
   onHitsoundVolumeChange: (volume: number) => void;
@@ -31,6 +33,7 @@ export function VolumeMenu({
   hitsounds,
   hitsoundVolume,
   onOpenChange,
+  onHoverChange,
   onMasterVolumeChange,
   onSongVolumeChange,
   onHitsoundVolumeChange,
@@ -39,52 +42,51 @@ export function VolumeMenu({
   onToggleHitsounds,
 }: VolumeMenuProps) {
   const t = useTranslations('viewer.transport');
+  const MasterVolumeIcon = masterMuted || masterVolume === 0 ? VolumeX : masterVolume < 0.5 ? Volume1 : Volume2;
+  const toggleMasterLabel = t(masterMuted ? 'unmuteMaster' : 'muteMaster');
 
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          className="max-sm:order-4 max-sm:size-8"
-          variant="ghost"
-          size="icon"
-          aria-label={t('audioVolumes')}
-          title={t('audioVolumes')}
-        >
-          <Volume2 />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent side="top" align="center" sideOffset={12} className="w-40 rounded-lg p-2.5">
-        <div className="flex h-28 justify-center gap-2">
-          <VolumeColumn
-            volume={songVolume}
-            muted={songMuted}
-            sliderLabel={t('songVolume')}
-            toggleLabel={t(songMuted ? 'unmuteSong' : 'muteSong')}
-            icon={Music2}
-            onVolumeChange={onSongVolumeChange}
-            onToggleMuted={onToggleSongMuted}
-          />
-          <VolumeColumn
-            volume={masterVolume}
-            muted={masterMuted}
-            sliderLabel={t('masterVolume')}
-            toggleLabel={t(masterMuted ? 'unmuteMaster' : 'muteMaster')}
-            icon={Volume2}
-            onVolumeChange={onMasterVolumeChange}
-            onToggleMuted={onToggleMasterMuted}
-          />
-          <VolumeColumn
-            volume={hitsoundVolume}
-            muted={!hitsounds}
-            sliderLabel={t('hitsoundVolume')}
-            toggleLabel={t(hitsounds ? 'muteHitsounds' : 'unmuteHitsounds')}
-            icon={AudioWaveform}
-            onVolumeChange={onHitsoundVolumeChange}
-            onToggleMuted={onToggleHitsounds}
-          />
-        </div>
-      </PopoverContent>
-    </Popover>
+    <TransportMenu
+      open={open}
+      label={t('audioVolumes')}
+      desktopLabel={toggleMasterLabel}
+      icon={MasterVolumeIcon}
+      triggerClassName="max-sm:order-4 max-sm:size-8"
+      className="w-40 rounded-lg p-2.5"
+      onOpenChange={onOpenChange}
+      onDesktopTriggerClick={onToggleMasterMuted}
+      onHoverChange={onHoverChange}
+    >
+      <div className="flex h-28 justify-center gap-2">
+        <VolumeColumn
+          volume={songVolume}
+          muted={songMuted}
+          sliderLabel={t('songVolume')}
+          toggleLabel={t(songMuted ? 'unmuteSong' : 'muteSong')}
+          icon={Music2}
+          onVolumeChange={onSongVolumeChange}
+          onToggleMuted={onToggleSongMuted}
+        />
+        <VolumeColumn
+          volume={masterVolume}
+          muted={masterMuted}
+          sliderLabel={t('masterVolume')}
+          toggleLabel={t(masterMuted ? 'unmuteMaster' : 'muteMaster')}
+          icon={Volume2}
+          onVolumeChange={onMasterVolumeChange}
+          onToggleMuted={onToggleMasterMuted}
+        />
+        <VolumeColumn
+          volume={hitsoundVolume}
+          muted={!hitsounds}
+          sliderLabel={t('hitsoundVolume')}
+          toggleLabel={t(hitsounds ? 'muteHitsounds' : 'unmuteHitsounds')}
+          icon={AudioWaveform}
+          onVolumeChange={onHitsoundVolumeChange}
+          onToggleMuted={onToggleHitsounds}
+        />
+      </div>
+    </TransportMenu>
   );
 }
 
