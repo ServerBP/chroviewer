@@ -19,6 +19,7 @@ import type { LightshowMode } from '../../core/lighting/basic-light';
 import { DEFAULT_VIEWER_SETTINGS, loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
+import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '../live/embedded-realtime-score-sync';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
 import { replayLightshowMode } from '../live/live-replay';
 import type { LiveTarget } from '../live/live-types';
@@ -58,6 +59,22 @@ import { cn } from '@/lib/utils';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function baseHost(hostname: string) {
+  const normalized = hostname.toLowerCase().replace(/^www\./, '');
+  if (normalized === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(normalized) || normalized.includes(':')) {
+    return normalized;
+  }
+  return normalized.split('.').slice(-2).join('.');
+}
+
+function isSameBaseSite(origin: string) {
+  try {
+    return baseHost(new URL(origin).hostname) === baseHost(window.location.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function dynamicSettingsPatch(values: Record<string, unknown>) {
@@ -217,6 +234,10 @@ export function ViewerShell() {
     settings,
     settingsRef,
   });
+  const embeddedScoreTimelineRef = useRef(new EmbeddedRealtimeScoreTimeline());
+  const embeddedScoreParentOriginRef = useRef<string | null>(null);
+  const embeddedScorePlatformIdsRef = useRef<string[]>([]);
+  const lastEmbeddedScoreSignatureRef = useRef('');
   const [activePanel, setActivePanel] = useState<ViewerPanel>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
@@ -327,6 +348,48 @@ export function ViewerShell() {
       window.removeEventListener('popstate', applySettingsFromLocation);
     };
   }, [embeddedSource]);
+  useEffect(() => {
+    if (!taLive || liveTarget === null) return;
+    const timeline = embeddedScoreTimelineRef.current;
+
+    function receiveRealtimeScore(event: MessageEvent) {
+      if (event.source !== window.parent || !isSameBaseSite(event.origin)) return;
+      if (!isEmbeddedRealtimeScoreMessage(event.data, liveTarget!.playerId)) return;
+      embeddedScoreParentOriginRef.current = event.origin;
+      embeddedScorePlatformIdsRef.current = [event.data.playerId, ...event.data.platformIds];
+      timeline.add(event.data.score);
+    }
+
+    window.addEventListener('message', receiveRealtimeScore);
+    return () => {
+      window.removeEventListener('message', receiveRealtimeScore);
+      timeline.clear();
+      embeddedScoreParentOriginRef.current = null;
+      embeddedScorePlatformIdsRef.current = [];
+      lastEmbeddedScoreSignatureRef.current = '';
+    };
+  }, [liveTarget?.playerId, taLive]);
+  useEffect(() => {
+    if (!taLive || liveTarget === null) return;
+    const parentOrigin = embeddedScoreParentOriginRef.current;
+    const cached = embeddedScoreTimelineRef.current.at(transport.time);
+    if (parentOrigin === null || cached === null) return;
+    const signature = `${cached.position}\0${cached.signature}`;
+    if (signature === lastEmbeddedScoreSignatureRef.current) return;
+    lastEmbeddedScoreSignatureRef.current = signature;
+    window.parent.postMessage(
+      {
+        type: 'beatkhana:synced-realtime-score',
+        version: 1,
+        playerId: liveTarget.playerId,
+        platformIds: embeddedScorePlatformIdsRef.current,
+        replayTime: transport.time,
+        score: cached.score,
+        sentAt: Date.now(),
+      },
+      parentOrigin,
+    );
+  }, [liveTarget?.playerId, taLive, transport.time]);
   useEffect(() => {
     if (!embeddedSource) return;
 
