@@ -262,6 +262,10 @@ export class MapView implements RenderView {
     this.replayView.setGameUIEnabled(enabled);
   }
 
+  setGameplayNotesVisible(visible: boolean) {
+    this.mapObjects.setGameplayNotesVisible(visible);
+  }
+
   setSongDuration(duration: number | null) {
     this.songDuration = duration ?? 0;
     this.replayView.setSongDuration(duration);

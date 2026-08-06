@@ -166,6 +166,7 @@ export class MapObjectRenderer {
   private previewHitNotes = true;
   private previewHitLine = false;
   private previewNotesLookAtPlayer = false;
+  private gameplayNotesVisible = true;
   private instanceGroups: InstancedGroup[] = [];
   private arcEntries: ArcEntry[] = [];
   private noteReplayWindows: ActiveWindowIndex | null = null;
@@ -414,6 +415,12 @@ export class MapObjectRenderer {
     this.invalidate();
   }
 
+  setGameplayNotesVisible(visible: boolean) {
+    if (visible === this.gameplayNotesVisible) return;
+    this.gameplayNotesVisible = visible;
+    this.invalidate();
+  }
+
   invalidate() {
     this.objectBeat = Number.NaN;
     this.noteLookStates.clear();
@@ -436,7 +443,7 @@ export class MapObjectRenderer {
     for (const group of this.instanceGroups) group.begin();
     const replayLoaded = replayView.hasReplay;
     const hitPreviewNotes = !replayLoaded && this.previewHitNotes;
-    this.hitLine.visible = !replayLoaded && this.previewHitLine;
+    this.hitLine.visible = this.gameplayNotesVisible && !replayLoaded && this.previewHitLine;
     const poseFrames = replayView.poseFrames;
 
     const activeNotes = this.noteReplayWindows?.at(now) ?? [];
@@ -455,6 +462,7 @@ export class MapObjectRenderer {
         const rotation =
           note.rotationDeg * (note.noodle?.disableLook === true ? 1 : spawnRotationProgress(note, movementBeat));
         const interactable = noodle.interactable === undefined ? note.interactable : noodle.interactable >= 1;
+        if (!this.gameplayNotesVisible && interactable) continue;
         const visible =
           noodleObjectVisible(note, now, movementBeat, noodle) &&
           (!hitPreviewNotes || !interactable || isVisibleBeforeHit(note, movementBeat));
@@ -522,6 +530,8 @@ export class MapObjectRenderer {
       if (bomb === undefined) continue;
       const duration = bomb.hjdBeats * 2;
       const noodle = sampleNoodleRenderObject(bomb, data.noodle, now, duration, context, data.leftHanded);
+      const interactable = noodle.interactable === undefined || noodle.interactable >= 1;
+      if (!this.gameplayNotesVisible && interactable) continue;
       const movementBeat = noodleMovementBeat(bomb, now, noodle, duration);
       if (
         !noodleObjectVisible(bomb, now, movementBeat, noodle) ||
@@ -568,6 +578,7 @@ export class MapObjectRenderer {
         const y = link.noodle?.disableGravity ? link.y : Y_OFFSET + (link.y - Y_OFFSET) * jump;
         const rotation = link.rotationDeg * spawnRotationProgress(link, movementBeat);
         const interactable = noodle.interactable === undefined ? link.interactable : noodle.interactable >= 1;
+        if (!this.gameplayNotesVisible && interactable) continue;
         const visible =
           noodleObjectVisible(link, now, movementBeat, noodle) &&
           (!hitPreviewNotes || !interactable || isVisibleBeforeHit(link, movementBeat));
@@ -702,6 +713,8 @@ export class MapObjectRenderer {
       const arc = entry.arc;
       const duration = arc.hjdBeats * 1.5 + arc.tailBeat - arc.headBeat;
       const noodle = sampleNoodleRenderObject(arc, data.noodle, now, duration, context, data.leftHanded, arc.spawnBeat);
+      const interactable = noodle.interactable === undefined || noodle.interactable >= 1;
+      if (!this.gameplayNotesVisible && interactable) continue;
       const movementBeat = noodleMovementBeat(arc, now, noodle, duration);
       entry.mesh.visible = noodleObjectVisible(arc, now, movementBeat, noodle) && (noodle.dissolve ?? 1) > 0;
       if (!entry.mesh.visible) continue;

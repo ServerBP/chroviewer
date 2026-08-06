@@ -270,6 +270,7 @@ export function ViewerShell() {
   });
   const session = useViewerSession({
     disableGameUI: search.disableGameUI === true,
+    hideGameplayNotes: search.showcase === true,
     lightshowMode,
     lightshowModeRef,
     authoritativeLightshowMode: authoritativeLights,

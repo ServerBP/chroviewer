@@ -76,7 +76,7 @@ export const viewerSearchSchema = z.pipe(
     showcaseConfig: z.catch(z.optional(z.string().check(z.maxLength(250_000))), undefined),
     disableGameUI: z.catch(z.optional(z.boolean()), undefined),
     lightshow: z.catch(z.optional(z.literal('full-lightshow')), undefined),
-    lights: z.catch(z.optional(z.enum(['full', 'static', 'none'])), undefined),
+    lights: z.catch(z.optional(z.enum(['full', 'full-lightshow', 'static', 'none'])), undefined),
     masterVolume: z.catch(z.optional(unitNumberSchema), undefined),
     songVolume: z.catch(z.optional(unitNumberSchema), undefined),
     hitsoundVolume: z.catch(z.optional(unitNumberSchema), undefined),

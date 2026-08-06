@@ -28,6 +28,7 @@ type ViewerSources = ReturnType<typeof useViewerSources>;
 
 interface ViewerSessionOptions {
   disableGameUI: boolean;
+  hideGameplayNotes: boolean;
   lightshowMode: LightshowMode;
   lightshowModeRef: RefObject<LightshowMode>;
   authoritativeLightshowMode?: LightshowMode | null;
@@ -56,6 +57,7 @@ interface ViewerSessionOptions {
 
 export function useViewerSession({
   disableGameUI,
+  hideGameplayNotes,
   lightshowMode,
   lightshowModeRef,
   authoritativeLightshowMode = null,
@@ -115,6 +117,10 @@ export function useViewerSession({
   useEffect(() => {
     viewerRef.current?.view.setGameUIEnabled(!disableGameUI);
   }, [disableGameUI, viewerReady]);
+
+  useEffect(() => {
+    viewerRef.current?.view.setGameplayNotesVisible(!hideGameplayNotes);
+  }, [hideGameplayNotes, viewerReady]);
 
   useEffect(() => {
     const mode: LightshowMode = authoritativeLightshowMode ?? (settings.staticLights ? 'static' : 'full');
