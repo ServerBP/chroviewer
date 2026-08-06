@@ -176,7 +176,12 @@ const leaderboardsResponseSchema = z
 
 const leaderboardScoresSchema = z.object({
   scores: z
-    .array(z.object({ id: z.number().int().nonnegative() }))
+    .array(
+      z.object({
+        id: z.number().int().nonnegative(),
+        rank: z.number().int().positive().optional(),
+      }),
+    )
     .nullable()
     .optional(),
 });
@@ -192,7 +197,7 @@ export async function fetchBeatLeaderLeaderboards(hash: string, options: Resolve
 
 export async function fetchTopBeatLeaderScore(leaderboardId: string, options: ResolveOptions = {}) {
   const response = await requestJson(
-    `${env.VITE_BEATLEADER_API_URL}/leaderboard/${leaderboardId}?page=1&count=1&sortBy=rank&order=asc`,
+    `${env.VITE_BEATLEADER_API_URL}/leaderboard/${leaderboardId}?page=1&count=10&sortBy=rank&order=asc`,
     leaderboardScoresSchema,
     {
       ...options,
@@ -202,7 +207,12 @@ export async function fetchTopBeatLeaderScore(leaderboardId: string, options: Re
     },
   );
   return response.andThen(({ scores }) => {
-    const score = scores?.[0];
+    // BeatLeader documents rank ascending as the top-score order. Sort the
+    // returned page as well so an upstream ordering regression cannot make a
+    // map preview select the worst entry from that page.
+    const score = scores?.toSorted(
+      (left, right) => (left.rank ?? Number.MAX_SAFE_INTEGER) - (right.rank ?? Number.MAX_SAFE_INTEGER),
+    )[0];
     return score === undefined
       ? Result.err(
           new SourceError({

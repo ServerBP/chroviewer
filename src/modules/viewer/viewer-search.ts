@@ -72,6 +72,7 @@ export const viewerSearchSchema = z.pipe(
     previewStartSeconds: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     autoplay: z.catch(z.optional(z.boolean()), undefined),
     hideUI: z.catch(z.optional(z.boolean()), undefined),
+    showcase: z.catch(z.optional(z.boolean()), undefined),
     disableGameUI: z.catch(z.optional(z.boolean()), undefined),
     lightshow: z.catch(z.optional(z.literal('full-lightshow')), undefined),
     lights: z.catch(z.optional(z.enum(['full', 'static', 'none'])), undefined),

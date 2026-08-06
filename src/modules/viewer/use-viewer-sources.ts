@@ -5,8 +5,9 @@ import { Result } from 'better-result';
 import type { Replay } from '../../core/replay/types';
 import type { ViewerSettings } from '../../core/viewer-settings';
 import { fetchBeatSaverHash, fetchBeatSaverMap } from '../../sources/beatsaver/provider';
-import type { DownloadProgress, MapLookup } from '../../sources/source-types';
+import type { BeatSaverMapSource, DownloadProgress, MapLookup } from '../../sources/source-types';
 import { LiveMapCache } from '../live/live-map-cache';
+import type { PendingSharedView } from './use-viewer-file-source';
 import { useViewerFileSource } from './use-viewer-file-source';
 import { useViewerRemoteSource } from './use-viewer-remote-source';
 
@@ -60,6 +61,18 @@ export function useViewerSources({
       return files.loadFiles(selectedFiles, remote.resolveReplayMap);
     },
     loadLookup: remote.loadLookup,
+    async fetchPreparedMap(reference: string, signal?: AbortSignal) {
+      const value = reference.trim();
+      return value.length >= 10 ? fetchBeatSaverHash(value, { signal }) : fetchBeatSaverMap(value, { signal });
+    },
+    async loadPreparedMap(source: BeatSaverMapSource, pending: PendingSharedView) {
+      const requestId = files.beginSourceRequest();
+      files.pendingSharedViewRef.current = pending;
+      const loaded = await files.loadSourceFiles(requestId, source.files, null, {
+        identity: { key: source.key, hash: source.hash },
+      });
+      return loaded.isErr() ? Result.err(loaded.error) : Result.ok(undefined);
+    },
     async loadLiveReplay(hash: string, replay: Replay) {
       const requestId = files.beginSourceRequest();
       files.pendingSharedViewRef.current = {};

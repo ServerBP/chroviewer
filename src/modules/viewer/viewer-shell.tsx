@@ -18,6 +18,7 @@ import { useTranslations } from 'use-intl';
 import type { LightshowMode } from '../../core/lighting/basic-light';
 import { DEFAULT_VIEWER_SETTINGS, loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
+import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
 import { replayLightshowMode } from '../live/live-replay';
 import type { LiveTarget } from '../live/live-types';
@@ -204,7 +205,8 @@ export function ViewerShell() {
   effectiveSettingsRef.current = effectiveSettings;
   const [error, setError] = useState('');
   const [embeddedLights, setEmbeddedLights] = useState<LightshowMode | null>(null);
-  const presetLights = search.qualityPreset === 'broadcast' ? 'static' : null;
+  const presetLights =
+    search.showcase === true ? 'full-lightshow' : search.qualityPreset === 'broadcast' ? 'static' : null;
   const authoritativeLights = embeddedLights ?? search.lights ?? presetLights;
   const [lightshowMode, setLightshowMode] = useState<LightshowMode>(
     search.lightshow ?? search.lights ?? presetLights ?? (settings.staticLights ? 'static' : 'full'),
@@ -234,7 +236,7 @@ export function ViewerShell() {
     // TA owns the map/replay lifecycle. Keeping generic remote sources disabled
     // also prevents hidden leaderboard/profile/replay requests from conflicting
     // query parameters while an embedded TA viewer is running.
-    remoteSourcesEnabled: !taLiveSource,
+    remoteSourcesEnabled: !taLiveSource && search.showcase !== true,
     setError,
     setSettings,
     onClearViewer() {
@@ -287,7 +289,7 @@ export function ViewerShell() {
   useFavicon(faviconPlatform);
   const liveActive = liveTarget !== null;
   const taLive = liveTarget?.source === 'ta';
-  const embeddedSource = taLive || search.previewSource !== undefined;
+  const embeddedSource = taLive || search.previewSource !== undefined || search.showcase === true;
   const remoteActive = liveActive || partyActive;
   useEffect(() => {
     if (!embeddedSource) return;
@@ -302,9 +304,12 @@ export function ViewerShell() {
       const lights = [...new URLSearchParams(window.location.search)].find(
         ([key]) => key.toLowerCase() === 'lights',
       )?.[1];
-      if (lights === 'full' || lights === 'static' || lights === 'none') {
+      if (lights === 'full-lightshow' || lights === 'full' || lights === 'static' || lights === 'none') {
         setEmbeddedLights(lights);
         session.applyAuthoritativeLightshowMode(lights);
+      } else if (search.showcase === true) {
+        setEmbeddedLights('full-lightshow');
+        session.applyAuthoritativeLightshowMode('full-lightshow');
       } else if (values.qualityPreset === 'broadcast') {
         setEmbeddedLights('static');
         session.applyAuthoritativeLightshowMode('static');
@@ -352,7 +357,7 @@ export function ViewerShell() {
         });
       });
       const lights = data.lights;
-      if (lights === 'full' || lights === 'static' || lights === 'none') {
+      if (lights === 'full-lightshow' || lights === 'full' || lights === 'static' || lights === 'none') {
         setEmbeddedLights(lights);
         session.applyAuthoritativeLightshowMode(lights);
       }
@@ -363,6 +368,7 @@ export function ViewerShell() {
       window.removeEventListener('message', applyEmbeddedViewerSettings);
     };
   }, [embeddedSource]);
+  useLightshowShowcase({ enabled: search.showcase === true, session, sources, transport });
   useEffect(() => {
     if (search.previewSource === undefined || !transport.ended || transport.duration <= 0) return;
     const requestedStart = search.previewStartSeconds ?? 0;

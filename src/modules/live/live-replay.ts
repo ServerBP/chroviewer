@@ -204,6 +204,9 @@ export function appendLivePause(replay: Replay, event: ReplayPauseEvent) {
 export function applyLiveReplayExtensions(replay: Replay, extensions: ReplayExtension[], append: boolean) {
   for (const extension of extensions) {
     const result = Result.try(() => {
+      // Quest HitScoreVisualizer does not expose ScoreSaber PC's binary codec.
+      // Keep this bounded HSV-only fallback distinct instead of mislabelling JSON
+      // as a scoresaber.hsv-config payload.
       if (extension.id === 'ta.hsv-profile' && extension.version === 1) {
         const profile = new TextDecoder('utf-8', { fatal: true }).decode(extension.payload);
         if (parseHitScoreVisualizerProfile(profile).isErr()) throw new Error('invalid TA HSV profile');
