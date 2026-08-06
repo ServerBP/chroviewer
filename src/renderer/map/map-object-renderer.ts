@@ -451,6 +451,7 @@ export class MapObjectRenderer {
       for (const index of activeNotes) {
         const note = data.notes[index];
         if (note?.colorIndex !== colorIndex) continue;
+        if (!this.gameplayNotesVisible) continue;
         const duration = note.hjdBeats * 2;
         const noodle = sampleNoodleRenderObject(note, data.noodle, now, duration, context, data.leftHanded);
         const movementBeat = noodleMovementBeat(note, now, noodle, duration);
@@ -462,7 +463,6 @@ export class MapObjectRenderer {
         const rotation =
           note.rotationDeg * (note.noodle?.disableLook === true ? 1 : spawnRotationProgress(note, movementBeat));
         const interactable = noodle.interactable === undefined ? note.interactable : noodle.interactable >= 1;
-        if (!this.gameplayNotesVisible && interactable) continue;
         const visible =
           noodleObjectVisible(note, now, movementBeat, noodle) &&
           (!hitPreviewNotes || !interactable || isVisibleBeforeHit(note, movementBeat));
@@ -528,10 +528,9 @@ export class MapObjectRenderer {
     for (const index of this.bombWindows?.at(now) ?? []) {
       const bomb = data.bombs[index];
       if (bomb === undefined) continue;
+      if (!this.gameplayNotesVisible) continue;
       const duration = bomb.hjdBeats * 2;
       const noodle = sampleNoodleRenderObject(bomb, data.noodle, now, duration, context, data.leftHanded);
-      const interactable = noodle.interactable === undefined || noodle.interactable >= 1;
-      if (!this.gameplayNotesVisible && interactable) continue;
       const movementBeat = noodleMovementBeat(bomb, now, noodle, duration);
       if (
         !noodleObjectVisible(bomb, now, movementBeat, noodle) ||
@@ -571,6 +570,7 @@ export class MapObjectRenderer {
       for (const index of activeLinks) {
         const link = data.chainLinks[index];
         if (link?.colorIndex !== colorIndex) continue;
+        if (!this.gameplayNotesVisible) continue;
         const duration = link.hjdBeats * 2;
         const noodle = sampleNoodleRenderObject(link, data.noodle, now, duration, context, data.leftHanded);
         const movementBeat = noodleMovementBeat(link, now, noodle, duration);
@@ -578,7 +578,6 @@ export class MapObjectRenderer {
         const y = link.noodle?.disableGravity ? link.y : Y_OFFSET + (link.y - Y_OFFSET) * jump;
         const rotation = link.rotationDeg * spawnRotationProgress(link, movementBeat);
         const interactable = noodle.interactable === undefined ? link.interactable : noodle.interactable >= 1;
-        if (!this.gameplayNotesVisible && interactable) continue;
         const visible =
           noodleObjectVisible(link, now, movementBeat, noodle) &&
           (!hitPreviewNotes || !interactable || isVisibleBeforeHit(link, movementBeat));
@@ -711,10 +710,9 @@ export class MapObjectRenderer {
       const entry = this.arcEntries[index];
       if (entry === undefined) continue;
       const arc = entry.arc;
+      if (!this.gameplayNotesVisible) continue;
       const duration = arc.hjdBeats * 1.5 + arc.tailBeat - arc.headBeat;
       const noodle = sampleNoodleRenderObject(arc, data.noodle, now, duration, context, data.leftHanded, arc.spawnBeat);
-      const interactable = noodle.interactable === undefined || noodle.interactable >= 1;
-      if (!this.gameplayNotesVisible && interactable) continue;
       const movementBeat = noodleMovementBeat(arc, now, noodle, duration);
       entry.mesh.visible = noodleObjectVisible(arc, now, movementBeat, noodle) && (noodle.dissolve ?? 1) > 0;
       if (!entry.mesh.visible) continue;
