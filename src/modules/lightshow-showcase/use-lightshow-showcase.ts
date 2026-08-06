@@ -30,11 +30,14 @@ function isMap(value: unknown): value is LightshowShowcaseMap {
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parseConfig(value: unknown): LightshowShowcaseConfig | null {
+export function parseLightshowShowcaseConfig(value: unknown): LightshowShowcaseConfig | null {
+  if (typeof value === 'string') {
+    try {
+      return parseLightshowShowcaseConfig(JSON.parse(value));
+    } catch {
+      return null;
+    }
+  }
   if (typeof value !== 'object' || value === null) return null;
   const config = value as Record<string, unknown>;
   if (!Array.isArray(config.maps) || !config.maps.every(isMap)) return null;
@@ -61,11 +64,13 @@ function difficultyRank(value: string) {
 
 export function useLightshowShowcase({
   enabled,
+  configValue,
   session,
   sources,
   transport,
 }: {
   enabled: boolean;
+  configValue?: string;
   session: Session;
   sources: Sources;
   transport: Transport;
@@ -157,30 +162,26 @@ export function useLightshowShowcase({
 
   useEffect(() => {
     if (!enabled) return;
-    function receive(event: MessageEvent) {
-      const data: unknown = event.data;
-      if (event.source !== window.parent || !isRecord(data) || data.type !== 'beatkhana:lightshow-sequence') return;
-      const config = parseConfig(data.config);
-      if (config === null) return;
-      const generation = ++generationRef.current;
-      configRef.current = config;
-      preparedRef.current.clear();
-      transitioningRef.current = false;
-      setActive(null);
-      publish(null);
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      const plan = planLightshow(config);
-      entriesRef.current = plan.entries;
-      activeIndexRef.current = -1;
-      maintainWindow(0, generation);
-      const delay = Math.max(0, plan.startAtMs - Date.now());
-      timerRef.current = window.setTimeout(() => void activate(0, generation), delay);
+    const config = parseLightshowShowcaseConfig(configValue);
+    const generation = ++generationRef.current;
+    configRef.current = config;
+    preparedRef.current.clear();
+    transitioningRef.current = false;
+    setActive(null);
+    publish(null);
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    if (config === null) {
+      entriesRef.current = [];
+      sources.clearSource();
+      return;
     }
-    window.addEventListener('message', receive);
-    return () => {
-      window.removeEventListener('message', receive);
-    };
-  }, [enabled]);
+    const plan = planLightshow(config);
+    entriesRef.current = plan.entries;
+    activeIndexRef.current = -1;
+    maintainWindow(0, generation);
+    const delay = Math.max(0, plan.startAtMs - Date.now());
+    timerRef.current = window.setTimeout(() => void activate(0, generation), delay);
+  }, [configValue, enabled]);
 
   useEffect(() => {
     if (!enabled || !transport.ended || active === null || transitioningRef.current) return;

@@ -368,7 +368,13 @@ export function ViewerShell() {
       window.removeEventListener('message', applyEmbeddedViewerSettings);
     };
   }, [embeddedSource]);
-  useLightshowShowcase({ enabled: search.showcase === true, session, sources, transport });
+  useLightshowShowcase({
+    enabled: search.showcase === true,
+    configValue: search.showcaseConfig,
+    session,
+    sources,
+    transport,
+  });
   useEffect(() => {
     if (search.previewSource === undefined || !transport.ended || transport.duration <= 0) return;
     const requestedStart = search.previewStartSeconds ?? 0;

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { planLightshow, type LightshowShowcaseMap } from './lightshow-showcase';
+import { parseLightshowShowcaseConfig } from './use-lightshow-showcase';
 
 const map = (key: string, durationSeconds: number): LightshowShowcaseMap => ({
   reference: key,
@@ -14,6 +15,29 @@ const map = (key: string, durationSeconds: number): LightshowShowcaseMap => ({
   bpm: 120,
   characteristic: 'Lightshow',
   difficulty: 'ExpertPlus',
+});
+
+test('parses a serialized showcase query configuration', () => {
+  const value = JSON.stringify({
+    maps: [map('1', 120)],
+    loop: false,
+    playbackMode: 'order',
+    lastMap: null,
+    targetAtMs: null,
+  });
+
+  expect(parseLightshowShowcaseConfig(value)).toEqual({
+    maps: [map('1', 120)],
+    loop: false,
+    playbackMode: 'order',
+    lastMap: null,
+    targetAtMs: null,
+  });
+});
+
+test('rejects malformed showcase query configuration', () => {
+  expect(parseLightshowShowcaseConfig('{not-json')).toBeNull();
+  expect(parseLightshowShowcaseConfig(JSON.stringify({ maps: [{}] }))).toBeNull();
 });
 
 describe('planLightshow', () => {

@@ -114,6 +114,7 @@ const stringSearchAliases: Record<string, string[]> = {
   matchId: ['matchid'],
   watcherPlayerId: ['watcherplayerid'],
   authToken: ['authtoken'],
+  showcaseConfig: ['showcaseconfig'],
 };
 
 export function parseUrlSearch(search: string) {
