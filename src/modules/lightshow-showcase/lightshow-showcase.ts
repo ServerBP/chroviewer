@@ -33,6 +33,11 @@ export interface LightshowPlan {
   startAtMs: number;
 }
 
+export interface TimedLightshowPosition {
+  index: number;
+  startSeconds: number;
+}
+
 function duration(map: LightshowShowcaseMap) {
   return Math.max(0, map.durationSeconds || 0);
 }
@@ -52,6 +57,30 @@ export function shuffled<T>(values: readonly T[], random: () => number = Math.ra
 
 export function orderedCycle(config: Pick<LightshowShowcaseConfig, 'maps' | 'playbackMode'>, random = Math.random) {
   return config.playbackMode === 'random' ? shuffled(config.maps, random) : [...config.maps];
+}
+
+/** Resolves wall-clock time to the map and song position that should be visible. */
+export function resolveTimedLightshow(
+  entries: readonly PlannedLightshowMap[],
+  timelineStartAtMs: number,
+  nowMs = Date.now(),
+): TimedLightshowPosition | null {
+  let entryStartAtMs = timelineStartAtMs;
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (entry === undefined) continue;
+    const playableSeconds = Math.max(0, duration(entry.map) - entry.startSeconds);
+    const entryEndAtMs = entryStartAtMs + playableSeconds * 1000;
+    if (nowMs < entryEndAtMs) {
+      const elapsedSeconds = Math.max(0, (nowMs - entryStartAtMs) / 1000);
+      return {
+        index,
+        startSeconds: Math.min(duration(entry.map), entry.startSeconds + elapsedSeconds),
+      };
+    }
+    entryStartAtMs = entryEndAtMs;
+  }
+  return null;
 }
 
 export function planLightshow(

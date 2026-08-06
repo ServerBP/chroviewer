@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { planLightshow, type LightshowShowcaseMap } from './lightshow-showcase';
+import { planLightshow, resolveTimedLightshow, type LightshowShowcaseMap } from './lightshow-showcase';
 import { parseLightshowShowcaseConfig } from './use-lightshow-showcase';
 
 const map = (key: string, durationSeconds: number): LightshowShowcaseMap => ({
@@ -76,5 +76,27 @@ describe('planLightshow', () => {
     );
     expect(plan.entries.filter((entry) => entry.map.key === 'last')).toHaveLength(1);
     expect(plan.entries.at(-1)?.map.key).toBe('last');
+  });
+});
+
+describe('resolveTimedLightshow', () => {
+  test('adds download delay to the first map start offset', () => {
+    const entries = [
+      { map: map('a', 180), startSeconds: 60 },
+      { map: map('b', 240), startSeconds: 0 },
+    ];
+    expect(resolveTimedLightshow(entries, 0, 12_000)).toEqual({ index: 0, startSeconds: 72 });
+  });
+
+  test('skips maps whose complete playback window elapsed while loading', () => {
+    const entries = [
+      { map: map('a', 30), startSeconds: 20 },
+      { map: map('b', 40), startSeconds: 0 },
+    ];
+    expect(resolveTimedLightshow(entries, 0, 15_000)).toEqual({ index: 1, startSeconds: 5 });
+  });
+
+  test('returns no position once the countdown timeline has ended', () => {
+    expect(resolveTimedLightshow([{ map: map('a', 10), startSeconds: 0 }], 0, 10_000)).toBeNull();
   });
 });

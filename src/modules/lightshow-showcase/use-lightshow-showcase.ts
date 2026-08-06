@@ -7,6 +7,7 @@ import type { useViewerSources } from '../viewer/use-viewer-sources';
 import {
   orderedCycle,
   planLightshow,
+  resolveTimedLightshow,
   type LightshowShowcaseConfig,
   type LightshowShowcaseMap,
   type PlannedLightshowMap,
@@ -83,6 +84,7 @@ export function useLightshowShowcase({
   const transitioningRef = useRef(false);
   const preparedRef = useRef(new Map<string, Promise<BeatSaverMapSource | null>>());
   const timerRef = useRef<number | null>(null);
+  const timelineStartAtRef = useRef(0);
   const lastPublishRef = useRef({ identity: '', at: 0 });
 
   function publish(song: Record<string, unknown> | null) {
@@ -118,7 +120,16 @@ export function useLightshowShowcase({
 
   async function activate(index: number, generation: number) {
     if (generation !== generationRef.current || transitioningRef.current) return;
-    const entry = entriesRef.current[index];
+    const timedMode = configRef.current?.targetAtMs != null;
+    const timed = timedMode ? resolveTimedLightshow(entriesRef.current, timelineStartAtRef.current) : null;
+    if (timedMode && timed === null) {
+      setActive(null);
+      publish(null);
+      sources.clearSource();
+      return;
+    }
+    const resolvedIndex = timed === null ? index : Math.max(index, timed.index);
+    const entry = entriesRef.current[resolvedIndex];
     if (entry === undefined) {
       const config = configRef.current;
       if (config?.loop && config.lastMap === null && config.maps.length > 0 && config.targetAtMs === null) {
@@ -133,8 +144,8 @@ export function useLightshowShowcase({
       return;
     }
     transitioningRef.current = true;
-    activeIndexRef.current = index;
-    maintainWindow(index, generation);
+    activeIndexRef.current = resolvedIndex;
+    maintainWindow(resolvedIndex, generation);
     const source = await ensurePrepared(entry, generation);
     if (generation !== generationRef.current) {
       transitioningRef.current = false;
@@ -142,22 +153,52 @@ export function useLightshowShowcase({
     }
     if (source === null) {
       transitioningRef.current = false;
-      await activate(index + 1, generation);
+      await activate(resolvedIndex + 1, generation);
+      return;
+    }
+    const timedBeforeLoad = timedMode ? resolveTimedLightshow(entriesRef.current, timelineStartAtRef.current) : null;
+    if (timedMode && timedBeforeLoad === null) {
+      transitioningRef.current = false;
+      setActive(null);
+      publish(null);
+      sources.clearSource();
+      return;
+    }
+    const beforeLoad =
+      timedBeforeLoad === null || timedBeforeLoad.index < resolvedIndex
+        ? { index: resolvedIndex, startSeconds: entry.startSeconds }
+        : timedBeforeLoad;
+    if (beforeLoad.index !== resolvedIndex) {
+      transitioningRef.current = false;
+      await activate(beforeLoad.index, generation);
       return;
     }
     const result = await sources.loadPreparedMap(source, {
       autoplay: true,
-      startSeconds: entry.startSeconds,
+      startSeconds: beforeLoad.startSeconds,
       difficultyRank: difficultyRank(entry.map.difficulty),
       characteristic: entry.map.characteristic,
     });
     transitioningRef.current = false;
     if (generation !== generationRef.current || result.isErr()) {
-      if (generation === generationRef.current) await activate(index + 1, generation);
+      if (generation === generationRef.current) await activate(resolvedIndex + 1, generation);
       return;
     }
-    setActive(entry);
-    maintainWindow(index, generation);
+    const timedAfterLoad = timedMode ? resolveTimedLightshow(entriesRef.current, timelineStartAtRef.current) : null;
+    if (timedMode && timedAfterLoad === null) {
+      setActive(null);
+      publish(null);
+      sources.clearSource();
+      return;
+    }
+    const afterLoad = timedAfterLoad === null || timedAfterLoad.index < resolvedIndex ? beforeLoad : timedAfterLoad;
+    if (afterLoad.index !== resolvedIndex) {
+      await activate(afterLoad.index, generation);
+      return;
+    }
+    if (Math.abs(transport.time - afterLoad.startSeconds) > 0.25) transport.seek(afterLoad.startSeconds);
+    setActive({ ...entry, startSeconds: afterLoad.startSeconds });
+    maintainWindow(resolvedIndex, generation);
   }
 
   useEffect(() => {
@@ -177,6 +218,7 @@ export function useLightshowShowcase({
     }
     const plan = planLightshow(config);
     entriesRef.current = plan.entries;
+    timelineStartAtRef.current = plan.startAtMs;
     activeIndexRef.current = -1;
     maintainWindow(0, generation);
     const delay = Math.max(0, plan.startAtMs - Date.now());
@@ -187,6 +229,24 @@ export function useLightshowShowcase({
     if (!enabled || !transport.ended || active === null || transitioningRef.current) return;
     void activate(activeIndexRef.current + 1, generationRef.current);
   }, [active, enabled, transport.ended]);
+
+  useEffect(() => {
+    if (!enabled || active === null || configRef.current?.targetAtMs === null || transitioningRef.current) return;
+    const expected = resolveTimedLightshow(entriesRef.current, timelineStartAtRef.current);
+    if (expected === null) {
+      setActive(null);
+      publish(null);
+      sources.clearSource();
+      return;
+    }
+    if (expected.index > activeIndexRef.current) {
+      void activate(expected.index, generationRef.current);
+      return;
+    }
+    if (expected.index < activeIndexRef.current) return;
+    // Keep the wall-clock countdown authoritative if loading or playback drifted.
+    if (Math.abs(transport.time - expected.startSeconds) > 1) transport.seek(expected.startSeconds);
+  }, [active, enabled, transport.time]);
 
   useEffect(() => {
     if (!enabled || active === null || session.selectedKey === '') return;
