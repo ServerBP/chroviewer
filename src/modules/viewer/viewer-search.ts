@@ -163,6 +163,10 @@ export const viewerSearchSchema = z.pipe(
 
 export type ViewerSearch = z.infer<typeof viewerSearchSchema>;
 
+export function hasConfiguredShowcase(search: Pick<ViewerSearch, 'showcase' | 'showcaseConfig'>) {
+  return search.showcase === true && search.showcaseConfig !== undefined;
+}
+
 export function renderPerformanceForSearch(search: ViewerSearch): RenderPerformanceOptions {
   const preset = search.qualityPreset === 'broadcast' ? BROADCAST_RENDER_PERFORMANCE : DEFAULT_RENDER_PERFORMANCE;
   const mirrorQuality = search.mirrorQuality ?? search.graphicsQuality;

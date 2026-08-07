@@ -48,7 +48,12 @@ import { useViewerControls } from './use-viewer-controls';
 import { useViewerSession } from './use-viewer-session';
 import { useViewerShare } from './use-viewer-share';
 import { useViewerSources } from './use-viewer-sources';
-import { renderPerformanceForSearch, replaceRenderPerformance, updateRenderPerformance } from './viewer-search';
+import {
+  hasConfiguredShowcase,
+  renderPerformanceForSearch,
+  replaceRenderPerformance,
+  updateRenderPerformance,
+} from './viewer-search';
 import { quantizedBeatAt } from './viewer-timeline';
 import type { ViewerPanel } from './viewer-types';
 
@@ -171,6 +176,7 @@ export function ViewerShell() {
   const partyActive = search.party !== undefined;
   const hideUI = search.hideUI === true;
   const taLiveSource = search.liveSource === 'ta';
+  const configuredShowcase = hasConfiguredShowcase(search);
   const [performance, setPerformance] = useState(() => renderPerformanceForSearch(search));
   const [settings, setSettings] = useState(() => {
     const saved = loadViewerSettings();
@@ -254,10 +260,10 @@ export function ViewerShell() {
   const liveChatInputRef = useRef<HTMLTextAreaElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const sources = useViewerSources({
-    // TA owns the map/replay lifecycle. Keeping generic remote sources disabled
-    // also prevents hidden leaderboard/profile/replay requests from conflicting
-    // query parameters while an embedded TA viewer is running.
-    remoteSourcesEnabled: !taLiveSource && search.showcase !== true,
+    // TA and configured showcases own the map/replay lifecycle. Keeping generic
+    // remote sources disabled also prevents hidden requests from competing with
+    // those authoritative sources. Standalone showcase previews still use map=.
+    remoteSourcesEnabled: !taLiveSource && !configuredShowcase,
     setError,
     setSettings,
     onClearViewer() {
@@ -433,7 +439,7 @@ export function ViewerShell() {
     };
   }, [embeddedSource]);
   useLightshowShowcase({
-    enabled: search.showcase === true,
+    enabled: configuredShowcase,
     configValue: search.showcaseConfig,
     session,
     sources,
