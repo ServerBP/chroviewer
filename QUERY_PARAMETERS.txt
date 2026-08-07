@@ -35,7 +35,8 @@ fallback. No parent-page coordinator is required.
 LIGHTING AND PERFORMANCE
 lights=full|static|none       Full mapped lights, fixed static lights, or no mapped lights.
 lightshow=full-lightshow      Show only the full lightshow and hide gameplay objects.
-showcase=true                 Hide gameplay notes, bombs, arcs, and chains, but keep walls.
+showcase=true                 Hide gameplay notes, bombs, arcs, chains, and interactable walls.
+                              Fake or uninteractable decorative walls remain visible.
                               Without showcaseConfig, an ordinary map= source is loaded.
                               With showcaseConfig, the configured showcase owns map loading.
 qualityPreset=broadcast       Apply the optimized broadcast defaults listed below.
@@ -117,5 +118,5 @@ difficulty=<zero-based index> Difficulty index for a map preview.
 EXAMPLE
 ?liveSource=ta&playerId=76561199016011545&hideUI=true&masterVolume=0.8&songVolume=0.7&hitsoundVolume=0.5&lights=static&renderScale=0.75
 
-Full mapped lights with gameplay notes hidden and walls retained:
+Full mapped lights with gameplay objects hidden and decorative walls retained:
 ?showcase=true&lights=full&map=key

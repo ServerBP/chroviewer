@@ -611,6 +611,7 @@ export class MapObjectRenderer {
     for (const index of this.wallWindows?.at(now) ?? []) {
       const wall = data.walls[index];
       if (wall === undefined) continue;
+      if (!this.gameplayNotesVisible && wall.interactable) continue;
       const duration = wall.hjdBeats * 2 + (wall.durationBeats ?? wall.pullBeat - wall.beat);
       const noodle = sampleNoodleRenderObject(wall, data.noodle, now, duration, context, data.leftHanded);
       const movementBeat = noodleMovementBeat(wall, now, noodle, duration);
