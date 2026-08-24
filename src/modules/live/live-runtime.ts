@@ -1,6 +1,6 @@
 import type { SongClock } from '../../core/clock/song-clock';
 import type { Replay } from '../../core/replay/types';
-import { env, TALiveSocketUrl } from '../../env';
+import { CoCuLiveSocketUrl, env, TALiveSocketUrl } from '../../env';
 import type { ReplayStreamPacket } from './generated/proto/scoresaber/live/v1/replay_stream_pb';
 import type { LivePlaybackBuffer } from './generated/proto/scoresaber/live/v1/room_state_pb';
 import type { ScheduledReplayPause } from './live-playback';
@@ -95,14 +95,14 @@ export function createLiveRuntime(target: LiveTarget): LiveRuntime {
     socket: null,
     streamEnding: false,
     streamPaused: false,
-    taLive: target.source === 'ta',
+    taLive: target.source === 'ta' || target.source === 'cocu',
     taBufferingStartedAt: 0,
     taLiveMapHash: '',
     taSyncHolding: false,
     targetMatchId: target.matchId ?? (target.roomId === undefined ? `player:${target.playerId}` : ''),
     websocketUrl:
-      target.source === 'ta'
-        ? `${TALiveSocketUrl}/live/u/${encodeURIComponent(target.playerId)}`
+      target.source === 'ta' || target.source === 'cocu'
+        ? `${target.source === 'cocu' ? CoCuLiveSocketUrl : TALiveSocketUrl}/live/u/${encodeURIComponent(target.playerId)}`
         : ludusWebSocketUrl(env.VITE_LUDUS_URL),
   };
 }

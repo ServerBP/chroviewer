@@ -34,6 +34,7 @@ export const env = createEnv({
     VITE_BEATLEADER_API_URL: publicApiUrl.default('https://api.beatleader.com'),
     VITE_LUDUS_URL: publicApiUrl.default('https://ludus-1.scoresaber.com'),
     VITE_TA_LIVE_SOCKET_URL: publicWebSocketUrl.default('wss://server.tournamentassistant.net:8676'),
+    VITE_COCU_LIVE_SOCKET_URL: publicWebSocketUrl.default('wss://ws.compcube.net'),
     VITE_ENABLED_SOURCES: enabledViewerSourcesSchema,
   },
   runtimeEnvStrict: {
@@ -42,6 +43,7 @@ export const env = createEnv({
     VITE_BEATLEADER_API_URL: import.meta.env.VITE_BEATLEADER_API_URL,
     VITE_LUDUS_URL: import.meta.env.VITE_LUDUS_URL,
     VITE_TA_LIVE_SOCKET_URL: import.meta.env.VITE_TA_LIVE_SOCKET_URL,
+    VITE_COCU_LIVE_SOCKET_URL: import.meta.env.VITE_COCU_LIVE_SOCKET_URL,
     VITE_ENABLED_SOURCES: import.meta.env.VITE_ENABLED_SOURCES,
   },
   emptyStringAsUndefined: true,
@@ -50,3 +52,4 @@ export const env = createEnv({
 // Public configuration name used by the live viewer. Vite supplies it from
 // VITE_TA_LIVE_SOCKET_URL at build time.
 export const TALiveSocketUrl = env.VITE_TA_LIVE_SOCKET_URL;
+export const CoCuLiveSocketUrl = env.VITE_COCU_LIVE_SOCKET_URL;

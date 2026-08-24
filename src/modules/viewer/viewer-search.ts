@@ -17,7 +17,7 @@ export type ViewerShareSource =
   | {
       type: 'live';
       playerId: string;
-      liveSource?: 'scoresaber' | 'ta';
+      liveSource?: 'scoresaber' | 'ta' | 'cocu';
       tournamentId?: string;
       roomId?: string;
       matchId?: string;
@@ -99,7 +99,7 @@ export const viewerSearchSchema = z.pipe(
     audioOffsetMs: z.catch(z.optional(audioOffsetSchema), undefined),
     settings: z.catch(z.optional(viewerSettingsPatchSchema), undefined),
     playerId: z.catch(z.optional(livePlayerIdSchema), undefined),
-    liveSource: z.catch(z.optional(z.enum(['scoresaber', 'ta'])), undefined),
+    liveSource: z.catch(z.optional(z.enum(['scoresaber', 'ta', 'cocu'])), undefined),
     tournamentId: z.catch(z.optional(liveIdSchema), undefined),
     roomId: z.catch(z.optional(liveIdSchema), undefined),
     matchId: z.catch(z.optional(liveIdSchema), undefined),

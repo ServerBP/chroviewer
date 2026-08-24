@@ -175,7 +175,7 @@ export function ViewerShell() {
   const partyT = useTranslations('watchParty');
   const partyActive = search.party !== undefined;
   const hideUI = search.hideUI === true;
-  const taLiveSource = search.liveSource === 'ta';
+  const taLiveSource = search.liveSource === 'ta' || search.liveSource === 'cocu';
   const configuredShowcase = hasConfiguredShowcase(search);
   const [performance, setPerformance] = useState(() => renderPerformanceForSearch(search));
   const [settings, setSettings] = useState(() => {
@@ -205,7 +205,7 @@ export function ViewerShell() {
       ...(search.camera === undefined ? {} : { replayCamera: search.camera }),
       ...(search.fov === undefined ? {} : { replayCameraFov: search.fov }),
       ...(search.audioOffsetMs === undefined ? {} : { audioOffsetMs: search.audioOffsetMs }),
-      ...(search.liveSource === 'ta'
+      ...(search.liveSource === 'ta' || search.liveSource === 'cocu'
         ? { preferReplayColors: true, preferReplayEnvironment: true, preferReplayHsvProfile: true }
         : {}),
     });
@@ -316,7 +316,7 @@ export function ViewerShell() {
         : 'default';
   useFavicon(faviconPlatform);
   const liveActive = liveTarget !== null;
-  const taLive = liveTarget?.source === 'ta';
+  const taLive = liveTarget?.source === 'ta' || liveTarget?.source === 'cocu';
   const embeddedSource = taLive || search.previewSource !== undefined || search.showcase === true;
   const remoteActive = liveActive || partyActive;
   useEffect(() => {

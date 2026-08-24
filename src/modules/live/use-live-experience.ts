@@ -19,7 +19,7 @@ export function useLiveExperience(options: LiveExperienceOptions) {
   const runtimeRef = useRef<LiveRuntime | null>(null);
   const [state, setState] = useState<LiveExperienceState>(initialLiveState);
   const playerId = options.target?.playerId;
-  const profileOptional = options.target?.source === 'ta';
+  const profileOptional = options.target?.source === 'ta' || options.target?.source === 'cocu';
   const playerQuery = useQuery(scoreSaberPlayerQueryOptions(profileOptional ? undefined : playerId));
 
   const unlockAudio = useCallback(async () => {

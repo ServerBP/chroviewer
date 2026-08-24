@@ -52,7 +52,8 @@ export function useLiveConnection(
 
     let disposed = false;
     const runtime = createLiveRuntime(activeTarget);
-    const taSync = activeTarget.source === 'ta' ? createTaLiveSync(activeTarget.playerId) : null;
+    const taSync =
+      activeTarget.source === 'ta' || activeTarget.source === 'cocu' ? createTaLiveSync(activeTarget.playerId) : null;
     runtimeRef.current = runtime;
     setState(initialLiveState);
 
@@ -167,7 +168,7 @@ export function useLiveConnection(
       const buffered = runtime.bufferedPackets;
       resetLiveStream(runtime);
       runtime.currentStreamId = packet.streamId;
-      const replay = createLiveReplay(start, activeTarget.source === 'ta');
+      const replay = createLiveReplay(start, activeTarget.source === 'ta' || activeTarget.source === 'cocu');
       runtime.replay = replay;
       runtime.playbackRate = replay.metadata.songSpeed && replay.metadata.songSpeed > 0 ? replay.metadata.songSpeed : 1;
       const hash = liveMapHash(start);
@@ -175,7 +176,7 @@ export function useLiveConnection(
         updateConnectionState('error');
         return;
       }
-      runtime.taLiveMapHash = activeTarget.source === 'ta' ? hash : '';
+      runtime.taLiveMapHash = activeTarget.source === 'ta' || activeTarget.source === 'cocu' ? hash : '';
       updateConnectionState(optionsRef.current.hasLiveMap(hash) ? 'buffering' : 'loading');
       void loadReplayMap();
 
@@ -199,7 +200,8 @@ export function useLiveConnection(
 
     function handleReplayEnd(packet: ReplayStreamPacket, deferPlaybackAttempt: boolean) {
       const result = applyLiveReplayEnd(runtime, packet);
-      if (activeTarget.source === 'ta' && result !== 'ignored') runtime.playbackAttemptPending = true;
+      if ((activeTarget.source === 'ta' || activeTarget.source === 'cocu') && result !== 'ignored')
+        runtime.playbackAttemptPending = true;
       if (result === 'waiting' && activeTarget.source !== 'ta') {
         pausePlayback();
         updateConnectionState('waiting');
@@ -390,7 +392,10 @@ export function useLiveConnection(
     async function connect() {
       if (runtimeRef.current !== runtime) return;
       updateConnectionState(runtime.reconnectAttempt === 0 ? 'connecting' : 'reconnecting');
-      const browserSession = activeTarget.source === 'ta' ? undefined : await fetchLiveBrowserSession(activeTarget);
+      const browserSession =
+        activeTarget.source === 'ta' || activeTarget.source === 'cocu'
+          ? undefined
+          : await fetchLiveBrowserSession(activeTarget);
       if (disposed) return;
       const socketResult = Result.try(() => new WebSocket(runtime.websocketUrl));
       if (socketResult.isErr()) {
@@ -406,7 +411,7 @@ export function useLiveConnection(
       socket.onopen = () => {
         if (disposed || runtime.socket !== socket) return;
         runtime.reconnectAttempt = 0;
-        if (activeTarget.source === 'ta') {
+        if (activeTarget.source === 'ta' || activeTarget.source === 'cocu') {
           updateConnectionState('waiting');
           return;
         }
@@ -420,7 +425,7 @@ export function useLiveConnection(
       };
       socket.onmessage = (event: MessageEvent<ArrayBuffer>) => {
         if (disposed || runtime.socket !== socket) return;
-        if (activeTarget.source === 'ta') handleTournamentAssistantReplay(event.data);
+        if (activeTarget.source === 'ta' || activeTarget.source === 'cocu') handleTournamentAssistantReplay(event.data);
         else handleEnvelope(event.data);
       };
       socket.onerror = () => {
@@ -445,7 +450,8 @@ export function useLiveConnection(
       if (clock.audioBlocked()) {
         setState((current) => ({ ...current, audioBlocked: true }));
       }
-      if (!clock.isPlaying()) transport.play({ autoplay: activeTarget.source === 'ta' });
+      if (!clock.isPlaying())
+        transport.play({ autoplay: activeTarget.source === 'ta' || activeTarget.source === 'cocu' });
       return clock.isPlaying();
     }
 

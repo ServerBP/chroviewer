@@ -18,7 +18,7 @@ export type LiveStatus =
 
 export interface LiveTarget {
   playerId: string;
-  source?: 'scoresaber' | 'ta';
+  source?: 'scoresaber' | 'ta' | 'cocu';
   tournamentId?: string;
   roomId?: string;
   matchId?: string;
