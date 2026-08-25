@@ -26,6 +26,8 @@ const beatKhanaFrameAncestors = [
   'https://replay.beatkhana.com',
   'https://*.replay.beatkhana.com',
   'https://*.shyyluna.dev',
+  'https://*.compcube.net',
+  'https://compcube.net',
 ];
 
 export default defineConfig(({ mode }) => {
