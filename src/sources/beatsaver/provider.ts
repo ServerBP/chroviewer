@@ -32,6 +32,29 @@ const beatSaverMapSchema: z.ZodType<BeatSaverMapContract> = z.object({
   versions: z.tuple([beatSaverVersionSchema], beatSaverVersionSchema),
 });
 
+const preparedHashSources = new Map<string, BeatSaverMapSource>();
+const preparedHashSourceLimit = 2;
+
+function preparedHashSource(hash: string) {
+  const key = hash.toLowerCase();
+  const source = preparedHashSources.get(key);
+  if (source === undefined) return null;
+  preparedHashSources.delete(key);
+  preparedHashSources.set(key, source);
+  return source;
+}
+
+function retainPreparedHashSource(source: BeatSaverMapSource) {
+  const key = source.hash.toLowerCase();
+  preparedHashSources.delete(key);
+  preparedHashSources.set(key, source);
+  while (preparedHashSources.size > preparedHashSourceLimit) {
+    const oldest = preparedHashSources.keys().next().value;
+    if (oldest === undefined) break;
+    preparedHashSources.delete(oldest);
+  }
+}
+
 export function beatSaverKey(input: string) {
   const value = input.trim();
   if (/^[0-9a-f]+$/i.test(value)) return value.toLowerCase();
@@ -67,10 +90,17 @@ export async function fetchBeatSaverHash(hash: string, options: ResolveOptions =
       }),
     );
   }
+  const prepared = preparedHashSource(hash);
+  if (prepared !== null) {
+    options.onProgress?.(1);
+    return Result.ok(prepared);
+  }
   const cached = await cachedBeatSaverSource(hash, options);
-  return cached === null
-    ? fetchBeatSaver(`/maps/hash/${hash}`, `BeatSaver hash ${hash}`, options, true)
-    : Result.ok(cached);
+  const result =
+    cached === null ? fetchBeatSaver(`/maps/hash/${hash}`, `BeatSaver hash ${hash}`, options, true) : Result.ok(cached);
+  const resolved = await result;
+  if (resolved.isOk()) retainPreparedHashSource(resolved.value);
+  return resolved;
 }
 
 async function cachedBeatSaverSource(hash: string, options: ResolveOptions) {
@@ -90,7 +120,7 @@ async function fetchBeatSaver(
   options: ResolveOptions,
   cacheChecked = false,
 ): Promise<SourceResult<BeatSaverMapSource>> {
-  return Result.gen(async function* () {
+  const metadata = await Result.gen(async function* () {
     const response = yield* Result.await(
       requestJson(`${env.VITE_BEATSAVER_API_URL}${path}`, beatSaverMapSchema, {
         ...options,
@@ -100,23 +130,41 @@ async function fetchBeatSaver(
       }),
     );
     const version = response.versions[0];
-    if (!cacheChecked) {
-      const cached = await cachedBeatSaverSource(version.hash, options);
-      if (cached !== null) return Result.ok(cached);
-    }
-    const archive = yield* Result.await(
-      requestArrayBuffer(version.downloadURL, {
-        ...options,
-        source: 'beatsaver',
-        label: `BeatSaver download ${response.id}`,
-        operation: 'download-map-archive',
-      }),
-    );
-    const source = yield* Result.await(mapSourceFromArchive(response.id, version.hash, archive));
-    const cache = options.cache === undefined ? browserMapArchiveCache : options.cache;
-    if (cache !== null) await cache.set({ key: source.key, hash: source.hash, archive });
-    return Result.ok(source);
+    return Result.ok({ response, version });
   });
+  if (metadata.isErr()) return Result.err(metadata.error);
+  const { response, version } = metadata.value;
+
+  const resolveVersion = (checkCache = !cacheChecked) =>
+    Result.gen(async function* () {
+      if (checkCache) {
+        const cached = await cachedBeatSaverSource(version.hash, options);
+        if (cached !== null) return Result.ok(cached);
+      }
+      const archive = yield* Result.await(
+        requestArrayBuffer(version.downloadURL, {
+          ...options,
+          source: 'beatsaver',
+          label: `BeatSaver download ${response.id}`,
+          operation: 'download-map-archive',
+        }),
+      );
+      const source = yield* Result.await(mapSourceFromArchive(response.id, version.hash, archive));
+      const cache = options.cache === undefined ? browserMapArchiveCache : options.cache;
+      if (cache !== null) await cache.set({ key: source.key, hash: source.hash, archive });
+      return Result.ok(source);
+    });
+
+  // OPFS is shared by same-origin iframe documents, but an empty cache alone
+  // does not stop four simultaneous viewers from all downloading and extracting
+  // the same archive. A Web Lock makes the cold load single-flight across those
+  // documents; waiters re-check OPFS after the first viewer commits the file.
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  const defaultSharedCache = options.cache === undefined && browserMapArchiveCache !== null;
+  if (locks === undefined || !defaultSharedCache) return resolveVersion();
+  return locks.request(`chroviewer-map-${version.hash.toLowerCase()}`, { signal: options.signal }, () =>
+    resolveVersion(true),
+  );
 }
 
 async function mapSourceFromArchive(key: string, hash: string, archive: ArrayBuffer) {

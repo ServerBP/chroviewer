@@ -10,13 +10,14 @@ import { colorOverride, type ViewerSettings } from '../../core/viewer-settings';
 import { resolveEnvironmentId } from '../../renderer/environment/environment-catalog';
 import { EnvironmentLoadAborted } from '../../renderer/environment/environment-error';
 import type { MapView } from '../../renderer/map-view';
+import type { MultiviewRendererHost, SharedViewerLifecycle } from '../../renderer/multiview-renderer-host';
 import type { RenderPerformanceOptions } from '../../renderer/render-performance';
 import type { RendererLifecycle } from '../../renderer/renderer-lifecycle';
 import type { ActiveSelection } from './viewer-types';
 
 export interface ViewerHandle {
   view: MapView;
-  lifecycle: RendererLifecycle;
+  lifecycle: RendererLifecycle | SharedViewerLifecycle;
 }
 
 interface ViewerRendererOptions {
@@ -29,6 +30,7 @@ interface ViewerRendererOptions {
   performance: RenderPerformanceOptions;
   skipInitialMenuEnvironment: boolean;
   setError: (message: string) => void;
+  sharedRenderer?: { host: MultiviewRendererHost; id: string };
 }
 
 function isCurrentViewer(viewerRef: RefObject<ViewerHandle | null>, view: MapView) {
@@ -45,6 +47,7 @@ export function useViewerRenderer({
   performance,
   skipInitialMenuEnvironment,
   setError,
+  sharedRenderer,
 }: ViewerRendererOptions) {
   const t = useTranslations('viewer');
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,12 +69,14 @@ export function useViewerRenderer({
         import('../../renderer/renderer-lifecycle'),
       ]);
       const canvas = canvasRef.current;
-      if (effect.signal.aborted || canvas === null) return;
+      if (effect.signal.aborted || (canvas === null && sharedRenderer === undefined)) return;
       const active = activeSelectionRef.current;
       const initialPerformance = performanceRef.current;
-      const lifecycle = new RendererLifecycle(initialPerformance);
-      lifecycle.attach(canvas);
-      lifecycle.setRenderScale(settings.renderScale);
+      const lifecycle = sharedRenderer === undefined ? new RendererLifecycle(initialPerformance) : null;
+      if (lifecycle !== null && canvas !== null) {
+        lifecycle.attach(canvas);
+        lifecycle.setRenderScale(settings.renderScale);
+      }
       const finishInitialEnvironmentLoad = () => {
         if (initialEnvironmentLoadedRef.current) return;
         initialEnvironmentLoadedRef.current = true;
@@ -83,7 +88,10 @@ export function useViewerRenderer({
         initialPerformance,
         () => orthoOverlayRef.current,
       );
-      lifecycle.setView(view);
+      const lifecycleControls =
+        lifecycle ?? sharedRenderer?.host.register(sharedRenderer.id, view, initialPerformance, settings.renderScale);
+      if (lifecycleControls === undefined) return;
+      lifecycle?.setView(view);
       if (active === null && !skipInitialMenuEnvironment) {
         view.startMenuLightshow(Math.floor(Math.random() * 0x1_0000_0000));
       } else {
@@ -95,13 +103,14 @@ export function useViewerRenderer({
       view.setPreviewHitNotes(settingsRef.current.previewHitNotes);
       view.setPreviewHitLine(settingsRef.current.previewHitLine);
       view.setPreviewNotesLookAtPlayer(settingsRef.current.previewNotesLookAtPlayer);
-      viewerRef.current = { view, lifecycle };
+      viewerRef.current = { view, lifecycle: lifecycleControls };
       setViewerReady(true);
       cleanup = () => {
         setViewerReady(false);
         viewerRef.current = null;
+        if (sharedRenderer !== undefined) sharedRenderer.host.unregister(sharedRenderer.id, view);
         view.dispose();
-        lifecycle.dispose();
+        lifecycle?.dispose();
       };
 
       const initialLoad = !initialEnvironmentLoadedRef.current;
@@ -148,7 +157,7 @@ export function useViewerRenderer({
       cleanup?.();
       cleanup = null;
     };
-  }, [settings.graphicsQuality]);
+  }, [settings.graphicsQuality, sharedRenderer?.host, sharedRenderer?.id]);
 
   useEffect(() => {
     const viewer = viewerRef.current;

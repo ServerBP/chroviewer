@@ -14,6 +14,7 @@ import {
   Scene,
   ShaderMaterial,
   Vector2,
+  Vector4,
   WebGLRenderTarget,
   type Camera,
   type WebGLRenderer,
@@ -94,6 +95,8 @@ export class PostBloomPipeline {
   private readonly passMesh: Mesh;
   private readonly drawingBufferSize = new Vector2();
   private readonly clearColor = new Color();
+  private readonly previousViewport = new Vector4();
+  private readonly previousScissor = new Vector4();
   private layout = postBloomLayout(1, 1);
   private noiseFrame = 0;
   private screenDisplacementEnabled = true;
@@ -171,10 +174,16 @@ export class PostBloomPipeline {
     }
   }
 
-  render(renderer: WebGLRenderer, scene: Scene, camera: Camera, displacementActive = true) {
+  render(
+    renderer: WebGLRenderer,
+    scene: Scene,
+    camera: Camera,
+    displacementActive = true,
+    output?: { x: number; y: number; width: number; height: number; renderWidth?: number; renderHeight?: number },
+  ) {
     renderer.getDrawingBufferSize(this.drawingBufferSize);
-    const width = Math.max(1, Math.floor(this.drawingBufferSize.x));
-    const height = Math.max(1, Math.floor(this.drawingBufferSize.y));
+    const width = Math.max(1, Math.floor(output?.renderWidth ?? this.drawingBufferSize.x));
+    const height = Math.max(1, Math.floor(output?.renderHeight ?? this.drawingBufferSize.y));
     if (this.sceneTarget.width !== width || this.sceneTarget.height !== height) {
       this.sceneTarget.setSize(width, height);
       this.setSize(width, height);
@@ -182,6 +191,9 @@ export class PostBloomPipeline {
 
     const previousTarget = renderer.getRenderTarget();
     const previousAutoClear = renderer.autoClear;
+    renderer.getViewport(this.previousViewport);
+    renderer.getScissor(this.previousScissor);
+    const previousScissorTest = renderer.getScissorTest();
     renderer.getClearColor(this.clearColor);
     const previousClearAlpha = renderer.getClearAlpha();
     renderer.autoClear = false;
@@ -238,7 +250,15 @@ export class PostBloomPipeline {
     this.passMesh.material = this.compositeMaterial;
     renderer.setRenderTarget(previousTarget);
     renderer.setClearColor(this.clearColor, previousClearAlpha);
+    if (output !== undefined) {
+      renderer.setViewport(output.x, output.y, output.width, output.height);
+      renderer.setScissor(output.x, output.y, output.width, output.height);
+      renderer.setScissorTest(true);
+    }
     renderer.render(this.passScene, this.passCamera);
+    renderer.setViewport(this.previousViewport);
+    renderer.setScissor(this.previousScissor);
+    renderer.setScissorTest(previousScissorTest);
     renderer.autoClear = previousAutoClear;
   }
 

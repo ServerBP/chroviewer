@@ -456,6 +456,20 @@ export class MapView implements RenderView {
   }
 
   render(renderer: WebGLRenderer) {
+    this.renderFrame(renderer);
+  }
+
+  renderViewport(
+    renderer: WebGLRenderer,
+    output: { x: number; y: number; width: number; height: number; renderWidth?: number; renderHeight?: number },
+  ) {
+    this.renderFrame(renderer, output);
+  }
+
+  private renderFrame(
+    renderer: WebGLRenderer,
+    output?: { x: number; y: number; width: number; height: number; renderWidth?: number; renderHeight?: number },
+  ) {
     const now = this.environment === null && this.data === null ? 0 : this.beatSource();
     this.update(now);
     this.scene.updateMatrixWorld();
@@ -468,7 +482,13 @@ export class MapView implements RenderView {
       });
     }
     this.pipeline.render(renderer, this.camera, this.environmentLights.lightSegments);
-    this.postBloom.render(renderer, this.scene, this.camera, this.mapRoot.visible && this.mapObjects.wallsVisible);
+    this.postBloom.render(
+      renderer,
+      this.scene,
+      this.camera,
+      this.mapRoot.visible && this.mapObjects.wallsVisible,
+      output,
+    );
     if (this.orthoCameraEnabled && this.replayView.hasReplay && !isForcedLightshowMode(this.lightshowMode)) {
       const element = this.orthoOverlayElement();
       if (element !== null) this.renderOrthographicOverlay(renderer, element, now);

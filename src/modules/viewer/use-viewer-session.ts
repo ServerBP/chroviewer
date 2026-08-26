@@ -17,6 +17,7 @@ import {
 } from '../../core/viewer-settings';
 import { resolveEnvironmentId } from '../../renderer/environment/environment-catalog';
 import { EnvironmentLoadAborted, type EnvironmentLoadFailure } from '../../renderer/environment/environment-error';
+import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import type { RenderPerformanceOptions } from '../../renderer/render-performance';
 import type { useSongTransport } from './use-song-transport';
 import { useViewerRenderer } from './use-viewer-renderer';
@@ -53,6 +54,7 @@ interface ViewerSessionOptions {
   >;
   transport: Pick<SongTransport, 'clear' | 'clockRef' | 'load' | 'play' | 'seek' | 'setHitsoundEvents'>;
   performance: RenderPerformanceOptions;
+  sharedRenderer?: { host: MultiviewRendererHost; id: string };
 }
 
 export function useViewerSession({
@@ -72,6 +74,7 @@ export function useViewerSession({
   sources,
   transport,
   performance,
+  sharedRenderer,
 }: ViewerSessionOptions) {
   const t = useTranslations('viewer');
   const activeSelectionRef = useRef<ActiveSelection | null>(null);
@@ -89,6 +92,7 @@ export function useViewerSession({
     performance,
     skipInitialMenuEnvironment,
     setError,
+    sharedRenderer,
   });
 
   useEffect(() => {

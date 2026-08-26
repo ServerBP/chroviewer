@@ -153,6 +153,7 @@ export class FlyingScoreHud {
   readonly root = new Group();
 
   private readonly flying = new Map<number, FlyingText>();
+  private readonly activeIds = new Set<number>();
   private readonly start = new Vector3();
   private readonly target = new Vector3();
   private readonly rotation = new Quaternion();
@@ -160,9 +161,10 @@ export class FlyingScoreHud {
 
   update(timeline: ReplayTimeline, time: number) {
     const active = flyingScoresAt(timeline, time, 0.7);
-    const activeIds = new Set(active.map((score) => score.id));
+    this.activeIds.clear();
+    for (const score of active) this.activeIds.add(score.id);
     for (const [id, flying] of this.flying) {
-      if (activeIds.has(id)) continue;
+      if (this.activeIds.has(id)) continue;
       this.disposeFlyingText(flying);
       this.flying.delete(id);
     }

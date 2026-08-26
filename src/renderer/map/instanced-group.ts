@@ -32,8 +32,11 @@ export class InstancedGroup {
   // converted color rounded to f32 so it compares exactly against the attribute array
   private readonly linear = new Float32Array(3);
   private colorsDirty = false;
+  private dissolvesDirty = false;
+  private cutoutSeedsDirty = false;
   private colorAlphasDirty = false;
   private uvScalesDirty = false;
+  private obstacleEdgeScalesDirty = false;
 
   constructor(geometry: BufferGeometry, material: Material, capacity: number, hasObstacleFrameData = false) {
     this.capacity = Math.max(capacity, 1);
@@ -96,8 +99,16 @@ export class InstancedGroup {
       this.mesh.setColorAt(this.cursor, this.color);
       this.colorsDirty = true;
     }
-    this.instanceDissolves.setX(this.cursor, dissolve);
-    this.instanceCutoutSeeds.setX(this.cursor, cutoutSeed);
+    const dissolveValue = Math.fround(dissolve);
+    if (this.instanceDissolves.getX(this.cursor) !== dissolveValue) {
+      this.instanceDissolves.setX(this.cursor, dissolveValue);
+      this.dissolvesDirty = true;
+    }
+    const cutoutSeedValue = Math.fround(cutoutSeed);
+    if (this.instanceCutoutSeeds.getX(this.cursor) !== cutoutSeedValue) {
+      this.instanceCutoutSeeds.setX(this.cursor, cutoutSeedValue);
+      this.cutoutSeedsDirty = true;
+    }
     const colorAlpha = Math.fround(color[3] ?? 1);
     if (this.instanceColorAlphas.getX(this.cursor) !== colorAlpha) {
       this.instanceColorAlphas.setX(this.cursor, colorAlpha);
@@ -114,12 +125,19 @@ export class InstancedGroup {
       this.instanceUvScales.setXYZ(this.cursor, uvScaleX, uvScaleY, uvScaleZ);
       this.uvScalesDirty = true;
     }
-    this.instanceObstacleEdgeScales?.setXYZ(
-      this.cursor,
-      obstacleEdgeScale[0],
-      obstacleEdgeScale[1],
-      obstacleEdgeScale[2],
-    );
+    if (this.instanceObstacleEdgeScales !== undefined) {
+      const edgeScaleX = Math.fround(obstacleEdgeScale[0]);
+      const edgeScaleY = Math.fround(obstacleEdgeScale[1]);
+      const edgeScaleZ = Math.fround(obstacleEdgeScale[2]);
+      if (
+        this.instanceObstacleEdgeScales.getX(this.cursor) !== edgeScaleX ||
+        this.instanceObstacleEdgeScales.getY(this.cursor) !== edgeScaleY ||
+        this.instanceObstacleEdgeScales.getZ(this.cursor) !== edgeScaleZ
+      ) {
+        this.instanceObstacleEdgeScales.setXYZ(this.cursor, edgeScaleX, edgeScaleY, edgeScaleZ);
+        this.obstacleEdgeScalesDirty = true;
+      }
+    }
     this.cursor++;
   }
 
@@ -136,16 +154,23 @@ export class InstancedGroup {
         this.instanceColors.needsUpdate = true;
         this.colorsDirty = false;
       }
-      this.instanceDissolves.clearUpdateRanges();
-      this.instanceDissolves.addUpdateRange(0, this.cursor);
-      this.instanceDissolves.needsUpdate = true;
-      this.instanceCutoutSeeds.clearUpdateRanges();
-      this.instanceCutoutSeeds.addUpdateRange(0, this.cursor);
-      this.instanceCutoutSeeds.needsUpdate = true;
-      if (this.instanceObstacleEdgeScales !== undefined) {
+      if (this.dissolvesDirty) {
+        this.instanceDissolves.clearUpdateRanges();
+        this.instanceDissolves.addUpdateRange(0, this.cursor);
+        this.instanceDissolves.needsUpdate = true;
+        this.dissolvesDirty = false;
+      }
+      if (this.cutoutSeedsDirty) {
+        this.instanceCutoutSeeds.clearUpdateRanges();
+        this.instanceCutoutSeeds.addUpdateRange(0, this.cursor);
+        this.instanceCutoutSeeds.needsUpdate = true;
+        this.cutoutSeedsDirty = false;
+      }
+      if (this.instanceObstacleEdgeScales !== undefined && this.obstacleEdgeScalesDirty) {
         this.instanceObstacleEdgeScales.clearUpdateRanges();
         this.instanceObstacleEdgeScales.addUpdateRange(0, this.cursor * 3);
         this.instanceObstacleEdgeScales.needsUpdate = true;
+        this.obstacleEdgeScalesDirty = false;
       }
       if (this.colorAlphasDirty) {
         this.instanceColorAlphas.clearUpdateRanges();

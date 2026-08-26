@@ -18,6 +18,7 @@ import { useTranslations } from 'use-intl';
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import { DEFAULT_VIEWER_SETTINGS, loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
+import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
 import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '../live/embedded-realtime-score-sync';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
@@ -56,6 +57,7 @@ import {
 } from './viewer-search';
 import { quantizedBeatAt } from './viewer-timeline';
 import type { ViewerPanel } from './viewer-types';
+import type { MapMeta } from './viewer-types';
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -167,9 +169,50 @@ function replaceDynamicLocation(values: Record<string, unknown>) {
   window.history.replaceState(window.history.state, '', url);
 }
 
-export function ViewerShell() {
+export interface MultiviewPlaybackSnapshot {
+  playerId: string;
+  time: number;
+  duration: number;
+  beat: number;
+  bpm: number;
+  playing: boolean;
+  map: MapMeta | null;
+  seek(time: number): void;
+}
+
+interface ViewerShellProps {
+  multiview?: {
+    id: string;
+    playerId: string;
+    host: MultiviewRendererHost;
+    masterVolume: number;
+    hitsoundVolume: number;
+    disableGameUI: boolean;
+    lights: 'full' | 'static' | 'none';
+    settings?: Record<string, string | number | boolean>;
+    onPlayback(snapshot: MultiviewPlaybackSnapshot): void;
+  };
+}
+
+export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const router = useRouter();
-  const search = useSearch({ from: '/' });
+  const routeSearch = useSearch({ from: '/' });
+  const search =
+    multiview === undefined
+      ? routeSearch
+      : {
+          ...routeSearch,
+          ...multiview.settings,
+          hideUI: true as const,
+          playerId: multiview.playerId,
+          liveSource: 'ta' as const,
+          masterVolume: multiview.masterVolume,
+          hitsoundVolume: multiview.hitsoundVolume,
+          disableGameUI: multiview.disableGameUI,
+          lights: multiview.lights,
+          qualityPreset: 'broadcast' as const,
+          maxFps: 60,
+        };
   const t = useTranslations('viewer');
   const commonT = useTranslations('common');
   const partyT = useTranslations('watchParty');
@@ -292,7 +335,28 @@ export function ViewerShell() {
     sources,
     transport,
     performance,
+    sharedRenderer: multiview === undefined ? undefined : { host: multiview.host, id: multiview.id },
   });
+  const multiviewSettingsSignature =
+    multiview === undefined
+      ? ''
+      : JSON.stringify({
+          ...multiview.settings,
+          masterVolume: multiview.masterVolume,
+          hitsoundVolume: multiview.hitsoundVolume,
+        });
+  useEffect(() => {
+    if (multiview === undefined) return;
+    const values = {
+      qualityPreset: 'broadcast',
+      maxFps: 60,
+      ...multiview.settings,
+      masterVolume: multiview.masterVolume,
+      hitsoundVolume: multiview.hitsoundVolume,
+    };
+    setPerformance(replaceRenderPerformance(values));
+    setSettings((current) => sanitizeViewerSettings({ ...current, ...dynamicSettingsPatch(values) }));
+  }, [multiviewSettingsSignature]);
   const liveTarget: LiveTarget | null =
     search.playerId === undefined
       ? null
@@ -718,6 +782,21 @@ export function ViewerShell() {
     '--live-safe-area-bottom': mobileViewport.keyboardInset > 0 ? '0px' : 'env(safe-area-inset-bottom)',
     '--live-viewport-center-y': mobileViewport.centerY,
   };
+  useEffect(() => {
+    if (multiview === undefined) return;
+    multiview.onPlayback({
+      playerId: multiview.playerId,
+      time: transport.time,
+      duration: transport.duration,
+      beat: quantizedBeatAt(transport.time, sources.songBpm, 1 / 1000),
+      bpm: sources.songBpm,
+      playing: transport.playing,
+      map: sources.mapMeta,
+      seek: transport.seek,
+    });
+  }, [multiview, sources.mapMeta, sources.songBpm, transport.duration, transport.playing, transport.time]);
+
+  if (multiview !== undefined) return null;
   return (
     <main
       className="relative size-full overflow-hidden bg-black [--live-sidebar-width:18rem]"
