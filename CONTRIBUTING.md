@@ -4,30 +4,30 @@ For local setup, start with [SETUP.md](SETUP.md)
 
 ## Package Management
 
-Use Bun for package work:
+Use Vite+ for package work. It manages the pinned pnpm version for the project:
 
 ```sh
-bun i
-bun add <package>
-bun remove <package>
+vp install
+vp add <package>
+vp remove <package>
 ```
 
-Do not use npm, pnpm or yarn in this repo
+Direct pnpm also works without a global Vite+ install. Use the version pinned in `package.json`, run `pnpm install`, then invoke built-in Vite+ commands through `pnpm exec vp`. Do not use npm, Bun or yarn to install dependencies
 
 ## Code Style
 
 - Use kebab-case for TypeScript filenames and directories
 - Use named exports
 - Omit explicit TypeScript return types when inference is clear
-- Put user facing text in `messages` and read it through the i18n helpers
+- Put user facing text in `src/i18n/messages` and read it through the i18n helpers
 
 ## Generated Files
 
 Do not edit generated API contracts or `public/environments/*.json` directly
 
 ```sh
-bun run api:generate
-bun run api:regen
+vp run api:generate
+vp run api:regen
 ```
 
 `api:regen` fetches fresh OpenAPI snapshots and requires network access. Commit refreshed snapshots and generated contracts together
@@ -37,7 +37,7 @@ bun run api:regen
 Run the full check before committing:
 
 ```sh
-bun run check
+vp run verify
 ```
 
 ## Commits

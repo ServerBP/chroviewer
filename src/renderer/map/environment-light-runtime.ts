@@ -1,4 +1,4 @@
-import { Color, ShaderMaterial, Vector3, type Object3D } from 'three';
+import { Color, MathUtils, ShaderMaterial, Vector3, type Object3D } from 'three';
 
 import type { PointSampleContext } from '../../core/animation/point-definition';
 import { createBpmConverter, songBpmTimeToSeconds } from '../../core/beatmap/bpm';
@@ -34,6 +34,7 @@ import { shaderColorUniform, shaderNumberUniform, shaderUniformValue } from '../
 import { ChromaTrackRuntime } from './chroma-track-runtime';
 import { lightBindingKey, rebuildEnvironmentLightEventCache } from './environment-light-timeline-routing';
 import { EnvironmentTransformRuntime } from './environment-transform-runtime';
+import { menuLightshowRandom } from './menu-lightshow';
 
 interface GlsColorSource {
   tween: ReturnType<typeof glsColorTween>;
@@ -125,9 +126,11 @@ export class EnvironmentLightRuntime {
     [ResolvedBindingSample | undefined, ResolvedBindingSample | undefined]
   >();
   private readonly latestTimelineBeats = new Map<BasicLightTimeline, number>();
+  private readonly menuLightSamples = new Map<string, ResolvedBindingSample>();
 
   private environment: LoadedEnvironment | null = null;
   private data: MapRenderData | null = null;
+  private menuLightshowSeed: number | null = null;
   private colors: ColorScheme = DEFAULT_COLORS;
   private lightshowMode: LightshowMode = 'full';
   private glsColorRuntime: GlsColorRuntime[] = [];
@@ -165,6 +168,12 @@ export class EnvironmentLightRuntime {
     this.rebuildRuntime();
   }
 
+  setMenuLightshow(seed: number) {
+    this.menuLightshowSeed = seed;
+    this.basicLightSampleBeat = Number.NaN;
+    this.rebuildRuntime();
+  }
+
   setColors(colors: ColorScheme) {
     this.colors = colors;
     this.basicLightSampleColors = undefined;
@@ -186,8 +195,9 @@ export class EnvironmentLightRuntime {
 
     const songBpm = this.data?.songBpm ?? 120;
     this.songTime.value = songBpmTimeToSeconds(beat, songBpm);
-    const full = isFullLightshowMode(this.lightshowMode);
-    const boosted = full ? boostAt(this.lightEventsByType.get(5) ?? [], beat) : false;
+    const menuLightshow = this.data === null && this.menuLightshowSeed !== null;
+    const full = menuLightshow || isFullLightshowMode(this.lightshowMode);
+    const boosted = menuLightshow ? false : full ? boostAt(this.lightEventsByType.get(5) ?? [], beat) : false;
     this.prepareBasicLightSamples(beat, boosted, songBpm);
     this.updateBakedReflectionProbe(beat, boosted, songBpm);
     for (const target of environment.boostSwitches) target.apply(boosted);
@@ -239,9 +249,14 @@ export class EnvironmentLightRuntime {
     this.glsColorRuntime = [];
     const data = this.data;
     const environment = this.environment;
-    if (data === null || environment === null) {
+    if (environment === null) {
       this.transforms.clear();
-      if (environment === null) this.chromaTracks.clear();
+      this.chromaTracks.clear();
+      return;
+    }
+    if (data === null) {
+      if (this.menuLightshowSeed === null) this.transforms.clear();
+      else this.transforms.rebuildMenuLightshow(environment, this.menuLightshowSeed);
       return;
     }
     this.jsonTimeToSongBpmTime = createBpmConverter(data.bpmEvents, data.songBpm);
@@ -528,6 +543,15 @@ export class EnvironmentLightRuntime {
 
   private sampleEnvironmentBinding(binding: EnvironmentLightBinding, beat: number, boosted: boolean, songBpm: number) {
     this.prepareBasicLightSamples(beat, boosted, songBpm);
+    if (this.data === null && this.menuLightshowSeed !== null) {
+      return this.sampleMenuLight(
+        this.menuLightshowSeed,
+        binding.eventType,
+        binding.lightId,
+        binding.invertColorScheme,
+        beat,
+      );
+    }
     const timeline = lightTimelineForMode(this.lightshowMode, this.timelineForBinding(binding));
     return this.sampleBasicTimeline(
       timeline,
@@ -541,6 +565,9 @@ export class EnvironmentLightRuntime {
   }
 
   private sampleEventType(eventType: number, beat: number, boosted: boolean, songBpm: number) {
+    if (this.data === null && this.menuLightshowSeed !== null) {
+      return this.sampleMenuLight(this.menuLightshowSeed, eventType, 0, false, beat);
+    }
     const events = this.lightEventsByType.get(eventType);
     if (events === undefined) return null;
     const sourceTimeline = this.lightTimelinesByEvents.get(events) ?? createBasicLightTimeline(events);
@@ -663,6 +690,61 @@ export class EnvironmentLightRuntime {
     this.basicLightSamples.clear();
     this.resolvedBasicLightSamples.clear();
     this.latestTimelineBeats.clear();
+    this.menuLightSamples.clear();
+  }
+
+  private sampleMenuLight(seed: number, eventType: number, lightId: number, invertColorScheme: boolean, beat: number) {
+    const key = `${eventType}:${lightId}:${invertColorScheme ? 1 : 0}`;
+    const cached = this.menuLightSamples.get(key);
+    if (cached !== undefined) return cached;
+    const channel = Math.imul(eventType + 1, 4_099) ^ lightId;
+    const period = 9 + menuLightshowRandom(seed, channel, 0) * 5;
+    const position = (beat + menuLightshowRandom(seed, channel, 1) * period) / period;
+    const step = Math.floor(position);
+    const amount = MathUtils.smoothstep(position - step, 0.68, 1);
+    const left = invertColorScheme ? this.colors.environmentRight : this.colors.environmentLeft;
+    const right = invertColorScheme ? this.colors.environmentLeft : this.colors.environmentRight;
+    const state = (stateStep: number) => {
+      const stateRandom = menuLightshowRandom(seed, channel, stateStep + 2);
+      const color = menuLightshowRandom(seed, channel ^ 0x5bd1e995, stateStep) < 0.5 ? left : right;
+      const alpha = stateRandom < 0.22 ? 0 : 0.48 + menuLightshowRandom(seed, channel ^ 0x27d4eb2d, stateStep) * 0.24;
+      return { color, alpha };
+    };
+    const current = state(step);
+    const next = state(step + 1);
+    const mixedColor: Rgb = [
+      MathUtils.lerp(current.color[0], next.color[0], amount),
+      MathUtils.lerp(current.color[1], next.color[1], amount),
+      MathUtils.lerp(current.color[2], next.color[2], amount),
+    ];
+    const palettePeriod = 24;
+    const palettePosition = (beat + menuLightshowRandom(seed, 0x68bc21eb, 0) * palettePeriod) / palettePeriod;
+    const paletteStep = Math.floor(palettePosition);
+    const infectionOffset = menuLightshowRandom(seed, channel ^ 0x165667b1, paletteStep);
+    const infectionStart = 0.56 + infectionOffset * 0.3;
+    const paletteAmount = MathUtils.smoothstep(palettePosition - paletteStep, infectionStart, infectionStart + 0.14);
+    const paletteColor = (paletteIndex: number) => {
+      const palette = menuLightshowRandom(seed, 0x68bc21eb, paletteIndex + 1);
+      if (palette < 0.2) return this.colors.environmentLeft;
+      if (palette < 0.4) return this.colors.environmentRight;
+      return mixedColor;
+    };
+    const currentPalette = paletteColor(paletteStep);
+    const nextPalette = paletteColor(paletteStep + 1);
+    const alpha = MathUtils.lerp(current.alpha, next.alpha, amount);
+    const sample: ResolvedBindingSample = {
+      color: [
+        MathUtils.lerp(currentPalette[0], nextPalette[0], paletteAmount),
+        MathUtils.lerp(currentPalette[1], nextPalette[1], paletteAmount),
+        MathUtils.lerp(currentPalette[2], nextPalette[2], paletteAmount),
+      ],
+      alpha,
+      stateAlpha: alpha,
+      fading: (amount > 0 && amount < 1) || (paletteAmount > 0 && paletteAmount < 1),
+      visible: true,
+    };
+    this.menuLightSamples.set(key, sample);
+    return sample;
   }
 
   private eventsForBinding(binding: EnvironmentLightBinding) {

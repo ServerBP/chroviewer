@@ -6,6 +6,7 @@ import { HeckPlacement } from './heck-placement';
 
 const rowTolerance = 0.001;
 const noCutDirection = 9;
+const anyCutDirection = 8;
 
 export interface NoteFormation {
   startLineIndex: number;
@@ -16,6 +17,7 @@ export interface NoteFormation {
 
 export interface FormedNote {
   note: Note;
+  cutDirection: number;
   time: number;
   formation: NoteFormation;
 }
@@ -84,11 +86,11 @@ function setCrossedStart(entry: FormedNote, counterpart: FormedNote, heck: HeckP
   entry.formation.flipYSide = xDifference * yDifference < 0 ? -laneSide : laneSide;
 }
 
-function noteRotation(note: Note, majorVersion: number) {
+function noteRotation(note: Note, majorVersion: number, cutDirection: number) {
   if (majorVersion === 2 && note.customData?._cutDirection != null) {
     return beatSaberNumberSchema.parse(note.customData._cutDirection);
   }
-  return directionalize(note.cutDirection, note.angleOffset);
+  return directionalize(cutDirection, note.angleOffset);
 }
 
 function applyWindowRotations(formedNotes: FormedNote[], majorVersion: number, heck: HeckPlacement) {
@@ -100,8 +102,8 @@ function applyWindowRotations(formedNotes: FormedNote[], majorVersion: number, h
       const second = pair[1];
       if (first === undefined || second === undefined) continue;
 
-      const firstDirection = first.note.cutDirection;
-      const secondDirection = second.note.cutDirection;
+      const firstDirection = first.cutDirection;
+      const secondDirection = second.cutDirection;
       const hasPrecisionDirection =
         firstDirection >= 1000 || firstDirection <= -1000 || secondDirection >= 1000 || secondDirection <= -1000;
       const firstCoordinates = first.note.customData?._position ?? first.note.customData?.coordinates;
@@ -122,18 +124,19 @@ function applyWindowRotations(formedNotes: FormedNote[], majorVersion: number, h
       const companionPosition = heck.position(companion.note);
       const lineAngle =
         (Math.atan2(guidePosition.y - companionPosition.y, guidePosition.x - companionPosition.x) * 180) / Math.PI;
-      const cutAxisAngle = guide.note.cutDirection === 8 ? 90 : cutDirectionEuler(guide.note.cutDirection) - 90;
+      const cutAxisAngle = guide.cutDirection === anyCutDirection ? 90 : cutDirectionEuler(guide.cutDirection) - 90;
       const windowAngle = ((((lineAngle - cutAxisAngle + 90) % 180) + 180) % 180) - 90;
 
-      if (guide.note.cutDirection === 8 && companion.note.cutDirection === 8) {
+      if (guide.cutDirection === anyCutDirection && companion.cutDirection === anyCutDirection) {
         guide.formation.rotationDeg = windowAngle;
         companion.formation.rotationDeg = windowAngle;
       } else if (Math.abs(windowAngle) <= 40) {
-        guide.formation.rotationDeg = noteRotation(guide.note, majorVersion) - guide.note.angleOffset + windowAngle;
+        guide.formation.rotationDeg =
+          noteRotation(guide.note, majorVersion, guide.cutDirection) - guide.note.angleOffset + windowAngle;
         const diagonalDot =
-          companion.note.cutDirection === 8 && (guide.note.cutDirection < 0 || guide.note.cutDirection > 3);
+          companion.cutDirection === anyCutDirection && (guide.cutDirection < 0 || guide.cutDirection > 3);
         companion.formation.rotationDeg =
-          noteRotation(companion.note, majorVersion) -
+          noteRotation(companion.note, majorVersion, companion.cutDirection) -
           companion.note.angleOffset +
           windowAngle +
           (diagonalDot ? 45 : 0);
@@ -142,18 +145,28 @@ function applyWindowRotations(formedNotes: FormedNote[], majorVersion: number, h
   }
 }
 
-export function buildNoteFormation(difficulty: Difficulty, songBpm: number, heck = new HeckPlacement(difficulty)) {
+export function buildNoteFormation(
+  difficulty: Difficulty,
+  songBpm: number,
+  heck = new HeckPlacement(difficulty),
+  modifiers: string[] = [],
+) {
   const majorVersion = Number.parseInt(difficulty.version, 10);
-  const formedNotes: FormedNote[] = difficulty.notes.map((note) => ({
-    note,
-    time: songBpmTimeToSeconds(note.songBpmTime, songBpm),
-    formation: {
-      startLineIndex: note.posX,
-      startLineLayer: note.posY,
-      flipYSide: 0,
-      rotationDeg: noteRotation(note, majorVersion),
-    },
-  }));
+  const noArrowModifier = modifiers.includes('NA');
+  const formedNotes: FormedNote[] = difficulty.notes.map((note) => {
+    const cutDirection = noArrowModifier ? anyCutDirection : note.cutDirection;
+    return {
+      note,
+      cutDirection,
+      time: songBpmTimeToSeconds(note.songBpmTime, songBpm),
+      formation: {
+        startLineIndex: note.posX,
+        startLineLayer: note.posY,
+        flipYSide: 0,
+        rotationDeg: noteRotation(note, majorVersion, cutDirection),
+      },
+    };
+  });
   const movementTimeline: TimelineEntry[] = formedNotes.map((formed) => ({
     time: formed.time,
     formed,
@@ -174,7 +187,8 @@ export function buildNoteFormation(difficulty: Difficulty, songBpm: number, heck
 
   const endpoints = sliderEndpointTimes(difficulty, songBpm);
   const colorNotes = formedNotes.filter(
-    ({ note }) => (note.type === NoteType.Red || note.type === NoteType.Blue) && note.cutDirection !== noCutDirection,
+    ({ note, cutDirection }) =>
+      (note.type === NoteType.Red || note.type === NoteType.Blue) && cutDirection !== noCutDirection,
   );
   for (const pair of collectTimeBands(colorNotes, (entry) => entry.time)) {
     const first = pair[0];

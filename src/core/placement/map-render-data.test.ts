@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vite-plus/test';
 
 import { createDifficulty, type Obstacle } from '../beatmap/types';
 import { buildMapRenderData } from './map-render-data';

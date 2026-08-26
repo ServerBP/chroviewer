@@ -16,7 +16,12 @@ function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      resolve(reader.result as string);
+      const result = reader.result;
+      if (result === null || result instanceof ArrayBuffer) {
+        reject(new Error('FileReader returned an invalid data URL'));
+        return;
+      }
+      resolve(result);
     };
     reader.onerror = () => {
       reject(new Error('FileReader failed', { cause: reader.error }));

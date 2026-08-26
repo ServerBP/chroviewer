@@ -100,15 +100,15 @@ interface TubeTarget {
 }
 
 const laneSize = 0.6;
-const fogProperties = [
+const fogProperties: readonly [
+  keyof Pick<FogParams, 'height' | 'startY' | 'attenuation' | 'offset'>,
+  keyof ComponentTrackRuntime,
+][] = [
   ['height', 'fogHeight'],
   ['startY', 'fogStartY'],
   ['attenuation', 'fogAttenuation'],
   ['offset', 'fogOffset'],
-] as const satisfies readonly [
-  keyof Pick<FogParams, 'height' | 'startY' | 'attenuation' | 'offset'>,
-  keyof ComponentTrackRuntime,
-][];
+];
 
 function emptyTrack(): TrackRuntime {
   return {
@@ -224,22 +224,22 @@ function targetDepth(target: Object3D) {
   return depth;
 }
 
-function multiplyVector(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined) {
+function multiplyVector(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined): Vector3Tuple | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
-  return [left[0] * right[0], left[1] * right[1], left[2] * right[2]] as const;
+  return [left[0] * right[0], left[1] * right[1], left[2] * right[2]];
 }
 
-function addVector(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined) {
+function addVector(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined): Vector3Tuple | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
-  return [left[0] + right[0], left[1] + right[1], left[2] + right[2]] as const;
+  return [left[0] + right[0], left[1] + right[1], left[2] + right[2]];
 }
 
-function multiplyColor(left: Vector4Tuple | undefined, right: Vector4Tuple | undefined) {
+function multiplyColor(left: Vector4Tuple | undefined, right: Vector4Tuple | undefined): Vector4Tuple | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
-  return [left[0] * right[0], left[1] * right[1], left[2] * right[2], left[3] * right[3]] as const;
+  return [left[0] * right[0], left[1] * right[1], left[2] * right[2], left[3] * right[3]];
 }
 
 function mapPosition(value: Vector3Tuple, v2: boolean): Vector3Tuple {
@@ -397,9 +397,13 @@ export class ChromaTrackRuntime {
     return sampleEvent(latestEvent(events, beat), beat, sampleVector, context);
   }
 
-  private sampleRotation(events: RotationEvent[], beat: number, context?: PointSampleContext) {
+  private sampleRotation(
+    events: RotationEvent[],
+    beat: number,
+    context?: PointSampleContext,
+  ): QuaternionTuple | undefined {
     const rotation = sampleEvent(latestEvent(events, beat), beat, sampleRotation, context);
-    return rotation === undefined ? undefined : ([-rotation[0], -rotation[1], rotation[2], rotation[3]] as const);
+    return rotation === undefined ? undefined : [-rotation[0], -rotation[1], rotation[2], rotation[3]];
   }
 
   private sampleColor(events: ColorEvent[], beat: number, context?: PointSampleContext) {

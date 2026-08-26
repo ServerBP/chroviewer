@@ -1,3 +1,5 @@
+import type { BeatmapCustomDataValue } from '../beatmap/types';
+import { beatSaberNumber } from '../beatmap/value-schema';
 import { easing } from './easing';
 
 export type Vector3Tuple = readonly [number, number, number];
@@ -60,22 +62,42 @@ export interface RotationPoint extends DynamicPoint {
   easing?: string;
 }
 
-function number(value: unknown) {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') return Number.parseFloat(value) || 0;
-  if (typeof value === 'boolean') return Number(value);
-  return 0;
+function resolveRows(
+  value: BeatmapCustomDataValue | undefined,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
+) {
+  const resolved = value?.constructor === String ? definitions[String(value)] : value;
+  return Array.isArray(resolved) ? resolved : undefined;
 }
 
-function rows(value: unknown, definitions: Readonly<Record<string, unknown[]>>) {
-  const resolved = typeof value === 'string' ? definitions[value] : value;
-  if (!Array.isArray(resolved)) return [];
+function rows(resolved: BeatmapCustomDataValue[]) {
   return Array.isArray(resolved[0])
-    ? resolved.filter(Array.isArray).map((row) => Array.from<unknown>(row))
-    : [Array.from<unknown>(resolved).concat(0)];
+    ? resolved.filter(Array.isArray).map((row) => Array.from<BeatmapCustomDataValue>(row))
+    : [Array.from<BeatmapCustomDataValue>(resolved).concat(0)];
 }
 
-function groups(values: readonly unknown[]) {
+function cachedPoints<T extends { time: number }>(
+  cache: WeakMap<BeatmapCustomDataValue[], T[]>,
+  value: BeatmapCustomDataValue | undefined,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
+  parse: (row: BeatmapCustomDataValue[]) => T,
+) {
+  const resolved = resolveRows(value, definitions);
+  if (resolved === undefined) return [];
+  const cached = cache.get(resolved);
+  if (cached !== undefined) return cached;
+  const points = rows(resolved)
+    .map(parse)
+    .sort((left, right) => left.time - right.time);
+  cache.set(resolved, points);
+  return points;
+}
+
+const numberPointCache = new WeakMap<BeatmapCustomDataValue[], NumberPoint[]>();
+const vectorPointCache = new WeakMap<BeatmapCustomDataValue[], VectorPoint[]>();
+const vector4PointCache = new WeakMap<BeatmapCustomDataValue[], Vector4Point[]>();
+
+function groups(values: readonly BeatmapCustomDataValue[]) {
   const result: PointValues[] = [];
   let statics: number[] = [];
   const close = () => {
@@ -84,27 +106,37 @@ function groups(values: readonly unknown[]) {
     statics = [];
   };
   for (const value of values) {
-    if (typeof value === 'string' && value.startsWith('base')) {
+    const text = value?.constructor === String ? String(value) : undefined;
+    if (text?.startsWith('base') === true) {
       close();
-      result.push({ type: 'base', name: value });
+      result.push({ type: 'base', name: text });
     } else {
-      statics.push(number(value));
+      statics.push(beatSaberNumber(value));
     }
   }
   close();
   return result;
 }
 
-function expression(row: readonly unknown[]) {
-  const flags = row.filter((value): value is string => typeof value === 'string' && !value.startsWith('base'));
-  const values = groups(
-    row.filter((value) => !Array.isArray(value) && !(typeof value === 'string' && !value.startsWith('base'))),
-  );
-  const modifiers = row.filter(Array.isArray).map(modifier);
-  return { flags, point: { values, modifiers } satisfies PointExpression };
+function expression(row: readonly BeatmapCustomDataValue[]) {
+  const flags: string[] = [];
+  const staticValues: BeatmapCustomDataValue[] = [];
+  const modifiers: ModifierExpression[] = [];
+  for (const value of row) {
+    if (Array.isArray(value)) {
+      modifiers.push(modifier(value));
+      continue;
+    }
+    const text = value?.constructor === String ? String(value) : undefined;
+    if (text !== undefined && !text.startsWith('base')) flags.push(text);
+    else staticValues.push(value);
+  }
+  const values = groups(staticValues);
+  const point: PointExpression = { values, modifiers };
+  return { flags, point };
 }
 
-function modifier(row: unknown[]): ModifierExpression {
+function modifier(row: BeatmapCustomDataValue[]): ModifierExpression {
   const parsed = expression(row);
   const operation = parsed.flags.find((flag): flag is PointOperation => flag.startsWith('op')) ?? 'opNone';
   return { ...parsed.point, operation };
@@ -136,7 +168,7 @@ function evaluate(expression: PointExpression, size: number, context?: PointSamp
   return result;
 }
 
-function parsedPoint(row: readonly unknown[], size: number) {
+function parsedPoint(row: readonly BeatmapCustomDataValue[], size: number) {
   const parsed = expression(row);
   const dynamic = parsed.point.modifiers.length > 0 || parsed.point.values.some((value) => value.type === 'base');
   const values = evaluate(parsed.point, size);
@@ -149,48 +181,51 @@ function parsedPoint(row: readonly unknown[], size: number) {
   };
 }
 
-export function numberPoints(value: unknown, definitions: Readonly<Record<string, unknown[]>> = {}) {
-  return rows(value, definitions)
-    .map((row): NumberPoint => {
-      const point = parsedPoint(row, 1);
-      return {
-        value: point.values[0] ?? 0,
-        time: point.time,
-        easing: point.flags.find((flag) => flag.startsWith('ease')),
-        expression: point.expression,
-      };
-    })
-    .sort((left, right) => left.time - right.time);
+export function numberPoints(
+  value: BeatmapCustomDataValue | undefined,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>> = {},
+) {
+  return cachedPoints(numberPointCache, value, definitions, (row): NumberPoint => {
+    const point = parsedPoint(row, 1);
+    return {
+      value: point.values[0] ?? 0,
+      time: point.time,
+      easing: point.flags.find((flag) => flag.startsWith('ease')),
+      expression: point.expression,
+    };
+  });
 }
 
-export function vectorPoints(value: unknown, definitions: Readonly<Record<string, unknown[]>> = {}) {
-  return rows(value, definitions)
-    .map((row): VectorPoint => {
-      const point = parsedPoint(row, 3);
-      return {
-        value: [point.values[0] ?? 0, point.values[1] ?? 0, point.values[2] ?? 0],
-        time: point.time,
-        easing: point.flags.find((flag) => flag.startsWith('ease')),
-        spline: point.flags.includes('splineCatmullRom'),
-        expression: point.expression,
-      };
-    })
-    .sort((left, right) => left.time - right.time);
+export function vectorPoints(
+  value: BeatmapCustomDataValue | undefined,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>> = {},
+) {
+  return cachedPoints(vectorPointCache, value, definitions, (row): VectorPoint => {
+    const point = parsedPoint(row, 3);
+    return {
+      value: [point.values[0] ?? 0, point.values[1] ?? 0, point.values[2] ?? 0],
+      time: point.time,
+      easing: point.flags.find((flag) => flag.startsWith('ease')),
+      spline: point.flags.includes('splineCatmullRom'),
+      expression: point.expression,
+    };
+  });
 }
 
-export function vector4Points(value: unknown, definitions: Readonly<Record<string, unknown[]>> = {}) {
-  return rows(value, definitions)
-    .map((row): Vector4Point => {
-      const point = parsedPoint(row, 4);
-      return {
-        value: [point.values[0] ?? 0, point.values[1] ?? 0, point.values[2] ?? 0, point.values[3] ?? 0],
-        time: point.time,
-        easing: point.flags.find((flag) => flag.startsWith('ease')),
-        hsvLerp: point.flags.includes('lerpHSV'),
-        expression: point.expression,
-      };
-    })
-    .sort((left, right) => left.time - right.time);
+export function vector4Points(
+  value: BeatmapCustomDataValue | undefined,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>> = {},
+) {
+  return cachedPoints(vector4PointCache, value, definitions, (row): Vector4Point => {
+    const point = parsedPoint(row, 4);
+    return {
+      value: [point.values[0] ?? 0, point.values[1] ?? 0, point.values[2] ?? 0, point.values[3] ?? 0],
+      time: point.time,
+      easing: point.flags.find((flag) => flag.startsWith('ease')),
+      hsvLerp: point.flags.includes('lerpHSV'),
+      expression: point.expression,
+    };
+  });
 }
 
 export function quaternionFromEuler([x, y, z]: Vector3Tuple): QuaternionTuple {
@@ -211,7 +246,10 @@ export function quaternionFromEuler([x, y, z]: Vector3Tuple): QuaternionTuple {
   ];
 }
 
-export function multiplyQuaternions(left: QuaternionTuple | undefined, right: QuaternionTuple | undefined) {
+export function multiplyQuaternions(
+  left: QuaternionTuple | undefined,
+  right: QuaternionTuple | undefined,
+): QuaternionTuple | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
   return [
@@ -219,7 +257,7 @@ export function multiplyQuaternions(left: QuaternionTuple | undefined, right: Qu
     left[3] * right[1] - left[0] * right[2] + left[1] * right[3] + left[2] * right[0],
     left[3] * right[2] + left[0] * right[1] - left[1] * right[0] + left[2] * right[3],
     left[3] * right[3] - left[0] * right[0] - left[1] * right[1] - left[2] * right[2],
-  ] as const;
+  ];
 }
 
 export function eulerFromQuaternion([x, y, z, w]: QuaternionTuple): Vector3Tuple {
@@ -237,7 +275,10 @@ export function eulerFromQuaternion([x, y, z, w]: QuaternionTuple): Vector3Tuple
   return [degrees(xAngle), degrees(yAngle), degrees(zAngle)];
 }
 
-export function rotationPoints(value: unknown, definitions: Readonly<Record<string, unknown[]>> = {}) {
+export function rotationPoints(
+  value: BeatmapCustomDataValue | undefined,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>> = {},
+) {
   return vectorPoints(value, definitions).map(
     (point): RotationPoint => ({
       value: quaternionFromEuler(point.value),

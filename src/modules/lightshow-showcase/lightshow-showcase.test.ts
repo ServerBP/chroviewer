@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vite-plus/test';
 
 import { planLightshow, resolveTimedLightshow, type LightshowShowcaseMap } from './lightshow-showcase';
 import { parseLightshowShowcaseConfig } from './use-lightshow-showcase';

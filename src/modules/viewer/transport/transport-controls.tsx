@@ -40,6 +40,7 @@ interface TransportControlsProps {
   lightshowMode: LightshowMode;
   lightshowReadOnly: boolean;
   replayCamera: ViewerSettings['replayCamera'];
+  orthoCameraEnabled: boolean;
   hasReplay: boolean;
   songMuted: boolean;
   masterMuted: boolean;
@@ -59,6 +60,7 @@ interface TransportControlsProps {
   onPlaybackRateChange: (rate: number) => void;
   onLightshowModeChange: (mode: LightshowMode) => void;
   onReplayCameraChange: (camera: ViewerSettings['replayCamera']) => void;
+  onOrthoCameraEnabledChange: (enabled: boolean) => void;
   onMasterVolumeChange: (volume: number) => void;
   onSongVolumeChange: (volume: number) => void;
   onHitsoundVolumeChange: (volume: number) => void;
@@ -84,6 +86,7 @@ export function TransportControls({
   lightshowMode,
   lightshowReadOnly,
   replayCamera,
+  orthoCameraEnabled,
   hasReplay,
   songMuted,
   masterMuted,
@@ -103,6 +106,7 @@ export function TransportControls({
   onPlaybackRateChange,
   onLightshowModeChange,
   onReplayCameraChange,
+  onOrthoCameraEnabledChange,
   onMasterVolumeChange,
   onSongVolumeChange,
   onHitsoundVolumeChange,
@@ -229,6 +233,7 @@ export function TransportControls({
         <ReplayCameraMenu
           open={panel === 'camera'}
           camera={replayCamera}
+          orthoCameraEnabled={orthoCameraEnabled}
           onOpenChange={(open) => {
             onPanelOpenChange('camera', open);
           }}
@@ -236,6 +241,7 @@ export function TransportControls({
             changePanelHover('camera', hovered);
           }}
           onCameraChange={onReplayCameraChange}
+          onOrthoCameraEnabledChange={onOrthoCameraEnabledChange}
         />
       )}
       <VolumeMenu

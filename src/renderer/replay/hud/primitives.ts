@@ -109,17 +109,17 @@ export function italicizeHudText(mesh: Text) {
   mesh.matrixAutoUpdate = false;
 }
 
-export function hudShape(
+export function hudMesh(
   geometry: PlaneGeometry,
   opacity?: number,
   color?: number,
 ): Mesh<PlaneGeometry, MeshBasicMaterial>;
-export function hudShape(
+export function hudMesh(
   geometry: RingGeometry,
   opacity?: number,
   color?: number,
 ): Mesh<RingGeometry, MeshBasicMaterial>;
-export function hudShape(geometry: PlaneGeometry | RingGeometry, opacity = 1, color = 0xffffff) {
+export function hudMesh(geometry: PlaneGeometry | RingGeometry, opacity = 1, color = 0xffffff) {
   const mesh = new Mesh(geometry, fixedHudMaterial(opacity, color));
   mesh.renderOrder = 1000;
   mesh.layers.set(MAIN_ONLY_LAYER);

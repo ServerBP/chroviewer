@@ -18,7 +18,13 @@ import {
 import { materialFogUniforms } from '../materials/shared';
 import { FOG_CHUNK } from '../shaders/chunks';
 import type { EnvironmentMaterialContext } from './materials/material-context';
-import type { EnvironmentParticleSystemData } from './types';
+import {
+  particleEmitterPositionProperty,
+  particleEmitterRadiusProperty,
+  particleEmitterRotationProperty,
+  particleEmitterScaleProperty,
+  type EnvironmentParticleSystemData,
+} from './types';
 
 const PARTICLE_VERT = /* glsl */ `
 attribute vec3 particleVelocity;
@@ -129,26 +135,32 @@ function particleGeometry(system: EnvironmentParticleSystemData) {
   const lifetimes: number[] = [];
   const sizes: number[] = [];
   const rotations: number[] = [];
-  const shapeRotation = new Quaternion().setFromEuler(
+  const {
+    [particleEmitterRotationProperty]: emitterEuler,
+    [particleEmitterRadiusProperty]: emitterRadius,
+    [particleEmitterScaleProperty]: emitterScale,
+    [particleEmitterPositionProperty]: emitterPosition,
+  } = system;
+  const emitterRotation = new Quaternion().setFromEuler(
     new Euler(
-      (system.shapeRotation[0] * Math.PI) / 180,
-      (system.shapeRotation[1] * Math.PI) / 180,
-      (system.shapeRotation[2] * Math.PI) / 180,
+      (emitterEuler[0] * Math.PI) / 180,
+      (emitterEuler[1] * Math.PI) / 180,
+      (emitterEuler[2] * Math.PI) / 180,
       'XYZ',
     ),
   );
 
   for (let index = 0; index < system.maxParticles; index += 1) {
     const direction = randomUnitVector(index, 0);
-    const radius = system.shapeRadius * Math.cbrt(random(index, 2));
+    const radius = emitterRadius * Math.cbrt(random(index, 2));
     const position = direction
       .clone()
       .multiplyScalar(radius)
-      .multiply(new Vector3(...system.shapeScale))
-      .applyQuaternion(shapeRotation)
-      .add(new Vector3(...system.shapePosition));
+      .multiply(new Vector3(...emitterScale))
+      .applyQuaternion(emitterRotation)
+      .add(new Vector3(...emitterPosition));
     const emissionDirection =
-      system.randomDirection === 0 ? new Vector3(0, 1, 0).applyQuaternion(shapeRotation) : direction;
+      system.randomDirection === 0 ? new Vector3(0, 1, 0).applyQuaternion(emitterRotation) : direction;
     const speed = system.speed[0] + (system.speed[1] - system.speed[0]) * random(index, 3);
     positions.push(position.x, position.y, position.z);
     velocities.push(emissionDirection.x * speed, emissionDirection.y * speed, emissionDirection.z * speed);

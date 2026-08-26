@@ -9,16 +9,15 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   RGBAFormat,
-  type IUniform,
   type Material,
   type Scene,
-  ShaderMaterial,
   type Texture,
   Vector3,
   Vector4,
   type WebGLRenderer,
   WebGLRenderTarget,
 } from 'three';
+import { z } from 'zod';
 
 import { MULTISAMPLE_DEPTH_STENCIL_RESOLVE_OPTIONS } from '../platform';
 import { mirrorTextureSize, type QualitySettings } from '../quality';
@@ -29,6 +28,7 @@ import {
   obliqueProjection,
   reflectionMatrix,
 } from './mirror-math';
+import { MirrorPassMaterial } from './mirror-pass-material';
 
 export const MAIN_ONLY_LAYER = 1;
 export const SCREEN_DISPLACEMENT_LAYER = 2;
@@ -36,6 +36,11 @@ export const AFTER_SCREEN_DISPLACEMENT_LAYER = 3;
 
 const MEDIUM_REFLECTION_LAYERS = 536885504;
 const HIGH_REFLECTION_LAYERS = 537952032;
+const meshSchema = z.custom<Mesh>((value) => value instanceof Mesh);
+const mirrorMetadataSchema = z.looseObject({
+  mirrorExcluded: z.boolean().optional(),
+  environmentLayer: z.number().optional(),
+});
 
 function blackTexture() {
   const texture = new DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, RGBAFormat);
@@ -67,7 +72,7 @@ export class PlanarMirror {
   private readonly qScratch = new Vector4();
   private readonly cScratch = new Vector4();
   private readonly flippedMaterials = new Set<Material>();
-  private readonly mirrorPassUniforms = new Set<IUniform<number>>();
+  private readonly mirrorPassUniforms = new Set<MirrorPassMaterial['uniforms']['_MirrorPass']>();
   private readonly excludedObjects = new Set<Mesh>();
   private readonly reflectionLayers: number;
 
@@ -115,20 +120,18 @@ export class PlanarMirror {
     this.mirrorPassUniforms.clear();
     this.excludedObjects.clear();
     scene.traverse((object) => {
-      if (!(object instanceof Mesh)) return;
-      const mesh = object as Mesh;
-      if (mesh.userData.mirrorExcluded === true) this.excludedObjects.add(mesh);
-      const environmentLayer = mesh.userData.environmentLayer as number | undefined;
+      const mesh = meshSchema.safeParse(object);
+      if (!mesh.success) return;
+      const metadata = mirrorMetadataSchema.safeParse(mesh.data.userData);
+      if (metadata.success && metadata.data.mirrorExcluded === true) this.excludedObjects.add(mesh.data);
+      const environmentLayer = metadata.success ? metadata.data.environmentLayer : undefined;
       if (environmentLayer !== undefined && (this.reflectionLayers & (1 << environmentLayer)) === 0) {
-        mesh.layers.set(MAIN_ONLY_LAYER);
+        mesh.data.layers.set(MAIN_ONLY_LAYER);
       }
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const materials = Array.isArray(mesh.data.material) ? mesh.data.material : [mesh.data.material];
       for (const entry of materials) {
         if (entry.side === FrontSide || entry.side === BackSide) this.flippedMaterials.add(entry);
-        if (entry instanceof ShaderMaterial) {
-          const mirrorPass = entry.uniforms._MirrorPass as IUniform<number> | undefined;
-          if (mirrorPass !== undefined) this.mirrorPassUniforms.add(mirrorPass);
-        }
+        if (entry instanceof MirrorPassMaterial) this.mirrorPassUniforms.add(entry.uniforms._MirrorPass);
       }
     });
   }

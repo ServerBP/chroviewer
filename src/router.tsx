@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRouter, defaultParseSearch } from '@tanstack/react-router';
 import { AlertCircle, LoaderCircle } from 'lucide-react';
+import { z } from 'zod';
 
 import { createQueryClient } from './app/query-client';
 import { routeTree } from './routeTree.gen';
@@ -58,51 +59,53 @@ const replaySaberSearchKeys = [
   'saberZRotation',
 ] as const;
 
-const searchKeyAliases: Record<string, string> = {
-  ...Object.fromEntries(replaySaberSearchKeys.map((key) => [key.toLowerCase(), key])),
-  map: 'map',
-  replayurl: 'replayUrl',
-  scoreid: 'scoreId',
-  ssscoreid: 'scoreId',
-  difficulty: 'difficulty',
-  beat: 'beat',
-  autoplay: 'autoplay',
-  hideui: 'hideUI',
-  disablegameui: 'disableGameUI',
-  lightshow: 'lightshow',
-  lights: 'lights',
-  mastervolume: 'masterVolume',
-  songvolume: 'songVolume',
-  hitsoundvolume: 'hitsoundVolume',
-  hitsounds: 'hitsounds',
-  qualitypreset: 'qualityPreset',
-  maxfps: 'maxFps',
-  renderscale: 'renderScale',
-  graphicsquality: 'graphicsQuality',
-  mirrorquality: 'mirrorQuality',
-  mirrorresolution: 'mirrorResolution',
-  mirrormsaasamples: 'mirrorMsaaSamples',
-  msaasamples: 'msaaSamples',
-  postbloomwidth: 'postBloomWidth',
-  bloomfogsize: 'bloomFogSize',
-  screendisplacement: 'screenDisplacement',
-  outputwidth: 'outputWidth',
-  outputheight: 'outputHeight',
-  camera: 'camera',
-  fov: 'fov',
-  audiooffsetms: 'audioOffsetMs',
-  settings: 'settings',
-  party: 'party',
-  playerid: 'playerId',
-  livesource: 'liveSource',
-  tournamentid: 'tournamentId',
-  roomid: 'roomId',
-  matchid: 'matchId',
-  watcherplayerid: 'watcherPlayerId',
-  authtoken: 'authToken',
-};
+const searchKeyAliases = new Map(
+  Object.entries({
+    ...Object.fromEntries(replaySaberSearchKeys.map((key) => [key.toLowerCase(), key])),
+    map: 'map',
+    replayurl: 'replayUrl',
+    scoreid: 'scoreId',
+    ssscoreid: 'scoreId',
+    difficulty: 'difficulty',
+    beat: 'beat',
+    autoplay: 'autoplay',
+    hideui: 'hideUI',
+    disablegameui: 'disableGameUI',
+    lightshow: 'lightshow',
+    lights: 'lights',
+    mastervolume: 'masterVolume',
+    songvolume: 'songVolume',
+    hitsoundvolume: 'hitsoundVolume',
+    hitsounds: 'hitsounds',
+    qualitypreset: 'qualityPreset',
+    maxfps: 'maxFps',
+    renderscale: 'renderScale',
+    graphicsquality: 'graphicsQuality',
+    mirrorquality: 'mirrorQuality',
+    mirrorresolution: 'mirrorResolution',
+    mirrormsaasamples: 'mirrorMsaaSamples',
+    msaasamples: 'msaaSamples',
+    postbloomwidth: 'postBloomWidth',
+    bloomfogsize: 'bloomFogSize',
+    screendisplacement: 'screenDisplacement',
+    outputwidth: 'outputWidth',
+    outputheight: 'outputHeight',
+    camera: 'camera',
+    fov: 'fov',
+    audiooffsetms: 'audioOffsetMs',
+    settings: 'settings',
+    party: 'party',
+    playerid: 'playerId',
+    livesource: 'liveSource',
+    tournamentid: 'tournamentId',
+    roomid: 'roomId',
+    matchid: 'matchId',
+    watcherplayerid: 'watcherPlayerId',
+    authtoken: 'authToken',
+  }),
+);
 
-const stringSearchAliases: Record<string, string[]> = {
+const stringSearchAliases = {
   party: ['party'],
   map: ['map'],
   replayUrl: ['replayurl'],
@@ -118,10 +121,10 @@ const stringSearchAliases: Record<string, string[]> = {
 };
 
 export function parseUrlSearch(search: string) {
-  const raw: Record<string, unknown> = defaultParseSearch(search);
-  const parsed: Record<string, unknown> = {};
+  const raw = z.record(z.string(), z.json()).parse(defaultParseSearch(search));
+  const parsed: Record<string, RouterSearchValue> = {};
   for (const [key, value] of Object.entries(raw)) {
-    const canonical = searchKeyAliases[key.toLowerCase()];
+    const canonical = searchKeyAliases.get(key.toLowerCase());
     if (canonical === undefined) {
       parsed[key] = value;
       continue;
@@ -134,9 +137,9 @@ export function parseUrlSearch(search: string) {
     const entry = [...searchParams].find(([key]) => aliases.includes(key.toLowerCase()));
     if (entry !== undefined) parsed[canonical] = entry[1];
   }
-  const nestedSettings =
+  const nestedSettings: Record<string, RouterSearchValue> =
     typeof parsed.settings === 'object' && parsed.settings !== null && !Array.isArray(parsed.settings)
-      ? { ...(parsed.settings as Record<string, unknown>) }
+      ? { ...parsed.settings }
       : {};
   for (const key of replaySaberSearchKeys) {
     if (parsed[key] === undefined) continue;
@@ -159,7 +162,7 @@ function appendSearchValue(searchParams: URLSearchParams, key: string, value: Ro
     for (const item of value) appendSearchValue(searchParams, key, item);
     return;
   }
-  searchParams.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+  searchParams.append(key, value instanceof Object ? JSON.stringify(value) : String(value));
 }
 
 function PendingFallback() {

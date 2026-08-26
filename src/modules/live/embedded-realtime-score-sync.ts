@@ -25,7 +25,7 @@ function finite(value: unknown): value is number {
 }
 
 export function normalizePlayerId(value: unknown) {
-  return `${value ?? ''}`.trim().toLowerCase();
+  return typeof value === 'string' || typeof value === 'number' ? String(value).trim().toLowerCase() : '';
 }
 
 export function isEmbeddedRealtimeScoreMessage(
@@ -78,7 +78,8 @@ export class EmbeddedRealtimeScoreTimeline {
     let match: CachedScore | null = null;
     while (low <= high) {
       const middle = (low + high) >>> 1;
-      const candidate = this.scores[middle]!;
+      const candidate = this.scores[middle];
+      if (candidate === undefined) break;
       if (candidate.position <= time + 0.025) {
         match = candidate;
         low = middle + 1;

@@ -1,6 +1,18 @@
 {
   "name": "chroviewer",
+  "private": true,
   "license": "GPL-2.0-only",
+  "type": "module",
+  "scripts": {
+    "start": "HOST=0.0.0.0 PORT=4000 node .output/server/index.mjs",
+    "prepare": "vp config --no-agent",
+    "api:generate": "node scripts/codegen/generate-api.ts",
+    "api:regen": "node scripts/codegen/generate-api.ts --refresh",
+    "api:check": "node scripts/codegen/generate-api.ts --check",
+    "proto:generate": "node scripts/codegen/generate-live-protocol.ts",
+    "proto:check": "node scripts/codegen/generate-live-protocol.ts --check && buf lint src/modules/live/proto",
+    "verify": "vp check && vp run api:check && vp run proto:check && vp test && vp build"
+  },
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.1",
     "@resvg/resvg-js": "2.6.2",
@@ -30,54 +42,23 @@
   "devDependencies": {
     "@bufbuild/buf": "^1.71.0",
     "@bufbuild/protoc-gen-es": "^2.12.1",
-    "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.2",
-    "@types/bun": "latest",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitejs/plugin-rsc": "^0.5.26",
-    "eslint": "^10.7.0",
-    "globals": "^17.7.0",
-    "husky": "9.1.7",
-    "lint-staged": "17.0.4",
     "nitro": "^3.0.260522-beta",
-    "oxfmt": "0.47.0",
-    "oxlint": "1.62.0",
     "swagger-typescript-api": "13.9.2",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.9",
-    "typescript-eslint": "^8.63.0",
-    "vite": "^8.1.5"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
-  "private": true,
-  "packageManager": "bun@1.3.14",
   "engines": {
     "node": ">=24.15.0 <25",
-    "bun": ">=1.3.14 <2"
+    "pnpm": ">=11.20.0 <12"
   },
-  "scripts": {
-    "dev": "vite dev",
-    "build": "NODE_ENV=production vite build",
-    "start": "HOST=0.0.0.0 PORT=4000 node .output/server/index.mjs",
-    "preview": "bun run start",
-    "prepare": "husky",
-    "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
-    "lint:oxc": "oxlint .",
-    "lint:eslint": "eslint .",
-    "lint": "bun run lint:oxc && bun run lint:eslint",
-    "api:generate": "bun run scripts/codegen/generate-api.ts",
-    "api:regen": "bun run scripts/codegen/generate-api.ts --refresh",
-    "api:check": "bun run scripts/codegen/generate-api.ts --check",
-    "proto:generate": "bun run scripts/codegen/generate-live-protocol.ts",
-    "proto:check": "bun run scripts/codegen/generate-live-protocol.ts --check && buf lint proto",
-    "typecheck": "tsc --noEmit",
-    "check": "bun run format:check && bun run api:check && bun run proto:check && bun run typecheck && bun run lint && bun test && bun run build"
-  },
-  "type": "module",
-  "patchedDependencies": {
-    "@tanstack/react-router@1.170.18": "patches/@tanstack%2Freact-router@1.170.18.patch"
-  }
+  "packageManager": "pnpm@11.20.0"
 }

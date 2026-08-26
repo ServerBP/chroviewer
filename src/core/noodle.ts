@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { BeatmapCustomData } from './beatmap/types';
+import type { BeatmapCustomData, BeatmapCustomDataValue } from './beatmap/types';
 import { beatSaberNumberSchema } from './beatmap/value-schema';
 
 const rotationSchema = z.array(beatSaberNumberSchema).min(3);
@@ -8,7 +8,7 @@ const rotationSchema = z.array(beatSaberNumberSchema).min(3);
 export type NoodleCoordinates = readonly [number | undefined, number | undefined];
 export type NoodleWorldRotation = readonly [number, number, number];
 
-function coordinates(value: unknown): NoodleCoordinates | undefined {
+function coordinates(value: BeatmapCustomDataValue | undefined): NoodleCoordinates | undefined {
   if (!Array.isArray(value)) return undefined;
   const x = value[0] === null || value[0] === undefined ? undefined : beatSaberNumberSchema.parse(value[0]);
   const y = value[1] === null || value[1] === undefined ? undefined : beatSaberNumberSchema.parse(value[1]);

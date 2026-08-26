@@ -1,9 +1,11 @@
 import { useTranslations } from 'use-intl';
 
 import type { ViewerSettings } from '../../../core/viewer-settings';
+import { SettingRow } from '../components/setting-row';
 import { SettingSection } from '../components/setting-section';
 import type { CameraSettingsUpdate } from './camera-setting-controls';
 
+import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface ReplayCameraSettingsProps {
@@ -46,6 +48,14 @@ export function ReplayCameraSettings({ settings, update }: ReplayCameraSettingsP
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
+      <SettingRow label={t('camera.showHeadset')}>
+        <Switch
+          checked={settings.showHeadset}
+          onCheckedChange={(showHeadset) => {
+            update('showHeadset', showHeadset);
+          }}
+        />
+      </SettingRow>
     </SettingSection>
   );
 }

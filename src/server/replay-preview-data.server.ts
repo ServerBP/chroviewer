@@ -23,7 +23,7 @@ export interface ReplayPreviewScore {
   };
 }
 
-const replayPreviewScoreSchema = z.object({
+const replayPreviewScoreSchema: z.ZodType<ReplayPreviewScore> = z.object({
   leaderboard: z.object({
     difficulty: z.object({ difficulty: z.int() }),
     map: z.object({
@@ -50,7 +50,7 @@ const replayPreviewScoreSchema = z.object({
       name: z.string(),
     }),
   }),
-}) satisfies z.ZodType<ReplayPreviewScore>;
+});
 
 const scoreCacheTtlMs = 5 * 60 * 1000;
 const scoreCacheLimit = 128;

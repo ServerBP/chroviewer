@@ -16,6 +16,7 @@ import {
 
 import { BOMB_COLOR, type Rgb } from '../../core/colors';
 import type { FogUniforms } from '../bloomfog/pipeline';
+import { MirrorPassMaterial } from '../mirror/mirror-pass-material';
 import { OBJECT_VERT } from '../shaders/chunks';
 import {
   ARC_FRAG,
@@ -89,23 +90,14 @@ export function createNoteMaterial(fog: FogUniforms, color: Rgb, reflection: Tex
 }
 
 function directionalMaterial(fog: FogUniforms, decorative: boolean) {
-  return new ShaderMaterial({
-    defines: { INSTANCED_COLOR: '', ...(decorative ? { DECORATIVE_ARROW: '' } : {}) },
+  const defines = { INSTANCED_COLOR: '' };
+  if (decorative) Object.assign(defines, { DECORATIVE_ARROW: '' });
+  const material = new ShaderMaterial({
+    defines,
     vertexShader: OBJECT_VERT,
     fragmentShader: GLOWING_FRAG,
     transparent: decorative,
     depthWrite: !decorative,
-    ...(decorative
-      ? {
-          blending: CustomBlending,
-          blendEquation: AddEquation,
-          blendSrc: SrcAlphaFactor,
-          blendDst: OneMinusSrcAlphaFactor,
-          blendEquationAlpha: AddEquation,
-          blendSrcAlpha: ZeroFactor,
-          blendDstAlpha: OneFactor,
-        }
-      : {}),
     uniforms: {
       ...materialFogUniforms(fog, { startOffset: decorative ? 49 : 100 }),
       _Color: { value: linearColor([1, 1, 1]) },
@@ -115,6 +107,16 @@ function directionalMaterial(fog: FogUniforms, decorative: boolean) {
       _CutoutEdgeGlow: { value: 1 },
     },
   });
+  if (decorative) {
+    material.blending = CustomBlending;
+    material.blendEquation = AddEquation;
+    material.blendSrc = SrcAlphaFactor;
+    material.blendDst = OneMinusSrcAlphaFactor;
+    material.blendEquationAlpha = AddEquation;
+    material.blendSrcAlpha = ZeroFactor;
+    material.blendDstAlpha = OneFactor;
+  }
+  return material;
 }
 
 export function createDirectionalMaterial(fog: FogUniforms) {
@@ -126,8 +128,10 @@ export function createDecorativeDirectionalMaterial(fog: FogUniforms) {
 }
 
 function createNoteGlowMaterial(fog: FogUniforms, fragmentShader: string, additiveBlend: boolean, decorative = false) {
+  const defines = { INSTANCED_COLOR: '' };
+  if (decorative) Object.assign(defines, { DECORATIVE_ARROW: '' });
   return new ShaderMaterial({
-    defines: { INSTANCED_COLOR: '', ...(decorative ? { DECORATIVE_ARROW: '' } : {}) },
+    defines,
     vertexShader: OBJECT_VERT,
     fragmentShader,
     uniforms: {
@@ -176,7 +180,7 @@ export function createHitLineMaterial() {
 }
 
 export function createBombMaterial(fog: FogUniforms, reflection: Texture) {
-  return new ShaderMaterial({
+  return new MirrorPassMaterial({
     defines: { INSTANCED_COLOR: '', REFLECTIVE_SURFACE: '', MIRROR_FACE_CORRECTION: '' },
     vertexShader: OBJECT_VERT,
     fragmentShader: BOMB_FRAG,

@@ -1,6 +1,7 @@
 import type { ViewerSettings } from '../../core/viewer-settings';
 import { CameraTransformSettings } from './camera-settings/camera-transform-settings';
 import { HeadMovementSettings } from './camera-settings/head-movement-settings';
+import { OrthoCameraSettings } from './camera-settings/ortho-camera-settings';
 import { PreviewCameraSettings } from './camera-settings/preview-camera-settings';
 import { ReplayCameraSettings } from './camera-settings/replay-camera-settings';
 
@@ -23,6 +24,8 @@ export function CameraSettings({ settings, hasReplay, onChange }: CameraSettings
       <div className="flex flex-col gap-5 px-5 py-4">
         {hasReplay && (
           <>
+            <OrthoCameraSettings settings={settings} update={update} />
+            <Separator />
             <ReplayCameraSettings settings={settings} update={update} />
             <Separator />
           </>

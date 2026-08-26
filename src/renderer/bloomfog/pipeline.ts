@@ -70,6 +70,10 @@ type BloomfogSampleUniforms = ShaderMaterial['uniforms'] & {
   _CombineDst: IUniform<number>;
 };
 
+interface NullableTextureUniform {
+  value: Texture | null;
+}
+
 const MASK_X = [
   0, 0, 11, 27, 44, 65, 87, 109, 134, 156, 180, 201, 219, 236, 250, 255, 255, 255, 250, 236, 220, 201, 180, 157, 134,
   110, 87, 64, 44, 27, 11, 0,
@@ -170,8 +174,9 @@ export class BloomfogPipeline {
   private readonly finalUpsampleMaterial: ShaderMaterial;
   private readonly gradientMaterial: ShaderMaterial;
   private gradientTexture: DataTexture | null = null;
+  private readonly gradientTextureUniform: NullableTextureUniform = { value: null };
   private readonly gradientUniforms = {
-    _GradientTex: { value: null as Texture | null },
+    _GradientTex: this.gradientTextureUniform,
     _InverseProjectionMatrix: { value: new Matrix4() },
     _CameraToWorldMatrix: { value: new Matrix4() },
     _Color: { value: new Vector4(1, 1, 1, 1) },
@@ -367,7 +372,7 @@ export class BloomfogPipeline {
     this.ensureCapacity(lights.length);
     let quadCount = 0;
     let additiveQuadCount = 0;
-    for (const blendMode of ['add', 'max'] as const) {
+    for (const blendMode of ['add', 'max']) {
       for (const light of lights) {
         if ((light.blendMode ?? 'max') !== blendMode) continue;
         const written = writeLightQuad(

@@ -65,18 +65,18 @@ const defaultDefinition: ScoreDefinition = {
   afterMax: 30,
   fixed: 0,
 };
-const definitions: Record<number, ScoreDefinition> = {
-  3: defaultDefinition,
-  4: { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 },
-  5: { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 0, afterMax: 30, fixed: 0 },
-  6: { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 0, afterMax: 0, fixed: 0 },
-  7: { center: 0, beforeMin: 0, beforeMax: 0, afterMin: 0, afterMax: 0, fixed: 20 },
-  8: { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 },
-  9: { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 },
-  10: { center: 0, beforeMin: 0, beforeMax: 0, afterMin: 0, afterMax: 0, fixed: 20 },
-  11: { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 },
-  12: { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 },
-};
+const definitions = new Map<number, ScoreDefinition>([
+  [3, defaultDefinition],
+  [4, { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 }],
+  [5, { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 0, afterMax: 30, fixed: 0 }],
+  [6, { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 0, afterMax: 0, fixed: 0 }],
+  [7, { center: 0, beforeMin: 0, beforeMax: 0, afterMin: 0, afterMax: 0, fixed: 20 }],
+  [8, { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 }],
+  [9, { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 }],
+  [10, { center: 0, beforeMin: 0, beforeMax: 0, afterMin: 0, afterMax: 0, fixed: 20 }],
+  [11, { center: 15, beforeMin: 0, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 }],
+  [12, { center: 15, beforeMin: 70, beforeMax: 70, afterMin: 30, afterMax: 30, fixed: 0 }],
+]);
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -91,7 +91,7 @@ function roundToEven(value: number) {
 }
 
 function scoreDefinition(note: ReplayNoteEvent) {
-  const definition = definitions[(note.noteId.scoringType ?? 1) + 2];
+  const definition = definitions.get((note.noteId.scoringType ?? 1) + 2);
   return definition ?? defaultDefinition;
 }
 

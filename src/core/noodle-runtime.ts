@@ -65,16 +65,16 @@ const identityScale: Vector3Tuple = [1, 1, 1];
 const zero: Vector3Tuple = [0, 0, 0];
 const identityRotation: QuaternionTuple = [0, 0, 0, 1];
 
-function add(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined) {
+function add(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined): Vector3Tuple | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
-  return [left[0] + right[0], left[1] + right[1], left[2] + right[2]] as const;
+  return [left[0] + right[0], left[1] + right[1], left[2] + right[2]];
 }
 
-function multiplyVector(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined) {
+function multiplyVector(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined): Vector3Tuple | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
-  return [left[0] * right[0], left[1] * right[1], left[2] * right[2]] as const;
+  return [left[0] * right[0], left[1] * right[1], left[2] * right[2]];
 }
 
 function multiplyNumber(left: number | undefined, right: number | undefined) {
@@ -83,10 +83,10 @@ function multiplyNumber(left: number | undefined, right: number | undefined) {
   return left * right;
 }
 
-function multiplyVector4(left: Vector4Tuple | undefined, right: Vector4Tuple | undefined) {
+function multiplyVector4(left: Vector4Tuple | undefined, right: Vector4Tuple | undefined): Vector4Tuple | undefined {
   if (left === undefined) return right;
   if (right === undefined) return left;
-  return [left[0] * right[0], left[1] * right[1], left[2] * right[2], left[3] * right[3]] as const;
+  return [left[0] * right[0], left[1] * right[1], left[2] * right[2], left[3] * right[3]];
 }
 
 function vectorProperty(
@@ -142,7 +142,7 @@ const colorProperty: AnimationProperty<Vector4Tuple, Vector4Point> = {
   blend: blendVector4,
 };
 
-const animationPropertyKeys = [
+const animationPropertyKeys: readonly (keyof NoodleAnimationProperties)[] = [
   'position',
   'localPosition',
   'rotation',
@@ -156,7 +156,7 @@ const animationPropertyKeys = [
   'definitePosition',
   'color',
   'time',
-] as const satisfies readonly (keyof NoodleAnimationProperties)[];
+];
 const trackEventIndexes = new WeakMap<
   NoodleBeatmapData,
   Map<string, Map<keyof NoodleAnimationProperties, TrackPropertyEvents>>
@@ -348,23 +348,31 @@ function persistentStaticProperty<T, P>(
   );
 }
 
-function blendVector(left: Vector3Tuple | undefined, right: Vector3Tuple | undefined, amount: number) {
+function blendVector(
+  left: Vector3Tuple | undefined,
+  right: Vector3Tuple | undefined,
+  amount: number,
+): Vector3Tuple | undefined {
   if (left === undefined || right === undefined) return right;
   return [
     left[0] + (right[0] - left[0]) * amount,
     left[1] + (right[1] - left[1]) * amount,
     left[2] + (right[2] - left[2]) * amount,
-  ] as const;
+  ];
 }
 
-function blendVector4(left: Vector4Tuple | undefined, right: Vector4Tuple | undefined, amount: number) {
+function blendVector4(
+  left: Vector4Tuple | undefined,
+  right: Vector4Tuple | undefined,
+  amount: number,
+): Vector4Tuple | undefined {
   if (left === undefined || right === undefined) return right;
   return [
     left[0] + (right[0] - left[0]) * amount,
     left[1] + (right[1] - left[1]) * amount,
     left[2] + (right[2] - left[2]) * amount,
     left[3] + (right[3] - left[3]) * amount,
-  ] as const;
+  ];
 }
 
 function blendNumber(left: number | undefined, right: number | undefined, amount: number) {

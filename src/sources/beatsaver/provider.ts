@@ -27,10 +27,10 @@ const beatSaverVersionSchema = z.object({
   downloadURL: z.url(),
 });
 
-const beatSaverMapSchema = z.object({
+const beatSaverMapSchema: z.ZodType<BeatSaverMapContract> = z.object({
   id: z.string().min(1),
   versions: z.tuple([beatSaverVersionSchema], beatSaverVersionSchema),
-}) satisfies z.ZodType<BeatSaverMapContract>;
+});
 
 export function beatSaverKey(input: string) {
   const value = input.trim();

@@ -9,9 +9,13 @@ import {
   type Vector4Tuple,
   type VectorPoint,
 } from './animation/point-definition';
+import type { BeatmapCustomData, BeatmapCustomDataValue } from './beatmap/types';
 import {
-  beatSaberBooleanSchema,
   beatSaberIntegerSchema,
+  beatSaberNumber,
+  beatSaberTrack,
+  beatSaberBooleanSchema,
+  beatSaberJsonValueSchema,
   beatSaberJsonArraySchema,
   beatSaberJsonObjectSchema,
   beatSaberNumberSchema,
@@ -160,6 +164,13 @@ export interface ChromaEnvironmentData {
   fogTrack?: string;
 }
 
+export interface ParsedBeatmapCustomData {
+  chromaEnvironment: ChromaEnvironmentData;
+  pointDefinitions: Record<string, BeatmapCustomDataValue[]>;
+  events: { time: number; type: string; data: BeatmapCustomData }[];
+  localSpaceSaberTrail: BeatmapCustomDataValue | undefined;
+}
+
 export const EMPTY_CHROMA_ENVIRONMENT: ChromaEnvironmentData = {
   version: 2,
   materials: {},
@@ -202,17 +213,14 @@ const optionalStringSchema = z.preprocess(
 );
 const optionalVectorSchema = beatSaberVector3Schema.optional().catch(undefined);
 const colorSchema = z
-  .array(z.json())
+  .array(beatSaberJsonValueSchema)
   .min(3)
-  .transform(
-    ([red, green, blue, alpha]) =>
-      [
-        beatSaberNumberSchema.parse(red),
-        beatSaberNumberSchema.parse(green),
-        beatSaberNumberSchema.parse(blue),
-        alpha === undefined ? 1 : beatSaberNumberSchema.parse(alpha),
-      ] as const,
-  );
+  .transform(([red, green, blue, alpha]): [number, number, number, number] => [
+    beatSaberNumberSchema.parse(red),
+    beatSaberNumberSchema.parse(green),
+    beatSaberNumberSchema.parse(blue),
+    alpha === undefined ? 1 : beatSaberNumberSchema.parse(alpha),
+  ]);
 const optionalColorSchema = colorSchema.optional().catch(undefined);
 const optionalKeywordsSchema = z.preprocess(
   (value) => (value === null ? undefined : value),
@@ -387,7 +395,7 @@ const v3EnhancementSchema = z
     }),
   );
 
-const pointValueSchema = z.json().optional();
+const pointValueSchema = beatSaberJsonValueSchema.optional();
 
 interface TrackAnimationInput {
   track: string[];
@@ -406,76 +414,45 @@ interface TrackAnimationInput {
   fogOffset?: z.output<typeof pointValueSchema>;
 }
 
-const v2TrackAnimationSchema = z
-  .looseObject({
-    _track: beatSaberTrackSchema,
-    _duration: beatSaberNumberSchema,
-    _easing: optionalStringSchema,
-    _position: pointValueSchema,
-    _localPosition: pointValueSchema,
-    _rotation: pointValueSchema,
-    _localRotation: pointValueSchema,
-    _scale: pointValueSchema,
-    _color: pointValueSchema,
-    _height: pointValueSchema,
-    _startY: pointValueSchema,
-    _attenuation: pointValueSchema,
-    _offset: pointValueSchema,
-  })
-  .transform(
-    (data): TrackAnimationInput => ({
-      track: data._track,
-      duration: data._duration,
-      easing: data._easing,
-      repeat: 0,
-      position: data._position,
-      localPosition: data._localPosition,
-      rotation: data._rotation,
-      localRotation: data._localRotation,
-      scale: data._scale,
-      color: data._color,
-      fogHeight: data._height,
-      fogStartY: data._startY,
-      fogAttenuation: data._attenuation,
-      fogOffset: data._offset,
-    }),
-  );
+function optionalString(value: BeatmapCustomDataValue | undefined) {
+  return value == null ? undefined : beatSaberStringSchema.parse(value);
+}
 
-const v3TrackAnimationSchema = z
-  .looseObject({
-    track: beatSaberTrackSchema,
-    duration: beatSaberNumberSchema,
-    easing: optionalStringSchema,
-    repeat: optionalIntegerSchema,
-    position: pointValueSchema,
-    localPosition: pointValueSchema,
-    rotation: pointValueSchema,
-    localRotation: pointValueSchema,
-    scale: pointValueSchema,
-    color: pointValueSchema,
-    _height: pointValueSchema,
-    _startY: pointValueSchema,
-    _attenuation: pointValueSchema,
-    _offset: pointValueSchema,
-  })
-  .transform(
-    (data): TrackAnimationInput => ({
-      track: data.track,
-      duration: data.duration,
-      easing: data.easing,
-      repeat: Math.max(data.repeat ?? 0, 0),
-      position: data.position,
-      localPosition: data.localPosition,
-      rotation: data.rotation,
-      localRotation: data.localRotation,
-      scale: data.scale,
-      color: data.color,
-      fogHeight: data._height,
-      fogStartY: data._startY,
-      fogAttenuation: data._attenuation,
-      fogOffset: data._offset,
-    }),
-  );
+function trackAnimation(data: BeatmapCustomData, v2: boolean): TrackAnimationInput {
+  return v2
+    ? {
+        track: beatSaberTrack(data._track),
+        duration: beatSaberNumber(data._duration),
+        easing: optionalString(data._easing),
+        repeat: 0,
+        position: data._position,
+        localPosition: data._localPosition,
+        rotation: data._rotation,
+        localRotation: data._localRotation,
+        scale: data._scale,
+        color: data._color,
+        fogHeight: data._height,
+        fogStartY: data._startY,
+        fogAttenuation: data._attenuation,
+        fogOffset: data._offset,
+      }
+    : {
+        track: beatSaberTrack(data.track),
+        duration: beatSaberNumber(data.duration),
+        easing: optionalString(data.easing),
+        repeat: Math.max(Math.trunc(beatSaberNumber(data.repeat)), 0),
+        position: data.position,
+        localPosition: data.localPosition,
+        rotation: data.rotation,
+        localRotation: data.localRotation,
+        scale: data.scale,
+        color: data.color,
+        fogHeight: data._height,
+        fogStartY: data._startY,
+        fogAttenuation: data._attenuation,
+        fogOffset: data._offset,
+      };
+}
 
 const animatedBloomFogSchema = z.looseObject({
   attenuation: pointValueSchema,
@@ -531,7 +508,7 @@ function points<T>(parsed: T[]) {
 function parseTrackAnimation(
   time: number,
   data: TrackAnimationInput,
-  definitions: Readonly<Record<string, unknown[]>>,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
 ): ChromaTrackAnimation | undefined {
   if (data.track.length === 0) return undefined;
   return {
@@ -557,7 +534,7 @@ function parseTrackAnimation(
 
 function animatedBloomFog(
   data: z.output<typeof animatedBloomFogSchema> | undefined,
-  definitions: Readonly<Record<string, unknown[]>>,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
 ) {
   if (data === undefined) return undefined;
   const component: ChromaAnimatedBloomFogComponent = {
@@ -571,7 +548,7 @@ function animatedBloomFog(
 
 function animatedTubeBloom(
   data: z.output<typeof animatedTubeBloomSchema> | undefined,
-  definitions: Readonly<Record<string, unknown[]>>,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
 ) {
   if (data === undefined) return undefined;
   const component: ChromaAnimatedTubeBloomComponent = {
@@ -584,7 +561,7 @@ function animatedTubeBloom(
 function parseComponentAnimation(
   time: number,
   data: z.output<typeof componentAnimationSchema>,
-  definitions: Readonly<Record<string, unknown[]>>,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
 ): ChromaComponentAnimation | undefined {
   if (data.track.length === 0) return undefined;
   const components: ChromaAnimatedComponents = {
@@ -603,15 +580,21 @@ function parseComponentAnimation(
   };
 }
 
-function parseChromaEnvironment(input: unknown, version: 2 | 3): ChromaEnvironmentData {
+function parseChromaEnvironment(input: BeatmapCustomData | undefined, version: 2 | 3): ParsedBeatmapCustomData {
   const v2 = version === 2;
-  let definitions: Record<string, unknown[]>;
+  let definitions: Record<string, BeatmapCustomDataValue[]>;
   let materials: Record<string, ChromaMaterial>;
   let enhancements: ChromaEnvironmentEnhancement[];
   let events: { time: number; type: string; data: z.output<typeof beatSaberJsonObjectSchema> }[];
   if (v2) {
     const parsed = v2ChromaSchema.safeParse(input);
-    if (!parsed.success) return { ...EMPTY_CHROMA_ENVIRONMENT, version };
+    if (!parsed.success)
+      return {
+        chromaEnvironment: { ...EMPTY_CHROMA_ENVIRONMENT, version },
+        pointDefinitions: {},
+        events: [],
+        localSpaceSaberTrail: input?._localSpaceSaberTrail,
+      };
     const data = parsed.data;
     definitions = Object.fromEntries(
       data._pointDefinitions.flatMap((definition) =>
@@ -629,7 +612,13 @@ function parseChromaEnvironment(input: unknown, version: 2 | 3): ChromaEnvironme
     );
   } else {
     const parsed = v3ChromaSchema.safeParse(input);
-    if (!parsed.success) return { ...EMPTY_CHROMA_ENVIRONMENT, version };
+    if (!parsed.success)
+      return {
+        chromaEnvironment: { ...EMPTY_CHROMA_ENVIRONMENT, version },
+        pointDefinitions: {},
+        events: [],
+        localSpaceSaberTrail: input?._localSpaceSaberTrail,
+      };
     const data = parsed.data;
     definitions = Object.fromEntries(
       Object.entries(data.pointDefinitions).flatMap(([name, definition]) =>
@@ -649,11 +638,7 @@ function parseChromaEnvironment(input: unknown, version: 2 | 3): ChromaEnvironme
   const fogTrackEvents: ChromaFogTrackEvent[] = [];
   for (const event of events) {
     if (event.type === 'AnimateTrack') {
-      const animation = parseTrackAnimation(
-        event.time,
-        (v2 ? v2TrackAnimationSchema : v3TrackAnimationSchema).parse(event.data),
-        definitions,
-      );
+      const animation = parseTrackAnimation(event.time, trackAnimation(event.data, v2), definitions);
       if (animation !== undefined) animations.push(animation);
       continue;
     }
@@ -671,20 +656,25 @@ function parseChromaEnvironment(input: unknown, version: 2 | 3): ChromaEnvironme
   componentAnimations.sort((left, right) => left.jsonTime - right.jsonTime);
   fogTrackEvents.sort((left, right) => left.jsonTime - right.jsonTime);
   return {
-    version,
-    materials,
-    enhancements,
-    animations,
-    componentAnimations,
-    fogTrackEvents,
-    fogTrack: fogTrackEvents.at(-1)?.track,
+    chromaEnvironment: {
+      version,
+      materials,
+      enhancements,
+      animations,
+      componentAnimations,
+      fogTrackEvents,
+      fogTrack: fogTrackEvents.at(-1)?.track,
+    },
+    pointDefinitions: definitions,
+    events,
+    localSpaceSaberTrail: input?._localSpaceSaberTrail,
   };
 }
 
-export function parseV2ChromaEnvironment(input: unknown) {
+export function parseV2ChromaEnvironment(input: BeatmapCustomData | undefined) {
   return parseChromaEnvironment(input, 2);
 }
 
-export function parseV3ChromaEnvironment(input: unknown) {
+export function parseV3ChromaEnvironment(input: BeatmapCustomData | undefined) {
   return parseChromaEnvironment(input, 3);
 }

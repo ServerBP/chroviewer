@@ -48,6 +48,7 @@ export function useViewerRenderer({
 }: ViewerRendererOptions) {
   const t = useTranslations('viewer');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const orthoOverlayRef = useRef<HTMLButtonElement>(null);
   const viewerRef = useRef<ViewerHandle | null>(null);
   const performanceRef = useRef(performance);
   performanceRef.current = performance;
@@ -80,9 +81,14 @@ export function useViewerRenderer({
         { mirrorQuality: settings.graphicsQuality },
         finishInitialEnvironmentLoad,
         initialPerformance,
+        () => orthoOverlayRef.current,
       );
       lifecycle.setView(view);
-      view.setLightshowMode(active === null ? 'static' : lightshowModeRef.current);
+      if (active === null && !skipInitialMenuEnvironment) {
+        view.startMenuLightshow(Math.floor(Math.random() * 0x1_0000_0000));
+      } else {
+        view.setLightshowMode(active === null ? 'static' : lightshowModeRef.current);
+      }
       view.setReplayCameraSettings(settings);
       view.setReplaySaberSettings(settingsRef.current);
       view.setScreenDisplacementEffects(settingsRef.current.screenDisplacementEffects);
@@ -160,5 +166,5 @@ export function useViewerRenderer({
     performance.outputHeight,
   ]);
 
-  return { canvasRef, environmentLoading, viewerReady, viewerRef };
+  return { canvasRef, environmentLoading, orthoOverlayRef, viewerReady, viewerRef };
 }

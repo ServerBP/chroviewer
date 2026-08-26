@@ -57,14 +57,12 @@ export function encodeWatchPartyViewerSettings(settings: ViewerSettings, lightsh
     environmentWhiteBoostColor: settings.environmentWhiteBoostColor,
     replayCameraFov: settings.replayCameraFov,
     previewCameraDistance: settings.previewCameraDistance,
-  } satisfies WatchPartyViewerSettingsValue);
+  });
 }
 
 export function parseWatchPartyViewerSettings(json: string) {
-  const parsedJson = Result.try((): unknown => JSON.parse(json));
-  if (parsedJson.isErr()) return null;
-  const parsed = watchPartyViewerSettingsSchema.safeParse(parsedJson.value);
-  return parsed.success ? parsed.data : null;
+  const parsed = Result.try(() => watchPartyViewerSettingsSchema.safeParse(JSON.parse(json)));
+  return parsed.isOk() && parsed.value.success ? parsed.value.data : null;
 }
 
 export function preserveLocalWatchPartyViewerSettings(local: ViewerSettings, next: ViewerSettings) {

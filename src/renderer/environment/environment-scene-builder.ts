@@ -234,6 +234,8 @@ export function buildEnvironmentScene(
     const rendererMaterial = rendererMaterials.length === 1 ? rendererMaterials[0] : undefined;
     if (
       object.mesh?.startsWith('__chroma_geometry_') === true &&
+      materialName !== null &&
+      materialName !== undefined &&
       materialData?.shader === 'ChroMapper/Lit' &&
       rendererMaterial !== undefined &&
       !controlledObjects.has(index) &&

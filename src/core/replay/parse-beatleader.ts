@@ -109,13 +109,15 @@ function quaternion(reader: BinaryReader): ReplayQuaternion {
   return { ...vector3(reader), w: reader.float32() };
 }
 
-const legacyDifficultyRanks: Record<string, number> = {
-  easy: 1,
-  normal: 3,
-  hard: 5,
-  expert: 7,
-  expertplus: 9,
-};
+const legacyDifficultyRanks = new Map(
+  Object.entries({
+    easy: 1,
+    normal: 3,
+    hard: 5,
+    expert: 7,
+    expertplus: 9,
+  }),
+);
 
 export function parseBeatLeaderReplay(data: Uint8Array): Replay {
   const reader = new BinaryReader(data);
@@ -162,7 +164,7 @@ export function parseBeatLeaderReplay(data: Uint8Array): Replay {
         metadata = {
           version: `BeatLeader ${version}`,
           levelId: `custom_level_${hash.toUpperCase()}`,
-          difficulty: legacyDifficultyRanks[difficultyStr.toLowerCase()] ?? 1,
+          difficulty: legacyDifficultyRanks.get(difficultyStr.toLowerCase()) ?? 1,
           characteristic: mode,
           environment,
           modifiers: modifiers === '' ? [] : modifiers.split(','),
@@ -396,8 +398,8 @@ export function parseBeatLeaderReplay(data: Uint8Array): Replay {
     | { type: 'wall'; data: ReplayWallEvent; time: number };
 
   const simulationEvents: SimulationEvent[] = [
-    ...notes.map((data) => ({ type: 'note' as const, data, time: data.time })),
-    ...walls.map((data) => ({ type: 'wall' as const, data, time: data.time })),
+    ...notes.map<SimulationEvent>((data) => ({ type: 'note', data, time: data.time })),
+    ...walls.map<SimulationEvent>((data) => ({ type: 'wall', data, time: data.time })),
   ].sort((a, b) => a.time - b.time);
 
   for (const event of simulationEvents) {

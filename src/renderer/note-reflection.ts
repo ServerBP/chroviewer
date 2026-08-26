@@ -127,20 +127,20 @@ function reflectionValue(x: number, y: number, z: number) {
   return SHADOW_FLOOR + progress * (SHADOW_TOE - SHADOW_FLOOR);
 }
 
-function faceDirection(face: number, u: number, v: number) {
+function faceDirection(face: number, u: number, v: number): readonly [number, number, number] {
   switch (face) {
     case 0:
-      return [1, -v, -u] as const;
+      return [1, -v, -u];
     case 1:
-      return [-1, -v, u] as const;
+      return [-1, -v, u];
     case 2:
-      return [u, 1, v] as const;
+      return [u, 1, v];
     case 3:
-      return [u, -1, -v] as const;
+      return [u, -1, -v];
     case 4:
-      return [u, -v, 1] as const;
+      return [u, -v, 1];
     default:
-      return [-u, -v, -1] as const;
+      return [-u, -v, -1];
   }
 }
 

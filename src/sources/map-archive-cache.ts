@@ -116,11 +116,10 @@ export class OpfsMapArchiveCache implements MapArchiveCache {
   }
 }
 
-const storage =
-  typeof navigator === 'undefined' ||
-  !Reflect.has(navigator, 'storage') ||
-  typeof navigator.storage.getDirectory !== 'function'
-    ? null
-    : navigator.storage;
+const storageManagerSchema = z.custom<Pick<StorageManager, 'getDirectory'>>(
+  (value) => value instanceof Object && 'getDirectory' in value && value.getDirectory instanceof Function,
+);
+const browserStorage = z.object({ navigator: z.object({ storage: storageManagerSchema }) }).safeParse(globalThis);
+const storage = browserStorage.success ? browserStorage.data.navigator.storage : null;
 
 export const browserMapArchiveCache = storage === null ? null : new OpfsMapArchiveCache(storage);

@@ -15,6 +15,8 @@ import {
 } from './types';
 import {
   beatSaberBooleanSchema as booleanSchema,
+  type BeatSaberJsonValue,
+  beatSaberJsonValueSchema,
   beatSaberJsonObjectSchema as customDataSchema,
   beatSaberNumberSchema as numberSchema,
   beatSaberStringSchema,
@@ -53,9 +55,11 @@ const bookmarkSchema = z.object({
   _name: beatSaberStringSchema,
   _color: z.array(numberSchema).min(3).max(4).optional().catch(undefined),
 });
-const difficultyCustomDataSchema = z.looseObject({
-  _bookmarks: z.array(bookmarkSchema).catch([]),
-});
+const difficultyCustomDataSchema = z
+  .object({
+    _bookmarks: z.array(bookmarkSchema).catch([]),
+  })
+  .catchall(beatSaberJsonValueSchema);
 const v2DifficultySchema = z
   .looseObject({
     _version: beatSaberStringSchema,
@@ -141,12 +145,13 @@ function parseRotationEvent(node: V2Event): RotationEvent {
   };
 }
 
-export function parseV2Difficulty(input: unknown): Difficulty {
+export function parseV2Difficulty(input: BeatSaberJsonValue): Difficulty {
   const root = v2DifficultySchema.parse(input);
   const version = root._version;
   const difficulty = createDifficulty(version === '' ? '2.0.0' : version);
-  difficulty.chromaEnvironment = parseV2ChromaEnvironment(root._customData);
-  difficulty.noodle = parseNoodleBeatmap(root._customData, 2);
+  const customData = parseV2ChromaEnvironment(root._customData);
+  difficulty.chromaEnvironment = customData.chromaEnvironment;
+  difficulty.noodle = parseNoodleBeatmap(customData, 2);
 
   for (const bookmark of root._customData?._bookmarks ?? []) {
     difficulty.bookmarks.push({

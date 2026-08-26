@@ -44,18 +44,20 @@ interface UseViewerFileSourceOptions {
   onSourceLoaded: () => void;
 }
 
-const legacyDifficultyRanks: Record<string, number> = {
-  easy: 1,
-  normal: 3,
-  hard: 5,
-  expert: 7,
-  expertplus: 9,
-};
+const legacyDifficultyRanks = new Map(
+  Object.entries({
+    easy: 1,
+    normal: 3,
+    hard: 5,
+    expert: 7,
+    expertplus: 9,
+  }),
+);
 
 function legacyMetadataFromFilename(name: string) {
   const match = /-([^-]+)-([^-]+)-([0-9a-f]{40})\.dat$/i.exec(name);
   if (match === null) return null;
-  const difficulty = legacyDifficultyRanks[match[1]?.toLowerCase() ?? ''];
+  const difficulty = legacyDifficultyRanks.get(match[1]?.toLowerCase() ?? '');
   const characteristic = match[2];
   const hash = match[3];
   return difficulty === undefined || characteristic === undefined || hash === undefined

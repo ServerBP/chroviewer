@@ -41,6 +41,7 @@ export class ReplayCameraController {
   private readonly headEuler = new Euler(0, 0, 0, 'YXZ');
   private mode: ReplayCameraMode = DEFAULT_REPLAY_CAMERA_SETTINGS.replayCamera;
   private settings: ReplayCameraSettings = DEFAULT_REPLAY_CAMERA_SETTINGS;
+  private previewCameraDistanceOverride: number | null = null;
   private forced = false;
   private hasReplay = false;
   private hasMapNotes = false;
@@ -112,6 +113,11 @@ export class ReplayCameraController {
     if (!this.hasReplay) this.camera.position.set(...fixedCameraPosition(this.staticCameraDistance));
   }
 
+  setPreviewCameraDistanceOverride(distance: number | null) {
+    this.previewCameraDistanceOverride = distance;
+    if (!this.hasReplay) this.camera.position.set(...fixedCameraPosition(this.staticCameraDistance));
+  }
+
   setAspect(aspect: number) {
     this.camera.aspect = aspect;
     this.applyFov();
@@ -173,6 +179,8 @@ export class ReplayCameraController {
 
   private get staticCameraDistance() {
     if (this.forced && !this.hasReplay && !this.hasMapNotes) return 0;
-    return this.hasReplay ? this.settings.fixedCameraDistance : this.settings.previewCameraDistance;
+    return this.hasReplay
+      ? this.settings.fixedCameraDistance
+      : (this.previewCameraDistanceOverride ?? this.settings.previewCameraDistance);
   }
 }

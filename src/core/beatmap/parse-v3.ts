@@ -19,6 +19,8 @@ import {
 } from './types';
 import {
   beatSaberBooleanSchema as booleanSchema,
+  type BeatSaberJsonValue,
+  beatSaberJsonValueSchema,
   beatSaberIntegerSchema as integerSchema,
   beatSaberJsonObjectSchema as customDataSchema,
   beatSaberNumberSchema as numberSchema,
@@ -105,13 +107,15 @@ const bookmarkSchema = z.object({
   n: beatSaberStringSchema,
   c: z.array(numberSchema).min(3).max(4).optional().catch(undefined),
 });
-const customDifficultyDataSchema = z.looseObject({
-  bookmarks: z.array(bookmarkSchema).catch([]),
-  fakeColorNotes: z.array(colorNoteSchema).catch([]),
-  fakeBombNotes: z.array(bombNoteSchema).catch([]),
-  fakeObstacles: z.array(obstacleSchema).catch([]),
-  fakeBurstSliders: z.array(chainSchema).catch([]),
-});
+const customDifficultyDataSchema = z
+  .object({
+    bookmarks: z.array(bookmarkSchema).catch([]),
+    fakeColorNotes: z.array(colorNoteSchema).catch([]),
+    fakeBombNotes: z.array(bombNoteSchema).catch([]),
+    fakeObstacles: z.array(obstacleSchema).catch([]),
+    fakeBurstSliders: z.array(chainSchema).catch([]),
+  })
+  .catchall(beatSaberJsonValueSchema);
 const v3DifficultySchema = z
   .looseObject({
     version: beatSaberStringSchema,
@@ -281,7 +285,7 @@ function parseBpmEvent(node: z.infer<typeof bpmEventSchema>): BpmEvent {
   };
 }
 
-export function parseV3Difficulty(input: unknown): Difficulty {
+export function parseV3Difficulty(input: BeatSaberJsonValue): Difficulty {
   const root = v3DifficultySchema.parse(input);
   const version = root.version;
   const difficulty = createDifficulty(version === '' ? '3.3.0' : version);
@@ -295,12 +299,13 @@ export function parseV3Difficulty(input: unknown): Difficulty {
   for (const obstacle of root.obstacles) difficulty.obstacles.push(parseObstacle(obstacle, false));
   for (const arc of root.sliders) difficulty.arcs.push(parseArc(arc));
   for (const chain of root.burstSliders) difficulty.chains.push(parseChain(chain, false));
-  parseV3Gls(root, difficulty);
+  parseV3Gls(input, difficulty);
 
   const customData = root.customData;
   if (customData !== undefined) {
-    difficulty.chromaEnvironment = parseV3ChromaEnvironment(customData);
-    difficulty.noodle = parseNoodleBeatmap(customData, 3);
+    const parsedCustomData = parseV3ChromaEnvironment(customData);
+    difficulty.chromaEnvironment = parsedCustomData.chromaEnvironment;
+    difficulty.noodle = parseNoodleBeatmap(parsedCustomData, 3);
     for (const bookmark of customData.bookmarks) {
       difficulty.bookmarks.push({
         jsonTime: bookmark.b,

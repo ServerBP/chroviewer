@@ -4,7 +4,7 @@ import { CircleOff, Pause, X } from 'lucide-react';
 import { useFormatter, useLocale, useTranslations } from 'use-intl';
 
 import { formatDuration } from '../../../i18n/formats';
-import type { TimelineMarker, TimelineMarkerKind } from '../timeline-markers';
+import type { TimelineMarker } from '../timeline-markers';
 import { quantizedBeatAt } from '../viewer-timeline';
 
 import { Button } from '@/components/ui/button';
@@ -26,12 +26,19 @@ interface TimelineSliderProps {
   onSeekBeats: (beats: number) => void;
 }
 
-const markerTranslationKeys = {
+interface MarkerTranslationKeys {
+  'bad-cut': 'markerBadCut';
+  bookmark: 'markerBookmark';
+  miss: 'markerMiss';
+  pause: 'markerPause';
+}
+
+const markerTranslationKeys: MarkerTranslationKeys = {
   'bad-cut': 'markerBadCut',
   bookmark: 'markerBookmark',
   miss: 'markerMiss',
   pause: 'markerPause',
-} as const satisfies Record<TimelineMarkerKind, string>;
+};
 
 const timelineLanes = [1, 2, 3, 4];
 const timelineBoundaries = [0, 1, 2, 3, 4];

@@ -158,6 +158,7 @@ export interface MapRenderOptions {
   initialPlayerHeight?: number;
   replayHeights?: ReplayHeightEvent[];
   environmentRemoval?: string[];
+  modifiers?: string[];
 }
 
 const anyCutDirection = 8;
@@ -229,10 +230,10 @@ function mirrorCutDirection(cutDirection: number) {
   return cutDirection;
 }
 
-function replayCutDirection(note: Difficulty['notes'][number], majorVersion: number) {
-  return majorVersion === 2 && note.cutDirection !== anyCutDirection && note.customData?._cutDirection != null
+function replayCutDirection(note: Difficulty['notes'][number], majorVersion: number, cutDirection: number) {
+  return majorVersion === 2 && cutDirection !== anyCutDirection && note.customData?._cutDirection != null
     ? 1
-    : note.cutDirection;
+    : cutDirection;
 }
 
 function motionFor(state: SpawnState, beat: number, leadInBeats: number, despawnBeat?: number): ObjectMotion {
@@ -258,7 +259,7 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
   );
   const majorVersion = heck.majorVersion;
   const leadInBeats = preJumpTravelBeats(options.songBpm);
-  const formedNotes = buildNoteFormation(difficulty, options.songBpm, heck);
+  const formedNotes = buildNoteFormation(difficulty, options.songBpm, heck, options.modifiers);
   const replayNotes = [...(options.replayNotes ?? [])];
   const initialPlayerHeight = options.initialPlayerHeight ?? defaultPlayerHeight;
   const replayHeights = [...(options.replayHeights ?? [])];
@@ -305,7 +306,7 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
         samePosition(heck.position(chain), notePosition),
     );
   }
-  for (const { note, formation } of formedNotes) {
+  for (const { note, cutDirection: formedCutDirection, formation } of formedNotes) {
     const extension = heck.resolve(note);
     const { noodle, coordinates, worldRotation } = extension;
     const interactable = !note.customFake && noodle?.uninteractable !== true;
@@ -351,7 +352,7 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
     } else {
       const lineIndex = options.leftHanded === true ? 3 - note.posX : note.posX;
       const colorType = options.leftHanded === true ? 1 - note.type : note.type;
-      const sourceCutDirection = replayCutDirection(note, majorVersion);
+      const sourceCutDirection = replayCutDirection(note, majorVersion, formedCutDirection);
       const cutDirection = options.leftHanded === true ? mirrorCutDirection(sourceCutDirection) : sourceCutDirection;
       const replayEvent = !replayable
         ? undefined
@@ -377,7 +378,7 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
         rotationDeg: formation.rotationDeg * (options.leftHanded === true ? -1 : 1),
         colorIndex:
           options.leftHanded === true ? (note.type === NoteType.Blue ? 0 : 1) : note.type === NoteType.Blue ? 1 : 0,
-        dot: note.cutDirection === anyCutDirection,
+        dot: formedCutDirection === anyCutDirection,
         lookAtPlayer:
           replayEvent?.noteId.gameplayType === undefined ? !isChainHead(note) : replayEvent.noteId.gameplayType === 0,
         interactable,

@@ -6,6 +6,7 @@ import { loadV4Gls } from './parse-gls';
 import { createDifficulty, NoteType, sortByJsonTime, type Difficulty } from './types';
 import {
   beatSaberIntegerSchema as integerSchema,
+  type BeatSaberJsonValue,
   beatSaberJsonObjectSchema as customDataSchema,
   beatSaberNumberSchema as numberSchema,
   beatSaberStringSchema,
@@ -174,13 +175,14 @@ function readNoteData(node: z.infer<typeof noteDataSchema>): NoteData {
   };
 }
 
-export function parseV4Difficulty(input: unknown): Difficulty {
+export function parseV4Difficulty(input: BeatSaberJsonValue): Difficulty {
   const root = v4DifficultySchema.parse(input);
   const version = root.version;
   const difficulty = createDifficulty(version === '' ? '4.1.0' : version);
   if (root.customData !== undefined) {
-    difficulty.chromaEnvironment = parseV3ChromaEnvironment(root.customData);
-    difficulty.noodle = parseNoodleBeatmap(root.customData, 3);
+    const customData = parseV3ChromaEnvironment(root.customData);
+    difficulty.chromaEnvironment = customData.chromaEnvironment;
+    difficulty.noodle = parseNoodleBeatmap(customData, 3);
   }
 
   const notesData = root.colorNotesData.map(readNoteData);
@@ -346,7 +348,7 @@ export function parseV4Difficulty(input: unknown): Difficulty {
   return difficulty;
 }
 
-export function loadV4Bookmarks(input: unknown, difficulty: Difficulty) {
+export function loadV4Bookmarks(input: BeatSaberJsonValue, difficulty: Difficulty) {
   const root = v4BookmarksSchema.parse(input);
   const hex = root.color.replace(/^#/, '');
   const color: [number, number, number, number] = /^[0-9a-f]{6}$/i.test(hex)
@@ -367,7 +369,7 @@ export function loadV4Bookmarks(input: unknown, difficulty: Difficulty) {
   }
 }
 
-export function loadV4Lightshow(input: unknown, difficulty: Difficulty): void {
+export function loadV4Lightshow(input: BeatSaberJsonValue, difficulty: Difficulty): void {
   const root = v4LightshowSchema.parse(input);
   const basicEventsData = root.basicEventsData.map((node) => ({
     type: node.t,
@@ -398,7 +400,7 @@ export function loadV4Lightshow(input: unknown, difficulty: Difficulty): void {
     });
   }
 
-  loadV4Gls(root, difficulty);
+  loadV4Gls(input, difficulty);
 
   sortByJsonTime(difficulty.events);
   sortByJsonTime(difficulty.lightColorEventBoxGroups);

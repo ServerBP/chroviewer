@@ -30,7 +30,7 @@ interface CosmeticsSettingsProps {
   onChange: (settings: ViewerSettings) => void;
 }
 
-type NumericSaberSetting = Exclude<keyof ReplaySaberSettings, 'showSabers' | 'showSaberTrails' | 'replayTrailShape'>;
+type NumericSaberSetting = Exclude<keyof ReplaySaberSettings, 'showSabers' | 'showSaberTrails' | 'replayTrailStyle'>;
 
 interface SaberSliderOptions {
   minimum: number;
@@ -371,11 +371,11 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
               <SettingRow label={t('replayTrailShape')}>
                 <ToggleGroup
                   type="single"
-                  value={settings.replayTrailShape}
+                  value={settings.replayTrailStyle}
                   aria-label={t('replayTrailShape')}
-                  onValueChange={(replayTrailShape) => {
-                    if (replayTrailShape === 'flag' || replayTrailShape === 'rectangle') {
-                      update('replayTrailShape', replayTrailShape);
+                  onValueChange={(replayTrailStyle) => {
+                    if (replayTrailStyle === 'flag' || replayTrailStyle === 'rectangle') {
+                      update('replayTrailStyle', replayTrailStyle);
                     }
                   }}
                 >

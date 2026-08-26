@@ -11,6 +11,7 @@ import {
   SphereGeometry,
   Vector3,
 } from 'three';
+import { z } from 'zod';
 
 import type {
   ChromaEnvironmentData,
@@ -47,32 +48,6 @@ interface LookupEntry {
   id: string;
   index: number;
 }
-
-interface RendererGeometry {
-  type: string;
-  material: string | ChromaMaterial;
-  collision?: boolean;
-}
-
-interface RendererComponents {
-  ILightWithId?: { lightId?: number; type?: number };
-  BloomFogEnvironment?: {
-    attenuation?: number;
-    offset?: number;
-    startY?: number;
-    height?: number;
-  };
-  TubeBloomPrePassLight?: {
-    colorAlphaMultiplier?: number;
-    bloomFogIntensityMultiplier?: number;
-  };
-}
-
-type RendererEnhancement = Omit<ChromaEnvironmentEnhancement, 'geometry' | 'track'> & {
-  geometry?: RendererGeometry;
-  track?: string | string[];
-  components?: RendererComponents;
-};
 
 function mapPosition(value: ChromaVector, version: number): [number, number, number] {
   const scale = version === 2 ? laneSize : 1;
@@ -119,7 +94,12 @@ function setWorldRotation(data: EnvironmentData, index: number, rotation: Chroma
   object.rotation = [local.x, local.y, local.z, local.w];
 }
 
-function applyTransform(data: EnvironmentData, index: number, enhancement: RendererEnhancement, version: number) {
+function applyTransform(
+  data: EnvironmentData,
+  index: number,
+  enhancement: ChromaEnvironmentEnhancement,
+  version: number,
+) {
   const object = data.objects[index];
   if (object === undefined) return;
   if (enhancement.scale !== undefined) object.scale = [...enhancement.scale];
@@ -129,7 +109,7 @@ function applyTransform(data: EnvironmentData, index: number, enhancement: Rende
   else if (enhancement.rotation !== undefined) setWorldRotation(data, index, enhancement.rotation);
 }
 
-function matcherFor(enhancement: RendererEnhancement) {
+function matcherFor(enhancement: ChromaEnvironmentEnhancement) {
   const query = enhancement.id ?? '';
   switch (enhancement.lookupMethod) {
     case 'Exact':
@@ -214,12 +194,16 @@ function subtreeIndices(objects: EnvironmentObjectData[], root: number) {
   return [...descendants].sort((left, right) => left - right);
 }
 
-function cloneWithRemappedReferences<T>(value: T, remap: Map<number, number>): T {
-  return JSON.parse(
-    JSON.stringify(value, (key, current: unknown) =>
-      key === 'obj' && typeof current === 'number' ? (remap.get(current) ?? current) : current,
-    ),
-  ) as T;
+type SerializableValue = string | number | boolean | null | SerializableValue[] | { [key: string]: SerializableValue };
+
+function cloneWithRemappedReferences<T extends object>(value: T, remap: Map<number, number>): T {
+  const clone = structuredClone(value);
+  const serialized = JSON.stringify(value, (key, current: SerializableValue) => {
+    const objectIndex = z.number().safeParse(current);
+    return key === 'obj' && objectIndex.success ? (remap.get(objectIndex.data) ?? objectIndex.data) : current;
+  });
+  Object.assign(clone, JSON.parse(serialized));
+  return clone;
 }
 
 function appendReferences(references: ObjectReference[], remap: Map<number, number>) {
@@ -229,7 +213,7 @@ function appendReferences(references: ObjectReference[], remap: Map<number, numb
   references.push(...clones);
 }
 
-function appendReferenceEntries<T>(
+function appendReferenceEntries<T extends object>(
   entries: T[],
   reference: (entry: T) => ObjectReference | undefined,
   remap: Map<number, number>,
@@ -311,7 +295,9 @@ function nextCloneRootId(lookups: LookupEntry[], originalId: string) {
   const segment = originalId.slice(separator + 1);
   const parsed = /^\[(\d+)\](.*)$/.exec(segment);
   if (parsed === null) return `${originalId}(Clone)`;
-  let sibling = Number(parsed[1]);
+  const parsedIndex = parsed[1];
+  if (parsedIndex === undefined) return `${originalId}(Clone)`;
+  let sibling = Number(parsedIndex);
   const prefix = `${parent}.[`;
   for (const lookup of lookups) {
     if (!lookup.id.startsWith(prefix)) continue;
@@ -320,7 +306,7 @@ function nextCloneRootId(lookups: LookupEntry[], originalId: string) {
     const candidate = /^\[(\d+)\]/.exec(suffix);
     if (candidate !== null) sibling = Math.max(sibling, Number(candidate[1]));
   }
-  return `${parent}.[${String(sibling + 1)}]${parsed[2]}(Clone)`;
+  return `${parent}.[${String(sibling + 1)}]${parsed[2] ?? ''}(Clone)`;
 }
 
 function addDuplicatedLookups(
@@ -568,7 +554,7 @@ function registerGeometryLight(
 function applyComponents(
   data: EnvironmentData,
   indices: readonly number[],
-  enhancement: RendererEnhancement,
+  enhancement: ChromaEnvironmentEnhancement,
   version: number,
   remapLightComponents = true,
 ) {
@@ -846,9 +832,9 @@ function glowingMaterial(color: ChromaMaterial['color']): EnvironmentMaterialDat
 function materialData(data: EnvironmentData, material: ChromaMaterial) {
   const useGlowingCompatibility =
     (material.shader === 'Standard' || material.shader === 'BTSPillar') && material.keywords?.length === 0;
-  const color =
+  const color: ChromaMaterial['color'] =
     useGlowingCompatibility && material.color !== undefined
-      ? ([material.color[0], material.color[1], material.color[2], 0] as const)
+      ? [material.color[0], material.color[1], material.color[2], 0]
       : material.color;
   const preset = data.materials[chromaMaterialPresetKey(material.shader)];
   let result: EnvironmentMaterialData | undefined;
@@ -893,8 +879,8 @@ function addGeometryMaterial(
   value: string | ChromaMaterial,
   enhancementIndex: number,
 ) {
-  const name = typeof value === 'string' ? value : `inline_${String(enhancementIndex)}`;
-  const material = typeof value === 'string' ? source.materials[value] : value;
+  const name = value instanceof Object ? `inline_${String(enhancementIndex)}` : value;
+  const material = value instanceof Object ? value : source.materials[value];
   if (material === undefined) return undefined;
   const key = `__chroma_material_${name}`;
   const definition = materialData(data, material);
@@ -910,8 +896,8 @@ function addTrack(tracks: Map<string, number[]>, name: string, index: number) {
   else if (!targets.includes(index)) targets.push(index);
 }
 
-function enhancementTracks(enhancement: RendererEnhancement) {
-  return typeof enhancement.track === 'string' ? [enhancement.track] : (enhancement.track ?? []);
+function enhancementTracks(enhancement: ChromaEnvironmentEnhancement) {
+  return enhancement.track;
 }
 
 function disableTrackedBoxLightTransforms(data: EnvironmentData, indices: readonly number[]) {
@@ -930,7 +916,7 @@ function wrapTrackedObject(
   data: EnvironmentData,
   tracks: Map<string, number[]>,
   targetIndex: number,
-  enhancement: RendererEnhancement,
+  enhancement: ChromaEnvironmentEnhancement,
   version: number,
 ) {
   const target = data.objects[targetIndex];
@@ -982,7 +968,7 @@ export function buildChromaEnvironmentVariant(
   );
   addRuntimeRingLookups(data, lookups);
 
-  function addComponentTracks(enhancement: RendererEnhancement, indices: readonly number[]) {
+  function addComponentTracks(enhancement: ChromaEnvironmentEnhancement, indices: readonly number[]) {
     for (const track of enhancementTracks(enhancement)) {
       if (animatedFogTracks.has(track) || enhancement.components?.BloomFogEnvironment !== undefined) {
         fogTracks.add(track);
@@ -992,15 +978,14 @@ export function buildChromaEnvironmentVariant(
     }
   }
 
-  for (const [enhancementIndex, coreEnhancement] of source.enhancements.entries()) {
-    const enhancement = coreEnhancement as RendererEnhancement;
+  for (const [enhancementIndex, enhancement] of source.enhancements.entries()) {
     if (enhancement.geometry !== undefined) {
       const meshName = `__chroma_geometry_${enhancement.geometry.type}`;
       const mesh = data.meshes[meshName] ?? geometryMesh(enhancement.geometry.type);
       const material =
-        typeof enhancement.geometry.material === 'string'
-          ? source.materials[enhancement.geometry.material]
-          : enhancement.geometry.material;
+        enhancement.geometry.material instanceof Object
+          ? enhancement.geometry.material
+          : source.materials[enhancement.geometry.material];
       const materialName = addGeometryMaterial(
         data,
         source,
@@ -1022,7 +1007,7 @@ export function buildChromaEnvironmentVariant(
         scale: [...identityScale],
         mesh: meshName,
         materials: [materialName],
-        components: geometryComponents(material.shader, objectIndex, meshName, enhancement.geometry.collision ?? false),
+        components: geometryComponents(material.shader, objectIndex, meshName, enhancement.geometry.collision),
       });
       lookups.push({
         id: nextGeneratedRootId(data, lookups, objectName),

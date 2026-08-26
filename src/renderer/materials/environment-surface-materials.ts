@@ -138,12 +138,11 @@ export function createWaterLitMaterial(
   },
 ) {
   const elapsed = { value: 0 };
+  const defines = { USE_TANGENT: 1 };
+  if (settings.zFade !== undefined) Object.assign(defines, { Z_FADE: 1 });
+  if (settings.bakedReflectionProbe !== undefined) Object.assign(defines, { BAKED_REFLECTION_PROBE: 1 });
   const material = new ShaderMaterial({
-    defines: {
-      USE_TANGENT: 1,
-      ...(settings.zFade === undefined ? {} : { Z_FADE: 1 }),
-      ...(settings.bakedReflectionProbe === undefined ? {} : { BAKED_REFLECTION_PROBE: 1 }),
-    },
+    defines,
     vertexShader: ENVIRONMENT_LIT_VERT,
     fragmentShader: WATER_LIT_FRAG,
     uniforms: {
@@ -177,63 +176,69 @@ export function createEnvironmentLitMaterial(
   settings: EnvironmentLitSettings,
 ) {
   const elapsed = { value: 0 };
+  const defines = {};
+  if (settings.vertexColorEnabled || settings.vertexEmissionEnabled) {
+    Object.assign(defines, { USE_VERTEX_COLOR: 1 });
+  }
+  if (settings.vertexEmissionEnabled) Object.assign(defines, { VERTEX_EMISSION: 1 });
+  if (settings.vertexEmissionEnabled && settings.vertexEmissionMainEffect) {
+    Object.assign(defines, { VERTEX_EMISSION_MAIN_EFFECT: 1 });
+  }
+  if (settings.displacementEnabled) Object.assign(defines, { VERTEX_DISPLACEMENT: 1 });
+  if (settings.displacementSpatial) Object.assign(defines, { DISPLACEMENT_SPATIAL: 1 });
+  if (settings.displacementBidirectional) Object.assign(defines, { DISPLACEMENT_BIDIRECTIONAL: 1 });
+  if (settings.meshPackingEnabled) Object.assign(defines, { MESH_PACKING: 1 });
+  if (settings.diffuse !== undefined) Object.assign(defines, { DIFFUSE_TEXTURE: 1 });
+  if (settings.metalSmoothness !== undefined) {
+    Object.assign(defines, { METAL_SMOOTHNESS_TEXTURE: 1 });
+    if (settings.metallicTextureEnabled) Object.assign(defines, { METALLIC_TEXTURE: 1 });
+    if (settings.smoothnessTextureSource !== 'none') Object.assign(defines, { SMOOTHNESS_TEXTURE: 1 });
+    if (settings.smoothnessTextureSource === 'greenRoughness') {
+      Object.assign(defines, { METAL_SMOOTHNESS_GREEN_ROUGHNESS: 1 });
+    }
+    if (settings.smoothnessTextureSource === 'alpha') {
+      Object.assign(defines, { METAL_SMOOTHNESS_ALPHA: 1 });
+    }
+    if (settings.occlusionEnabled) Object.assign(defines, { OCCLUSION: 1 });
+    if (settings.occlusionEnabled && settings.occlusionBeforeEmission) {
+      Object.assign(defines, { OCCLUSION_BEFORE_EMISSION: 1 });
+    }
+  }
+  if (settings.occlusionDetail !== undefined && settings.occlusionDetailEnabled) {
+    Object.assign(defines, { OCCLUSION_DETAIL: 1 });
+  }
+  if (settings.normal !== undefined) Object.assign(defines, { NORMAL_TEXTURE: 1 });
+  if (settings.emission !== undefined) {
+    Object.assign(defines, { EMISSION_TEXTURE: 1 });
+    if (settings.emissionAlphaSource === 'green') Object.assign(defines, { EMISSION_TEXTURE_SIMPLE: 1 });
+    if (settings.emissionWhiteBoost) Object.assign(defines, { EMISSION_WHITE_BOOST: 1 });
+    if (settings.emissionMainEffect) Object.assign(defines, { EMISSION_MAIN_EFFECT: 1 });
+  }
+  if ((settings.emission !== undefined || settings.vertexEmissionEnabled) && settings.toneMapBeforeEmission) {
+    Object.assign(defines, { TONE_MAP_BEFORE_EMISSION: 1 });
+  }
+  if (settings.emissionMask !== undefined) Object.assign(defines, { EMISSION_MASK: 1 });
+  if (settings.secondaryEmissionMask !== undefined) Object.assign(defines, { SECONDARY_EMISSION_MASK: 1 });
+  if (settings.emissionMask !== undefined && settings.emissionMaskSecondaryUvs) {
+    Object.assign(defines, { EMISSION_MASK_SECONDARY_UV: 1, USE_SECONDARY_UV: 1 });
+  }
+  if (settings.secondaryEmissionMask !== undefined && settings.secondaryEmissionMaskSecondaryUvs) {
+    Object.assign(defines, { SECONDARY_EMISSION_MASK_SECONDARY_UV: 1, USE_SECONDARY_UV: 1 });
+  }
+  if (settings.reflectionProbe !== undefined || settings.bakedReflectionProbe !== undefined) {
+    Object.assign(defines, { REFLECTION_PROBE: 1 });
+  }
+  if (settings.bakedReflectionProbe !== undefined) Object.assign(defines, { BAKED_REFLECTION_PROBE: 1 });
+  if (
+    (settings.reflectionProbe !== undefined || settings.bakedReflectionProbe !== undefined) &&
+    settings.multiplyReflections
+  ) {
+    Object.assign(defines, { MULTIPLY_REFLECTIONS: 1 });
+  }
+  if (settings.customTime === 'freeze') Object.assign(defines, { CUSTOM_TIME_FREEZE: 1 });
+  if (settings.customTime === 'song') Object.assign(defines, { CUSTOM_TIME_SONG: 1 });
   const material = new ShaderMaterial({
-    defines: {
-      ...(settings.vertexColorEnabled || settings.vertexEmissionEnabled ? { USE_VERTEX_COLOR: 1 } : {}),
-      ...(settings.vertexEmissionEnabled ? { VERTEX_EMISSION: 1 } : {}),
-      ...(settings.vertexEmissionEnabled && settings.vertexEmissionMainEffect
-        ? { VERTEX_EMISSION_MAIN_EFFECT: 1 }
-        : {}),
-      ...(settings.displacementEnabled ? { VERTEX_DISPLACEMENT: 1 } : {}),
-      ...(settings.displacementSpatial ? { DISPLACEMENT_SPATIAL: 1 } : {}),
-      ...(settings.displacementBidirectional ? { DISPLACEMENT_BIDIRECTIONAL: 1 } : {}),
-      ...(settings.meshPackingEnabled ? { MESH_PACKING: 1 } : {}),
-      ...(settings.diffuse === undefined ? {} : { DIFFUSE_TEXTURE: 1 }),
-      ...(settings.metalSmoothness === undefined ? {} : { METAL_SMOOTHNESS_TEXTURE: 1 }),
-      ...(settings.metalSmoothness !== undefined && settings.metallicTextureEnabled ? { METALLIC_TEXTURE: 1 } : {}),
-      ...(settings.metalSmoothness !== undefined && settings.smoothnessTextureSource !== 'none'
-        ? { SMOOTHNESS_TEXTURE: 1 }
-        : {}),
-      ...(settings.metalSmoothness !== undefined && settings.smoothnessTextureSource === 'greenRoughness'
-        ? { METAL_SMOOTHNESS_GREEN_ROUGHNESS: 1 }
-        : {}),
-      ...(settings.metalSmoothness !== undefined && settings.smoothnessTextureSource === 'alpha'
-        ? { METAL_SMOOTHNESS_ALPHA: 1 }
-        : {}),
-      ...(settings.metalSmoothness !== undefined && settings.occlusionEnabled ? { OCCLUSION: 1 } : {}),
-      ...(settings.occlusionDetail !== undefined && settings.occlusionDetailEnabled ? { OCCLUSION_DETAIL: 1 } : {}),
-      ...(settings.metalSmoothness !== undefined && settings.occlusionEnabled && settings.occlusionBeforeEmission
-        ? { OCCLUSION_BEFORE_EMISSION: 1 }
-        : {}),
-      ...(settings.normal === undefined ? {} : { NORMAL_TEXTURE: 1 }),
-      ...(settings.emission === undefined ? {} : { EMISSION_TEXTURE: 1 }),
-      ...(settings.emission !== undefined && settings.emissionAlphaSource === 'green'
-        ? { EMISSION_TEXTURE_SIMPLE: 1 }
-        : {}),
-      ...(settings.emission !== undefined && settings.emissionWhiteBoost ? { EMISSION_WHITE_BOOST: 1 } : {}),
-      ...(settings.emission !== undefined && settings.emissionMainEffect ? { EMISSION_MAIN_EFFECT: 1 } : {}),
-      ...((settings.emission !== undefined || settings.vertexEmissionEnabled) && settings.toneMapBeforeEmission
-        ? { TONE_MAP_BEFORE_EMISSION: 1 }
-        : {}),
-      ...(settings.emissionMask === undefined ? {} : { EMISSION_MASK: 1 }),
-      ...(settings.secondaryEmissionMask === undefined ? {} : { SECONDARY_EMISSION_MASK: 1 }),
-      ...(settings.emissionMask !== undefined && settings.emissionMaskSecondaryUvs
-        ? { EMISSION_MASK_SECONDARY_UV: 1, USE_SECONDARY_UV: 1 }
-        : {}),
-      ...(settings.secondaryEmissionMask !== undefined && settings.secondaryEmissionMaskSecondaryUvs
-        ? { SECONDARY_EMISSION_MASK_SECONDARY_UV: 1, USE_SECONDARY_UV: 1 }
-        : {}),
-      ...(settings.reflectionProbe === undefined && settings.bakedReflectionProbe === undefined
-        ? {}
-        : { REFLECTION_PROBE: 1 }),
-      ...(settings.bakedReflectionProbe === undefined ? {} : { BAKED_REFLECTION_PROBE: 1 }),
-      ...((settings.reflectionProbe !== undefined || settings.bakedReflectionProbe !== undefined) &&
-      settings.multiplyReflections
-        ? { MULTIPLY_REFLECTIONS: 1 }
-        : {}),
-      ...(settings.customTime === 'freeze' ? { CUSTOM_TIME_FREEZE: 1 } : {}),
-      ...(settings.customTime === 'song' ? { CUSTOM_TIME_SONG: 1 } : {}),
-    },
+    defines,
     vertexShader: ENVIRONMENT_LIT_VERT,
     fragmentShader: ENVIRONMENT_LIT_FRAG,
     uniforms: {

@@ -1,6 +1,7 @@
 import { Result } from 'better-result';
 import { Group, Mesh, ShaderMaterial, type BufferGeometry, type Material, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { z } from 'zod';
 
 import type { Rgb } from '../../core/colors';
 import type { FogUniforms } from '../bloomfog/pipeline';
@@ -28,39 +29,43 @@ const DEFAULT_HEADSET_SURFACE: HeadsetSurface = {
   specularIntensity: 0.2,
 };
 
-const HEADSET_SURFACES: Record<string, HeadsetSurface> = {
-  Headset_M: DEFAULT_HEADSET_SURFACE,
-  Foam: {
-    color: [0.035, 0.04, 0.05],
-    metallic: 0,
-    smoothness: 0.12,
-    specularIntensity: 0.05,
-  },
-  Gray_Plastic: {
-    color: [0.12, 0.15, 0.2],
-    metallic: 0.05,
-    smoothness: 0.45,
-    specularIntensity: 0.18,
-  },
-  Lens: {
-    color: [0.025, 0.11, 0.16],
-    metallic: 0.35,
-    smoothness: 0.82,
-    specularIntensity: 0.45,
-  },
-  L: {
-    color: [0.06, 0.42, 0.58],
-    metallic: 0.15,
-    smoothness: 0.7,
-    specularIntensity: 0.3,
-  },
-  Strap: {
-    color: [0.06, 0.07, 0.09],
-    metallic: 0,
-    smoothness: 0.08,
-    specularIntensity: 0.04,
-  },
-};
+const meshSchema = z.custom<Mesh>((value) => value instanceof Mesh);
+
+const HEADSET_SURFACES = new Map<string, HeadsetSurface>(
+  Object.entries({
+    Headset_M: DEFAULT_HEADSET_SURFACE,
+    Foam: {
+      color: [0.035, 0.04, 0.05],
+      metallic: 0,
+      smoothness: 0.12,
+      specularIntensity: 0.05,
+    },
+    Gray_Plastic: {
+      color: [0.12, 0.15, 0.2],
+      metallic: 0.05,
+      smoothness: 0.45,
+      specularIntensity: 0.18,
+    },
+    Lens: {
+      color: [0.025, 0.11, 0.16],
+      metallic: 0.35,
+      smoothness: 0.82,
+      specularIntensity: 0.45,
+    },
+    L: {
+      color: [0.06, 0.42, 0.58],
+      metallic: 0.15,
+      smoothness: 0.7,
+      specularIntensity: 0.3,
+    },
+    Strap: {
+      color: [0.06, 0.07, 0.09],
+      metallic: 0,
+      smoothness: 0.08,
+      specularIntensity: 0.04,
+    },
+  }),
+);
 
 export const SABER_METAL_SURFACE: HeadsetSurface = {
   color: [0.05, 0.055, 0.065],
@@ -198,17 +203,19 @@ export class ReplayHeadset {
       sourceMaterials.add(source);
       const existing = materials.get(source.name);
       if (existing !== undefined) return existing;
-      const surface = HEADSET_SURFACES[source.name] ?? DEFAULT_HEADSET_SURFACE;
+      const surface = HEADSET_SURFACES.get(source.name) ?? DEFAULT_HEADSET_SURFACE;
       const material = createReplaySurfaceMaterial(fog, directionalLights, surface);
       material.name = source.name;
       materials.set(source.name, material);
       return material;
     }
     gltf.scene.traverse((object) => {
-      if (!(object instanceof Mesh)) return;
-      const mesh = object as Mesh;
-      geometries.add(mesh.geometry);
-      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(materialFor) : materialFor(mesh.material);
+      const mesh = meshSchema.safeParse(object);
+      if (!mesh.success) return;
+      geometries.add(mesh.data.geometry);
+      mesh.data.material = Array.isArray(mesh.data.material)
+        ? mesh.data.material.map(materialFor)
+        : materialFor(mesh.data.material);
     });
     for (const material of sourceMaterials) material.dispose();
     gltf.scene.name = 'ReplayHeadset';

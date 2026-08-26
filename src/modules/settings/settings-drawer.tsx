@@ -11,6 +11,8 @@ import { GraphicsSettings } from './graphics-settings';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+import logoUrl from '@/app/assets/logo.svg?url';
+
 interface SettingsDrawerProps {
   open: boolean;
   settings: ViewerSettings;
@@ -49,8 +51,14 @@ export function SettingsDrawer({
           event.preventDefault();
         }}
       >
-        <SheetHeader className="shrink-0 border-b-0 px-5 pt-5 pb-0">
-          <SheetTitle className="text-lg tracking-tight">{t('title')}</SheetTitle>
+        <SheetHeader className="shrink-0 border-b-0 px-5 pt-5 pr-12 pb-0">
+          <div className="flex items-center gap-4">
+            <SheetTitle className="font-pixel flex shrink-0 items-center gap-2.5 text-lg font-medium tracking-wider">
+              <img className="size-7" src={logoUrl} alt="" aria-hidden="true" />
+              {t('title')}
+            </SheetTitle>
+            <div className="from-border h-px flex-1 bg-gradient-to-r to-transparent" aria-hidden="true" />
+          </div>
         </SheetHeader>
         <Tabs value={tab} className="min-h-0 flex-1 gap-0" onValueChange={setTab}>
           <div className="shrink-0 px-5 pt-4">

@@ -8,7 +8,7 @@ import {
 } from '../noodle';
 import { parseNoodleObject, type NoodleObjectData } from '../noodle-data';
 import { noodleTrackControlsInteractability } from '../noodle-runtime';
-import { gridPosition, LANE_SIZE, type GridPosition, type ObstacleBounds } from './grid';
+import { gridPosition, LANE_SIZE, type ObstacleBounds } from './grid';
 
 type HeckObject = Note | Obstacle | Arc | Chain;
 
@@ -88,7 +88,7 @@ export class HeckPlacement {
     return {
       x: coordinates?.[0] === undefined ? fallback.x : (coordinates[0] + 0.5) * LANE_SIZE,
       y: coordinates?.[1] === undefined ? fallback.y : coordinates[1] * LANE_SIZE,
-    } satisfies GridPosition;
+    };
   }
 
   private objectCoordinates(object: HeckObject) {

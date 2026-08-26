@@ -9,8 +9,8 @@ const maxListItems = 32;
 const maxStringBytes = 512;
 const utf8Encoder = new TextEncoder();
 const latestSupportedMinor = 7;
-const displayModes = ['none', 'format', 'textonly', 'numeric', 'scoreontop', 'directions'] as const;
-const badCutTypes = ['all', 'wrongdirection', 'wrongcolor', 'bomb'] as const;
+const displayModes = ['none', 'format', 'textonly', 'numeric', 'scoreontop', 'directions'];
+const badCutTypes = ['all', 'wrongdirection', 'wrongcolor', 'bomb'];
 
 const colorSchema = z.union([
   z.array(z.number()).check(z.minLength(4)),
@@ -120,23 +120,25 @@ function validateText(value: string, name: string) {
 
 function readDisplayMode(value: string | number | undefined, legacy: boolean) {
   if (value === undefined) return Result.ok(legacy ? 4 : 0);
-  if (typeof value === 'number') {
-    return Number.isInteger(value) && value >= 0 && value < displayModes.length
-      ? Result.ok(value)
+  const numeric = z.number().safeParse(value);
+  if (numeric.success) {
+    return Number.isInteger(numeric.data) && numeric.data >= 0 && numeric.data < displayModes.length
+      ? Result.ok(numeric.data)
       : Result.err(invalid('display mode is not supported'));
   }
-  const index = displayModes.indexOf(value.replaceAll('_', '').toLowerCase() as (typeof displayModes)[number]);
+  const index = displayModes.indexOf(z.string().parse(value).replaceAll('_', '').toLowerCase());
   return index === -1 ? Result.err(invalid('display mode is not supported')) : Result.ok(index);
 }
 
 function readBadCutType(value: string | number | undefined) {
   if (value === undefined) return Result.ok(0);
-  if (typeof value === 'number') {
-    return Number.isInteger(value) && value >= 0 && value < badCutTypes.length
-      ? Result.ok(value)
+  const numeric = z.number().safeParse(value);
+  if (numeric.success) {
+    return Number.isInteger(numeric.data) && numeric.data >= 0 && numeric.data < badCutTypes.length
+      ? Result.ok(numeric.data)
       : Result.err(invalid('bad cut display type is not supported'));
   }
-  const index = badCutTypes.indexOf(value.replaceAll('_', '').toLowerCase() as (typeof badCutTypes)[number]);
+  const index = badCutTypes.indexOf(z.string().parse(value).replaceAll('_', '').toLowerCase());
   return index === -1 ? Result.err(invalid('bad cut display type is not supported')) : Result.ok(index);
 }
 
@@ -297,7 +299,7 @@ function readProfile(profile: Profile) {
     return Result.err(invalid('time dependence decimal precision is out of range'));
   if (!Number.isInteger(timeOffset) || timeOffset < 0 || timeOffset > 38)
     return Result.err(invalid('time dependence decimal offset is out of range'));
-  return Result.ok({
+  const config: HitScoreVisualizerConfig = {
     displayMode: displayMode.value,
     fixedPosition: vectorTuple(profile.fixedPosition),
     targetPositionOffset: vectorTuple(profile.targetPositionOffset),
@@ -318,17 +320,17 @@ function readProfile(profile: Profile) {
     misses: misses.value,
     timePrecision,
     timeOffset,
-  } satisfies HitScoreVisualizerConfig);
+  };
+  return Result.ok(config);
 }
 
 export function parseHitScoreVisualizerProfile(text: string) {
   if (utf8Encoder.encode(text).length > MAX_HSV_PROFILE_BYTES)
     return Result.err(invalid(`profile is larger than ${String(MAX_HSV_PROFILE_BYTES / 1024)} KB`));
-  const json = Result.try({
-    try: (): unknown => JSON.parse(text),
+  const parsed = Result.try({
+    try: () => profileSchema.safeParse(JSON.parse(text)),
     catch: () => invalid('profile is not valid JSON'),
   });
-  if (json.isErr()) return Result.err(json.error);
-  const parsed = profileSchema.safeParse(json.value);
-  return parsed.success ? readProfile(parsed.data) : Result.err(invalid('profile format is not supported'));
+  if (parsed.isErr()) return Result.err(parsed.error);
+  return parsed.value.success ? readProfile(parsed.value.data) : Result.err(invalid('profile format is not supported'));
 }

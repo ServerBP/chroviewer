@@ -1,4 +1,8 @@
-# ChroViewer
+<p align="center">
+  <img src="src/app/assets/logo.svg" alt="ChroViewer logo" width="180">
+</p>
+
+<h1 align="center">ChroViewer</h1>
 
 Initially based on [ChroMapper's](https://github.com/Caeden117/ChroMapper) map previewer, ChroViewer is a browser based Beat Saber map and replay viewer
 

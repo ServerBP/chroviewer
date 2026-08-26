@@ -157,23 +157,26 @@ const lzmaWorkerUrl = URL.createObjectURL(
 );
 const lzma = LZMA(lzmaWorkerUrl);
 
+type DecompressedReplay = { type: 'binary'; value: number[] } | { type: 'text' };
+
 async function decompressReplay(stream: Uint8Array) {
   const expectedSize = outputSize(stream);
-  let result: Uint8Array | string;
+  let result: DecompressedReplay;
   try {
-    result = await new Promise<Uint8Array | string>((resolve, reject) => {
+    result = await new Promise<DecompressedReplay>((resolve, reject) => {
       lzma.decompress(stream, (value, error) => {
         if (error !== undefined && error !== null) reject(error);
         else if (value === null) reject(new Error('empty ScoreSaber replay payload'));
-        else resolve(value);
+        else if (Array.isArray(value)) resolve({ type: 'binary', value });
+        else resolve({ type: 'text' });
       });
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`invalid ScoreSaber replay LZMA stream: ${detail}`, { cause: error });
   }
-  if (typeof result === 'string') throw new Error('invalid ScoreSaber replay binary payload');
-  const bytes = Uint8Array.from(result, (value) => value & 0xff);
+  if (result.type === 'text') throw new Error('invalid ScoreSaber replay binary payload');
+  const bytes = Uint8Array.from(result.value, (value) => value & 0xff);
   if (bytes.byteLength !== expectedSize) throw new Error('truncated ScoreSaber replay LZMA payload');
   return bytes;
 }

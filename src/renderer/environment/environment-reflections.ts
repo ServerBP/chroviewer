@@ -79,22 +79,26 @@ function buildReflectionColliders(
   }
 
   for (const [objectIndex, object] of data.objects.entries()) {
-    for (const [componentIndex, shape] of (object.components?.BoxCollider ?? []).entries()) {
+    for (const [componentIndex, boxCollider] of (object.components?.BoxCollider ?? []).entries()) {
       const reference: ObjectReference = { obj: objectIndex, component: 'BoxCollider', componentIndex };
       const key = referenceKey(reference);
       explicitColliders.add(key);
-      if (!shape.enabled) continue;
-      const geometry = new BoxGeometry(...shape.Size);
-      geometry.translate(...shape.Center);
+      if (!boxCollider.enabled) continue;
+      const geometry = new BoxGeometry(...boxCollider.Size);
+      geometry.translate(...boxCollider.Center);
       ownedGeometries.push(geometry);
       addCollider(geometry, scene.nodes[objectIndex], registeredColliders.get(key) ?? false);
     }
-    for (const [componentIndex, shape] of (object.components?.MeshCollider ?? []).entries()) {
+    for (const [componentIndex, meshCollider] of (object.components?.MeshCollider ?? []).entries()) {
       const reference: ObjectReference = { obj: objectIndex, component: 'MeshCollider', componentIndex };
       const key = referenceKey(reference);
       explicitColliders.add(key);
-      if (!shape.enabled) continue;
-      addCollider(scene.geometries.get(shape.Mesh), scene.nodes[objectIndex], registeredColliders.get(key) ?? false);
+      if (!meshCollider.enabled) continue;
+      addCollider(
+        scene.geometries.get(meshCollider.Mesh),
+        scene.nodes[objectIndex],
+        registeredColliders.get(key) ?? false,
+      );
     }
   }
 
@@ -190,7 +194,7 @@ function buildReflectionLight(
     hitPointMaterials: scene.objectShaderMaterials[reflected.HitPointGameObject.obj] ?? [],
     hitPointCurve: reflected.HitPointDistanceToAlphaCurve,
     showHitPoint: reflected.ShowHitPoint !== 0,
-  } satisfies ReflectionLight;
+  };
 }
 
 function buildReflectionSources(data: EnvironmentData, scene: EnvironmentSceneBuild, lighting: EnvironmentLighting) {

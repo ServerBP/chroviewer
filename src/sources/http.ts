@@ -77,9 +77,9 @@ export async function requestJson<T>(
 ): Promise<SourceResult<T>> {
   return Result.gen(async function* () {
     const response = yield* Result.await(sourceResponse(url, options));
-    const json = yield* Result.await(
+    const parsed = yield* Result.await(
       Result.tryPromise({
-        try: async (): Promise<unknown> => response.json(),
+        try: async () => schema.safeParse(await response.json()),
         catch: (cause) =>
           sourceError(cause, {
             message: `${options.label} returned invalid JSON`,
@@ -88,7 +88,6 @@ export async function requestJson<T>(
           }),
       }),
     );
-    const parsed = schema.safeParse(json);
     return parsed.success
       ? Result.ok(parsed.data)
       : Result.err(

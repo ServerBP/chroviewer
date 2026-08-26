@@ -1,12 +1,14 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-const root = resolve(import.meta.dir, '../..');
-const openApiDirectory = join(root, 'openapi');
-const generatedRoot = join(root, 'src/sources');
+import { runCommand } from './run-command.ts';
+
+const root = resolve(import.meta.dirname, '../..');
+const sourcesRoot = join(root, 'src/sources');
 const generator = join(root, 'node_modules/.bin/swagger-typescript-api');
 
 const jsonValueSchema = z.json();
@@ -108,9 +110,11 @@ function collectReferences(value: JsonValue, references: Set<string>) {
     for (const item of value) collectReferences(item, references);
     return;
   }
-  if (value === null || typeof value !== 'object') return;
-  if (typeof value.$ref === 'string' && value.$ref.startsWith('#/')) references.add(value.$ref);
-  for (const child of Object.values(value)) collectReferences(child, references);
+  const object = jsonObjectSchema.safeParse(value);
+  if (!object.success) return;
+  const reference = z.string().safeParse(object.data.$ref);
+  if (reference.success && reference.data.startsWith('#/')) references.add(reference.data);
+  for (const child of Object.values(object.data)) collectReferences(child, references);
 }
 
 function pointerSegments(reference: string) {
@@ -123,10 +127,9 @@ function pointerSegments(reference: string) {
 function valueAt(document: OpenApiDocument, reference: string) {
   let value: JsonValue = document;
   for (const segment of pointerSegments(reference)) {
-    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-      throw new Error(`OpenAPI document has an invalid reference ${reference}`);
-    }
-    const next: JsonValue | undefined = value[segment];
+    const object = jsonObjectSchema.safeParse(value);
+    if (!object.success) throw new Error(`OpenAPI document has an invalid reference ${reference}`);
+    const next = object.data[segment];
     if (next === undefined) throw new Error(`OpenAPI document has an invalid reference ${reference}`);
     value = next;
   }
@@ -137,8 +140,8 @@ function assignAt(document: Record<string, JsonValue>, reference: string, value:
   const segments = pointerSegments(reference);
   let target = document;
   for (const segment of segments.slice(0, -1)) {
-    const child = target[segment];
-    if (child !== null && typeof child === 'object' && !Array.isArray(child)) target = child;
+    const child = jsonObjectSchema.safeParse(target[segment]);
+    if (child.success) target = child.data;
     else {
       const next: Record<string, JsonValue> = {};
       target[segment] = next;
@@ -165,12 +168,9 @@ function pruneDocument(source: OpenApiDocument, target: ContractTarget) {
   collectReferences(paths, references);
   for (const reference of references) collectReferences(valueAt(document, reference), references);
 
-  const pruned = {
-    ...document,
-    paths,
-    ...(document.components === undefined ? {} : { components: {} }),
-    ...(document.definitions === undefined ? {} : { definitions: {} }),
-  } satisfies OpenApiDocument;
+  const pruned: OpenApiDocument = { ...document, paths };
+  if (document.components !== undefined) pruned.components = {};
+  if (document.definitions !== undefined) pruned.definitions = {};
   for (const reference of references) assignAt(pruned, reference, valueAt(document, reference));
   return pruned;
 }
@@ -193,9 +193,9 @@ async function writeAtomic(path: string, contents: string) {
 
 async function generateContract(target: ContractTarget, specPath: string, outputDirectory: string) {
   await mkdir(outputDirectory, { recursive: true });
-  const process = Bun.spawn(
+  runCommand(
+    generator,
     [
-      generator,
       'generate',
       '--path',
       specPath,
@@ -209,22 +209,20 @@ async function generateContract(target: ContractTarget, specPath: string, output
       '--sort-types',
       '--silent',
     ],
-    { cwd: root, stderr: 'pipe', stdout: 'pipe' },
+    root,
+    `${target.name} contract generation failed`,
   );
-  const [exitCode, stdout, stderr] = await Promise.all([
-    process.exited,
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-  ]);
-  if (exitCode !== 0) throw new Error(`${target.name} contract generation failed\n${stderr || stdout}`);
 }
 
 async function generatedContract(target: ContractTarget, refresh: boolean, outputDirectory: string) {
-  const specPath = join(openApiDirectory, `${target.name}.json`);
+  const specPath = join(sourcesRoot, target.name, 'openapi.json');
   if (refresh) await refreshDocument(target, specPath);
   else documentSchema.parse(JSON.parse(await readFile(specPath, 'utf8')));
   await generateContract(target, specPath, outputDirectory);
-  return join(outputDirectory, 'api-contracts.ts');
+  const output = join(outputDirectory, 'api-contracts.ts');
+  const source = await readFile(output, 'utf8');
+  await writeFile(output, source.replace('/* eslint-disable */\n', ''));
+  return output;
 }
 
 async function main() {
@@ -236,10 +234,10 @@ async function main() {
     for (const target of targets) {
       const temporaryDirectory = join(temporaryRoot, target.name);
       const generated = await generatedContract(target, refresh, temporaryDirectory);
-      const destination = join(generatedRoot, target.name, 'generated/api-contracts.ts');
+      const destination = join(sourcesRoot, target.name, 'generated/api-contracts.ts');
       const next = await readFile(generated, 'utf8');
       if (check) {
-        const current = (await Bun.file(destination).exists()) ? await readFile(destination, 'utf8') : '';
+        const current = existsSync(destination) ? await readFile(destination, 'utf8') : '';
         if (current !== next) drift.push(destination);
       } else {
         await writeAtomic(destination, next);
@@ -247,7 +245,7 @@ async function main() {
     }
     if (drift.length > 0) {
       throw new Error(
-        `generated API contracts are stale:\n${drift.map((path) => `- ${path}`).join('\n')}\nrun bun run api:generate`,
+        `generated API contracts are stale:\n${drift.map((path) => `- ${path}`).join('\n')}\nrun vp run api:generate`,
       );
     }
   } finally {

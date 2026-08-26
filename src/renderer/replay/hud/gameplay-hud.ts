@@ -12,7 +12,7 @@ import {
   formatAccuracy,
   formatScore,
   formatTime,
-  hudShape,
+  hudMesh,
   hudText,
   italicizeHudText,
   rankFor,
@@ -42,7 +42,7 @@ export class ReplayGameplayHud {
   private readonly comboTopLine: Mesh<PlaneGeometry, MeshBasicMaterial>;
   private readonly comboBottomLine: Mesh<PlaneGeometry, MeshBasicMaterial>;
   private readonly textMeshes: Text[];
-  private readonly shapes: Mesh<PlaneGeometry | RingGeometry, MeshBasicMaterial>[];
+  private readonly panelMeshes: Mesh<PlaneGeometry | RingGeometry, MeshBasicMaterial>[];
   private readonly flyingScores = new FlyingScoreHud();
   private timeline: ReplayTimeline | null = null;
   private comboBreakTime: number | null = null;
@@ -89,36 +89,36 @@ export class ReplayGameplayHud {
     );
     this.root.add(this.scoreHud, this.flyingScores.root);
 
-    this.comboTopLine = hudShape(new PlaneGeometry(1, 0.04));
+    this.comboTopLine = hudMesh(new PlaneGeometry(1, 0.04));
     this.comboTopLine.position.set(-3.2, 2.18, -7);
-    this.comboBottomLine = hudShape(new PlaneGeometry(1, 0.04));
+    this.comboBottomLine = hudMesh(new PlaneGeometry(1, 0.04));
     this.comboBottomLine.position.set(-3.2, 1.41, -7);
 
-    const energyBackground = hudShape(new PlaneGeometry(1.94, 0.09), 0.75, 0x000000);
+    const energyBackground = hudMesh(new PlaneGeometry(1.94, 0.09), 0.75, 0x000000);
     energyBackground.position.set(0, -0.64, -7.75);
     energyBackground.renderOrder = 999;
     const energyGeometry = new PlaneGeometry(1.908, 0.06).translate(0.954, 0, 0);
-    this.energyFill = hudShape(energyGeometry);
+    this.energyFill = hudMesh(energyGeometry);
     this.energyFill.position.set(-0.954, -0.64, -7.73);
-    const emptyEnergyIcon = hudShape(new PlaneGeometry(0.12, 0.12), 0.25);
+    const emptyEnergyIcon = hudMesh(new PlaneGeometry(0.12, 0.12), 0.25);
     emptyEnergyIcon.position.set(-1.1, -0.64, -7.73);
     emptyEnergyIcon.rotation.z = Math.PI / 4;
-    const fullEnergyIcon = hudShape(new PlaneGeometry(0.12, 0.12), 0.25);
+    const fullEnergyIcon = hudMesh(new PlaneGeometry(0.12, 0.12), 0.25);
     fullEnergyIcon.position.set(1.06, -0.64, -7.73);
     fullEnergyIcon.rotation.z = Math.PI / 4;
 
-    const multiplierBackground = hudShape(new RingGeometry(0.47, 0.5, 64), 0.25);
+    const multiplierBackground = hudMesh(new RingGeometry(0.47, 0.5, 64), 0.25);
     multiplierBackground.position.set(3.2, 1.7, -7);
     multiplierBackground.renderOrder = 999;
-    this.multiplierProgress = hudShape(new RingGeometry(0.47, 0.5, 64, 1, Math.PI / 2, -Math.PI * 2));
+    this.multiplierProgress = hudMesh(new RingGeometry(0.47, 0.5, 64, 1, Math.PI / 2, -Math.PI * 2));
     this.multiplierProgress.position.set(3.2, 1.7, -6.97);
 
-    const songProgressBackground = hudShape(new PlaneGeometry(1, 0.06), 0.25);
+    const songProgressBackground = hudMesh(new PlaneGeometry(1, 0.06), 0.25);
     songProgressBackground.position.set(3.2, 0.98, -6.99);
     const songProgressGeometry = new PlaneGeometry(1, 0.06).translate(0.5, 0, 0);
-    this.songProgressFill = hudShape(songProgressGeometry);
+    this.songProgressFill = hudMesh(songProgressGeometry);
     this.songProgressFill.position.set(2.7, 0.98, -6.97);
-    const songTimeSeparator = hudShape(new PlaneGeometry(0.02, 0.18), 0.5);
+    const songTimeSeparator = hudMesh(new PlaneGeometry(0.02, 0.18), 0.5);
     songTimeSeparator.position.set(3.2, 0.76, -6.99);
 
     this.scoreHud.add(
@@ -134,7 +134,7 @@ export class ReplayGameplayHud {
       this.songProgressFill,
       songTimeSeparator,
     );
-    this.shapes = [
+    this.panelMeshes = [
       this.comboTopLine,
       this.comboBottomLine,
       energyBackground,
@@ -209,9 +209,9 @@ export class ReplayGameplayHud {
   dispose() {
     this.flyingScores.clear();
     for (const text of this.textMeshes) disposeHudText(text);
-    for (const shape of this.shapes) {
-      shape.geometry.dispose();
-      shape.material.dispose();
+    for (const mesh of this.panelMeshes) {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
     }
   }
 

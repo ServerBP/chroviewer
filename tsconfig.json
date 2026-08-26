@@ -5,10 +5,11 @@
     "module": "Preserve",
     "moduleDetection": "force",
     "jsx": "react-jsx",
-    "types": ["bun", "vite/client"],
+    "types": ["node", "vite/client"],
     "paths": { "@/*": ["./src/*"] },
 
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true,
     "incremental": true,
     "verbatimModuleSyntax": true,
@@ -22,5 +23,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["src", "test", "scripts", "vite.config.ts"]
+  "include": ["src", "scripts/codegen", "vite.config.ts"]
 }

@@ -29,6 +29,12 @@ export function createMirrorMaterial(
   },
 ) {
   const elapsed = { value: 0 };
+  const defines = {};
+  if (dirt !== undefined) Object.assign(defines, { DIRT: 1 });
+  if (normal !== undefined) Object.assign(defines, { NORMAL_TEXTURE: 1 });
+  if (normal?.detailIntensity !== undefined && normal.detailIntensity !== 0) {
+    Object.assign(defines, { DETAIL_NORMAL_MAP: 1 });
+  }
   const material = new ShaderMaterial({
     vertexShader: OBJECT_VERT,
     fragmentShader: MIRROR_FRAG,
@@ -51,11 +57,7 @@ export function createMirrorMaterial(
       _BumpIntensity: { value: normal?.intensity ?? 0 },
       _TimeSeconds: elapsed,
     },
-    defines: {
-      ...(dirt === undefined ? {} : { DIRT: 1 }),
-      ...(normal === undefined ? {} : { NORMAL_TEXTURE: 1 }),
-      ...(normal?.detailIntensity === undefined || normal.detailIntensity === 0 ? {} : { DETAIL_NORMAL_MAP: 1 }),
-    },
+    defines,
   });
   if (normal !== undefined) {
     material.onBeforeRender = () => {

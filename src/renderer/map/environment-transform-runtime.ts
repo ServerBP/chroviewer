@@ -31,6 +31,7 @@ import type {
   EnvironmentGlsTransformEntry,
   LoadedEnvironment,
 } from '../environment/environment-runtime';
+import { menuLightshowRandom } from './menu-lightshow';
 
 interface GlsRotationRuntime {
   entry: EnvironmentGlsTransformEntry;
@@ -76,6 +77,7 @@ export class EnvironmentTransformRuntime {
   private glsFxRuntime: GlsFxRuntime[] = [];
   private ringRuntime: RingRuntime[] = [];
   private rotationRuntime: RotationRuntime[] = [];
+  private menuLightshow: { environment: LoadedEnvironment; seed: number } | null = null;
 
   rebuild(
     environment: LoadedEnvironment,
@@ -83,6 +85,7 @@ export class EnvironmentTransformRuntime {
     jsonTimeToSongBpmTime: (jsonTime: number) => number,
     eventsForType: (eventType: number) => MapRenderData['lightEvents'],
   ) {
+    this.menuLightshow = null;
     this.ringRuntime = environment.ringGroups.map((group) => {
       const runtime: RingRuntime = { group };
       if (group.rotationConfig !== undefined && group.rotationEventType !== undefined) {
@@ -187,7 +190,13 @@ export class EnvironmentTransformRuntime {
     }
   }
 
+  rebuildMenuLightshow(environment: LoadedEnvironment, seed: number) {
+    this.clear();
+    this.menuLightshow = { environment, seed };
+  }
+
   clear() {
+    this.menuLightshow = null;
     this.glsRotationRuntime = [];
     this.glsTranslationRuntime = [];
     this.glsFxRuntime = [];
@@ -196,6 +205,10 @@ export class EnvironmentTransformRuntime {
   }
 
   update(beat: number, full: boolean) {
+    if (this.menuLightshow !== null) {
+      this.updateMenuLightshow(beat, this.menuLightshow.environment, this.menuLightshow.seed);
+      return;
+    }
     const changed = this.changedMatrices;
     changed.clear();
     for (const runtime of this.rotationRuntime) {
@@ -274,6 +287,30 @@ export class EnvironmentTransformRuntime {
       }
       const value = sampleGlsFloat(runtime.tween, beat);
       for (const target of runtime.targets) target.apply(value);
+    }
+    for (const target of changed) target.updateMatrix();
+  }
+
+  private updateMenuLightshow(beat: number, environment: LoadedEnvironment, seed: number) {
+    const changed = this.changedMatrices;
+    changed.clear();
+    for (const rotation of environment.rotations) {
+      const phase = menuLightshowRandom(seed, rotation.seed, 0) * 360;
+      const direction = rotation.pair?.mirrored === true || rotation.speedMultiplier < 0 ? -1 : 1;
+      const speed = Math.min(Math.max(Math.abs(rotation.speedMultiplier), 0.75), 2) * 3;
+      this.rotationAxis.fromArray(rotation.axis).normalize();
+      this.rotationQuaternion.setFromAxisAngle(this.rotationAxis, (phase + beat * speed * direction) * degToRad);
+      rotation.target.quaternion.fromArray(rotation.startRotation).multiply(this.rotationQuaternion);
+      changed.add(rotation.target);
+    }
+    for (const group of environment.ringGroups) {
+      const phase = menuLightshowRandom(seed, group.seed, 1) * Math.PI * 2;
+      const centre = (menuLightshowRandom(seed, group.seed, 2) - 0.5) * 24;
+      group.rings.forEach((ring, index) => {
+        const angle = centre + Math.sin(beat * 0.12 + index * 0.36 + phase) * 16;
+        ring.target.quaternion.setFromAxisAngle(zAxis, angle * degToRad);
+        changed.add(ring.target);
+      });
     }
     for (const target of changed) target.updateMatrix();
   }

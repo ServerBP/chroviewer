@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { DEFAULT_COLORS, type LegacyColorOverrides, type Rgb } from '../colors';
 import {
   beatSaberBooleanSchema as booleanSchema,
+  type BeatSaberJsonValue,
+  beatSaberJsonTextSchema,
   beatSaberIntegerSchema as integerSchema,
   beatSaberNumberSchema as numberSchema,
   beatSaberStringSchema as stringSchema,
@@ -377,7 +379,7 @@ function environmentRemoval(data: V2CustomData | V4CustomData | undefined) {
   return (data?._environmentRemoval ?? data?.environmentRemoval ?? []).filter(Boolean);
 }
 
-function parseV2Info(input: unknown): MapInfo {
+function parseV2Info(input: BeatSaberJsonValue): MapInfo {
   const root = v2InfoSchema.parse(input);
   const difficultySets = root._difficultyBeatmapSets.map((set): InfoDifficultySet => {
     const characteristic = set._beatmapCharacteristicName;
@@ -408,7 +410,7 @@ function parseV2Info(input: unknown): MapInfo {
     };
   });
 
-  return {
+  const info: MapInfo = {
     version: root._version,
     songName: root._songName,
     songSubName: root._songSubName,
@@ -439,16 +441,15 @@ function parseV2Info(input: unknown): MapInfo {
       environmentWhiteBoost: color.environmentColorWBoost,
     })),
     difficultySets,
-    ...(root._customData?._editors?._lastEditedBy === undefined
-      ? {}
-      : { lastEditedBy: root._customData._editors._lastEditedBy }),
-    ...(root._customData?._editors?.ChroMapper?.version === undefined
-      ? {}
-      : { chroMapperVersion: root._customData._editors.ChroMapper.version }),
   };
+  const lastEditedBy = root._customData?._editors?._lastEditedBy;
+  if (lastEditedBy !== undefined) info.lastEditedBy = lastEditedBy;
+  const chroMapperVersion = root._customData?._editors?.ChroMapper?.version;
+  if (chroMapperVersion !== undefined) info.chroMapperVersion = chroMapperVersion;
+  return info;
 }
 
-function parseV4Info(input: unknown): MapInfo {
+function parseV4Info(input: BeatSaberJsonValue): MapInfo {
   const root = v4InfoSchema.parse(input);
   const setsByCharacteristic = new Map<string, InfoDifficulty[]>();
   for (const entry of root.difficultyBeatmaps) {
@@ -515,7 +516,7 @@ function parseV4Info(input: unknown): MapInfo {
 }
 
 export function parseInfo(text: string): MapInfo {
-  const input: unknown = JSON.parse(text);
+  const input = beatSaberJsonTextSchema.parse(text);
   const version = infoVersionSchema.parse(input);
   return (version.version ?? version._version ?? '').startsWith('4') ? parseV4Info(input) : parseV2Info(input);
 }

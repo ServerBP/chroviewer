@@ -1,11 +1,11 @@
 import type { MouseEventHandler } from 'react';
 
-import { CircleHelp, Settings, Share2 } from 'lucide-react';
+import { Settings, Share2 } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 
 import type { ShareSettingsCategory } from '../../../core/share-link';
 import { SharePanel } from '../../sharing/share-panel';
-import { ShortcutsPanel } from './shortcuts-panel';
+import { AboutDialog } from './about-dialog';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -13,6 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 
 interface ViewerActionsProps {
+  aboutOpen: boolean;
+  aboutTriggerVisible: boolean;
   chromeVisible: boolean;
   hasMap: boolean;
   shareEnabled?: boolean;
@@ -21,16 +23,17 @@ interface ViewerActionsProps {
   shareIncludeTimecode: boolean;
   shareOpen: boolean;
   shareUrl: string | null;
-  shortcutsOpen: boolean;
+  onAboutOpenChange: (open: boolean) => void;
   onCopyShare: (url: string) => Promise<boolean>;
   onSettingsClick: MouseEventHandler<HTMLButtonElement>;
   onShareCategoriesChange: (categories: ShareSettingsCategory[]) => void;
   onShareIncludeTimecodeChange: (include: boolean) => void;
   onShareOpenChange: (open: boolean) => void;
-  onShortcutsOpenChange: (open: boolean) => void;
 }
 
 export function ViewerActions({
+  aboutOpen,
+  aboutTriggerVisible,
   chromeVisible,
   hasMap,
   shareEnabled = true,
@@ -39,13 +42,12 @@ export function ViewerActions({
   shareIncludeTimecode,
   shareOpen,
   shareUrl,
-  shortcutsOpen,
+  onAboutOpenChange,
   onCopyShare,
   onSettingsClick,
   onShareCategoriesChange,
   onShareIncludeTimecodeChange,
   onShareOpenChange,
-  onShortcutsOpenChange,
 }: ViewerActionsProps) {
   const t = useTranslations('viewer');
   const tc = useTranslations('common');
@@ -94,22 +96,7 @@ export function ViewerActions({
       >
         <Settings />
       </Button>
-      <Popover open={shortcutsOpen} onOpenChange={onShortcutsOpenChange}>
-        <PopoverTrigger asChild>
-          <Button
-            className="max-sm:hidden"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={tc('keyboardShortcuts')}
-            title={tc('keyboardShortcuts')}
-          >
-            <CircleHelp />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent>
-          <ShortcutsPanel />
-        </PopoverContent>
-      </Popover>
+      <AboutDialog open={aboutOpen} showTrigger={aboutTriggerVisible} onOpenChange={onAboutOpenChange} />
     </nav>
   );
 }

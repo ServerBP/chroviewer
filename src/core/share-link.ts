@@ -47,7 +47,7 @@ export function settingsForShareCategories(
       saberCoreThickness: settings.saberCoreThickness,
       saberCoreInset: settings.saberCoreInset,
       showSaberTrails: settings.showSaberTrails,
-      replayTrailShape: settings.replayTrailShape,
+      replayTrailStyle: settings.replayTrailStyle,
       replayTrailLength: settings.replayTrailLength,
       replayTrailThinness: settings.replayTrailThinness,
       replayTrailSamples: settings.replayTrailSamples,
@@ -77,6 +77,9 @@ export function settingsForShareCategories(
   }
   if (categories.includes('camera')) {
     Object.assign(shared, {
+      showHeadset: settings.showHeadset,
+      orthoCameraEnabled: settings.orthoCameraEnabled,
+      orthoCameraView: settings.orthoCameraView,
       replayCamera: settings.replayCamera,
       replayCameraSmoothing: settings.replayCameraSmoothing,
       replayCameraSmoothingSpeed: settings.replayCameraSmoothingSpeed,

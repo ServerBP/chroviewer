@@ -67,31 +67,31 @@ type PlayerContract = Pick<PlayerControllerGetPlayerData, 'avatar' | 'country' |
   stats: Pick<PlayerControllerGetPlayerData['stats'], 'countryRank' | 'rank'>;
 };
 
-const leaderboardSchema = z.object({
+const leaderboardSchema: z.ZodType<LeaderboardContract> = z.object({
   difficulty: z.object({ rawDifficulty: z.string() }),
   map: z.object({
     hash: z.hash('sha1'),
     songName: z.string(),
   }),
-}) satisfies z.ZodType<LeaderboardContract>;
+});
 
-const playerScoresSchema = z.object({
+const playerScoresSchema: z.ZodType<PlayerScoresContract> = z.object({
   data: z.array(z.object({ leaderboard: leaderboardSchema })),
-}) satisfies z.ZodType<PlayerScoresContract>;
+});
 
-const leaderboardDifficultiesSchema = z.array(
+const leaderboardDifficultiesSchema: z.ZodType<LeaderboardDifficultyContract[]> = z.array(
   z.object({
     id: z.int().nonnegative(),
     difficulty: z.int(),
     gameMode: z.string(),
   }),
-) satisfies z.ZodType<LeaderboardDifficultyContract[]>;
+);
 
 const leaderboardScoresSchema = z.object({
   data: z.array(z.object({ id: z.int().nonnegative(), hasReplay: z.boolean() })),
 });
 
-const scoreSchema = z.object({
+const scoreSchema: z.ZodType<ScoreContract> = z.object({
   leaderboard: z.object({
     difficulty: z.object({
       difficulty: z.int(),
@@ -109,9 +109,9 @@ const scoreSchema = z.object({
       name: z.string(),
     }),
   }),
-}) satisfies z.ZodType<ScoreContract>;
+});
 
-const playerSchema = z.object({
+const playerSchema: z.ZodType<PlayerContract> = z.object({
   avatar: z.string(),
   country: z.string(),
   id: z.string().min(1),
@@ -120,7 +120,7 @@ const playerSchema = z.object({
     countryRank: z.int().nonnegative(),
     rank: z.int().nonnegative(),
   }),
-}) satisfies z.ZodType<PlayerContract>;
+});
 
 function mapLookup(leaderboard: LeaderboardContract): MapLookup {
   const label = leaderboard.difficulty.rawDifficulty.replace(/^_/, '').replaceAll('_', ' ');

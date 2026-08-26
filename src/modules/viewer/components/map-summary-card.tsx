@@ -17,14 +17,16 @@ export interface DifficultyOption {
   difficulty: string;
 }
 
-const difficultyAccent: Record<string, string> = {
-  Easy: 'before:bg-difficulty-easy',
-  Normal: 'before:bg-difficulty-normal',
-  Hard: 'before:bg-difficulty-hard',
-  Expert: 'before:bg-difficulty-expert',
-  ExpertPlus: 'before:bg-difficulty-expert-plus',
-  'Expert+': 'before:bg-difficulty-expert-plus',
-};
+const difficultyAccent = new Map(
+  Object.entries({
+    Easy: 'before:bg-difficulty-easy',
+    Normal: 'before:bg-difficulty-normal',
+    Hard: 'before:bg-difficulty-hard',
+    Expert: 'before:bg-difficulty-expert',
+    ExpertPlus: 'before:bg-difficulty-expert-plus',
+    'Expert+': 'before:bg-difficulty-expert-plus',
+  }),
+);
 
 interface MapSummaryCardProps {
   difficultyReadOnly?: boolean;
@@ -270,7 +272,7 @@ export function MapSummaryCard({
               <SelectTrigger
                 className={cn(
                   'relative h-8 bg-background/70 pl-5 text-xs before:absolute before:left-2 before:h-4 before:w-0.5 before:bg-border max-sm:h-7',
-                  difficultyAccent[selectedDifficulty],
+                  difficultyAccent.get(selectedDifficulty),
                 )}
                 aria-label={t('difficulty')}
               >
@@ -286,7 +288,7 @@ export function MapSummaryCard({
                     <SelectItem
                       className={cn(
                         'my-0.5 pl-5 before:absolute before:left-2 before:h-4 before:w-0.5 before:bg-border',
-                        difficultyAccent[option.difficulty],
+                        difficultyAccent.get(option.difficulty),
                       )}
                       key={option.key}
                       value={option.key}

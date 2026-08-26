@@ -187,8 +187,8 @@ function writeReplaySaberTrail(trail: ReplaySaberTrail) {
   const denominator = Math.max(trail.samples.length - 1, 1);
   trail.samples.forEach((sample, index) => {
     const span = index / denominator;
-    const shapeCollapse = trail.settings.replayTrailShape === 'flag' ? (1 - span) * 0.5 : 0;
-    const collapse = shapeCollapse + (0.5 - shapeCollapse) * trail.settings.replayTrailThinness;
+    const styleCollapse = trail.settings.replayTrailStyle === 'flag' ? (1 - span) * 0.5 : 0;
+    const collapse = styleCollapse + (0.5 - styleCollapse) * trail.settings.replayTrailThinness;
     position.setXYZ(
       index * 2,
       sample.base.x + (sample.tip.x - sample.base.x) * collapse,

@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import {
   numberPoints,
   rotationPoints,
@@ -12,15 +10,18 @@ import {
   type Vector4Point,
   type VectorPoint,
 } from './animation/point-definition';
-import type { BeatmapCustomData } from './beatmap/types';
+import type { BeatmapCustomData, BeatmapCustomDataValue } from './beatmap/types';
 import {
+  beatSaberBoolean,
   beatSaberBooleanSchema,
   beatSaberJsonObjectSchema as dataSchema,
+  beatSaberNumber,
   beatSaberNumberSchema,
-  beatSaberStringSchema,
+  beatSaberTrack,
   beatSaberTrackSchema,
   beatSaberVector3Schema,
 } from './beatmap/value-schema';
+import type { ParsedBeatmapCustomData } from './chroma-environment';
 
 type Animated<T> = T[] | null;
 type PartialVector3 = readonly [number | undefined, number | undefined, number | undefined];
@@ -82,7 +83,7 @@ export interface NoodlePlayerEvent {
 
 export interface NoodleBeatmapData {
   version: 2 | 3;
-  pointDefinitions: Record<string, unknown[]>;
+  pointDefinitions: Record<string, BeatmapCustomDataValue[]>;
   trackEvents: NoodleTrackEvent[];
   parentEvents: NoodleParentEvent[];
   playerEvents: NoodlePlayerEvent[];
@@ -113,51 +114,28 @@ export const EMPTY_NOODLE_BEATMAP: NoodleBeatmapData = {
 };
 
 const optionalVectorSchema = beatSaberVector3Schema.optional().catch(undefined);
-const v2PointDefinitionSchema = z.object({
-  _name: beatSaberStringSchema,
-  _points: z.array(z.unknown()),
-});
-// missing fields default like the game's SimpleJSON reads: time 0, type "", data {}
-const v2EventSchema = z.object({
-  _time: beatSaberNumberSchema.optional(),
-  _type: beatSaberStringSchema.optional(),
-  _data: dataSchema.optional().catch(undefined),
-});
-const v3EventSchema = z.object({
-  b: beatSaberNumberSchema.optional(),
-  t: beatSaberStringSchema.optional(),
-  d: dataSchema.optional().catch(undefined),
-});
-const v2BeatmapSchema = z.object({
-  _pointDefinitions: z.array(v2PointDefinitionSchema).optional().catch(undefined),
-  _customEvents: z.array(v2EventSchema.optional().catch(undefined)).optional().catch(undefined),
-  _localSpaceSaberTrail: z.unknown().optional(),
-});
-const v3BeatmapSchema = z.object({
-  pointDefinitions: z.record(z.string(), z.array(z.unknown())).optional().catch(undefined),
-  customEvents: z.array(v3EventSchema.optional().catch(undefined)).optional().catch(undefined),
-  _localSpaceSaberTrail: z.unknown().optional(),
-});
-
-function partialVector(value: unknown): PartialVector3 | undefined {
+function partialVector(value: BeatmapCustomDataValue | undefined): PartialVector3 | undefined {
   if (!Array.isArray(value)) return undefined;
-  const result = [
+  const result: PartialVector3 = [
     value[0] == null ? undefined : beatSaberNumberSchema.parse(value[0]),
     value[1] == null ? undefined : beatSaberNumberSchema.parse(value[1]),
     value[2] == null ? undefined : beatSaberNumberSchema.parse(value[2]),
-  ] as const;
+  ];
   return result.every((entry) => entry === undefined) ? undefined : result;
 }
 
-function rotation(value: unknown) {
+function rotation(value: BeatmapCustomDataValue | undefined) {
   return rotationPoints(value)[0]?.value;
 }
 
 function animated<T>(
-  data: Readonly<Record<string, unknown>>,
+  data: BeatmapCustomData,
   name: string,
-  definitions: Readonly<Record<string, unknown[]>>,
-  parse: (value: unknown, definitions: Readonly<Record<string, unknown[]>>) => T[],
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
+  parse: (
+    value: BeatmapCustomDataValue | undefined,
+    definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
+  ) => T[],
 ): Animated<T> | undefined {
   if (!(name in data)) return undefined;
   if (data[name] === null) return null;
@@ -166,8 +144,8 @@ function animated<T>(
 }
 
 function animationProperties(
-  data: Readonly<Record<string, unknown>>,
-  definitions: Readonly<Record<string, unknown[]>>,
+  data: BeatmapCustomData,
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
   v2: boolean,
   objectAnimation = false,
 ) {
@@ -214,7 +192,7 @@ function animationProperties(
   return animation;
 }
 
-function parentTransform(data: Readonly<Record<string, unknown>>, v2: boolean): NoodleParentTransform {
+function parentTransform(data: BeatmapCustomData, v2: boolean): NoodleParentTransform {
   if (v2) {
     return {
       position: optionalVectorSchema.parse(data._position),
@@ -233,8 +211,8 @@ function parentTransform(data: Readonly<Record<string, unknown>>, v2: boolean): 
 }
 
 function parseEvents(
-  events: readonly { time: number; type: string; data: Readonly<Record<string, unknown>> }[],
-  definitions: Readonly<Record<string, unknown[]>>,
+  events: readonly { time: number; type: string; data: BeatmapCustomData }[],
+  definitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
   v2: boolean,
 ) {
   const trackEvents: NoodleTrackEvent[] = [];
@@ -243,7 +221,7 @@ function parseEvents(
   for (const [order, event] of events.entries()) {
     const data = event.data;
     if (event.type === 'AnimateTrack' || event.type === 'AssignPathAnimation') {
-      const eventTracks = beatSaberTrackSchema.parse(data[v2 ? '_track' : 'track']);
+      const eventTracks = beatSaberTrack(data[v2 ? '_track' : 'track']);
       if (eventTracks.length === 0) continue;
       const eventEasing = data[v2 ? '_easing' : 'easing'];
       trackEvents.push({
@@ -252,24 +230,24 @@ function parseEvents(
         order,
         type: event.type,
         tracks: eventTracks,
-        duration: beatSaberNumberSchema.parse(data[v2 ? '_duration' : 'duration']),
+        duration: beatSaberNumber(data[v2 ? '_duration' : 'duration']),
         durationSongBpmTime: 0,
-        easing: typeof eventEasing === 'string' ? eventEasing : undefined,
-        repeat: v2 ? 0 : Math.max(Math.trunc(beatSaberNumberSchema.parse(data.repeat)), 0),
+        easing: eventEasing?.constructor === String ? String(eventEasing) : undefined,
+        repeat: v2 ? 0 : Math.max(Math.trunc(beatSaberNumber(data.repeat)), 0),
         animation: animationProperties(data, definitions, v2),
       });
       continue;
     }
     if (event.type === 'AssignTrackParent') {
       const parentTrack = data[v2 ? '_parentTrack' : 'parentTrack'];
-      if (typeof parentTrack !== 'string') continue;
+      if (parentTrack?.constructor !== String) continue;
       parentEvents.push({
         jsonTime: event.time,
         songBpmTime: 0,
         order,
-        parentTrack,
-        childrenTracks: beatSaberTrackSchema.parse(data[v2 ? '_childrenTracks' : 'childrenTracks']),
-        worldPositionStays: beatSaberBooleanSchema.parse(data[v2 ? '_worldPositionStays' : 'worldPositionStays']),
+        parentTrack: String(parentTrack),
+        childrenTracks: beatSaberTrack(data[v2 ? '_childrenTracks' : 'childrenTracks']),
+        worldPositionStays: beatSaberBoolean(data[v2 ? '_worldPositionStays' : 'worldPositionStays']),
         transform: parentTransform(data, v2),
       });
       continue;
@@ -277,13 +255,13 @@ function parseEvents(
     if (event.type === 'AssignPlayerToTrack') {
       const track = data[v2 ? '_track' : 'track'];
       const target = data[v2 ? '_target' : 'target'];
-      if (typeof track !== 'string') continue;
+      if (track?.constructor !== String) continue;
       playerEvents.push({
         jsonTime: event.time,
         songBpmTime: 0,
         order,
-        track,
-        target: typeof target === 'string' ? target : 'Root',
+        track: String(track),
+        target: target?.constructor === String ? String(target) : 'Root',
       });
     }
   }
@@ -295,42 +273,20 @@ function parseEvents(
   return { trackEvents, parentEvents, playerEvents };
 }
 
-export function parseNoodleBeatmap(input: unknown, majorVersion: number): NoodleBeatmapData {
+export function parseNoodleBeatmap(source: ParsedBeatmapCustomData, majorVersion: number): NoodleBeatmapData {
   const version = majorVersion === 2 ? 2 : 3;
-  if (version === 2) {
-    const parsed = v2BeatmapSchema.safeParse(input);
-    if (!parsed.success) return { ...EMPTY_NOODLE_BEATMAP, version };
-    const pointDefinitions = Object.fromEntries(
-      (parsed.data._pointDefinitions ?? []).map((definition) => [definition._name, definition._points]),
-    );
-    const events = (parsed.data._customEvents ?? []).flatMap((event) =>
-      event === undefined ? [] : [{ time: event._time ?? 0, type: event._type ?? '', data: event._data ?? {} }],
-    );
-    return {
-      version,
-      pointDefinitions,
-      ...parseEvents(events, pointDefinitions, true),
-      localSpaceSaberTrail: beatSaberBooleanSchema.parse(parsed.data._localSpaceSaberTrail),
-    };
-  }
-  const parsed = v3BeatmapSchema.safeParse(input);
-  if (!parsed.success) return { ...EMPTY_NOODLE_BEATMAP, version };
-  const pointDefinitions = parsed.data.pointDefinitions ?? {};
-  const events = (parsed.data.customEvents ?? []).flatMap((event) =>
-    event === undefined ? [] : [{ time: event.b ?? 0, type: event.t ?? '', data: event.d ?? {} }],
-  );
   return {
     version,
-    pointDefinitions,
-    ...parseEvents(events, pointDefinitions, false),
-    localSpaceSaberTrail: beatSaberBooleanSchema.parse(parsed.data._localSpaceSaberTrail),
+    pointDefinitions: source.pointDefinitions,
+    ...parseEvents(source.events, source.pointDefinitions, version === 2),
+    localSpaceSaberTrail: beatSaberBooleanSchema.parse(source.localSpaceSaberTrail),
   };
 }
 
 export function parseNoodleObject(
   customData: BeatmapCustomData | undefined,
   majorVersion: number,
-  pointDefinitions: Readonly<Record<string, unknown[]>>,
+  pointDefinitions: Readonly<Record<string, BeatmapCustomDataValue[]>>,
 ): NoodleObjectData | undefined {
   if (customData === undefined) return undefined;
   const v2 = majorVersion === 2;
@@ -353,7 +309,7 @@ export function parseNoodleObject(
     localRotation,
     scale: objectScale,
     obstacleSize,
-    link: typeof link === 'string' ? link : undefined,
+    link: link?.constructor === String ? String(link) : undefined,
     uninteractable,
     disableGravity: beatSaberBooleanSchema.parse(customData[v2 ? '_disableNoteGravity' : 'disableNoteGravity']),
     disableLook: beatSaberBooleanSchema.parse(customData[v2 ? '_disableNoteLook' : 'disableNoteLook']),

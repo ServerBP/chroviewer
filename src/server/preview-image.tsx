@@ -80,7 +80,11 @@ async function readPublicFile(path: string) {
   return null;
 }
 
-async function loadFont(origin: string, file: string, weight: 400 | 600 | 900) {
+async function loadFont(
+  origin: string,
+  file: string,
+  weight: 400 | 600 | 900,
+): Promise<SatoriOptions['fonts'][number]> {
   let data: Buffer | ArrayBuffer | null = await readPublicFile(join('fonts', file));
   if (data === null) {
     const response = await fetch(new URL(`/fonts/${file}`, origin), {
@@ -89,7 +93,7 @@ async function loadFont(origin: string, file: string, weight: 400 | 600 | 900) {
     if (!response.ok) throw new Error(`font ${file} failed (${String(response.status)})`);
     data = await response.arrayBuffer();
   }
-  return { name: 'Geist', data, weight, style: 'normal' as const };
+  return { name: 'Geist', data, weight, style: 'normal' };
 }
 
 function loadFonts(origin: string) {
@@ -108,25 +112,27 @@ function loadFonts(origin: string) {
 
 // geist only covers latin; satori hands us any segment it can't shape and we
 // pull a text-subsetted noto face from google fonts (or twemoji for emoji)
-const fallbackFamilies: Record<string, string | string[]> = {
-  'ja-JP': 'Noto Sans JP',
-  'ko-KR': 'Noto Sans KR',
-  'zh-CN': 'Noto Sans SC',
-  'zh-TW': 'Noto Sans TC',
-  'zh-HK': 'Noto Sans HK',
-  'th-TH': 'Noto Sans Thai',
-  'bn-IN': 'Noto Sans Bengali',
-  'ar-AR': 'Noto Sans Arabic',
-  'ta-IN': 'Noto Sans Tamil',
-  'ml-IN': 'Noto Sans Malayalam',
-  'he-IL': 'Noto Sans Hebrew',
-  'te-IN': 'Noto Sans Telugu',
-  devanagari: 'Noto Sans Devanagari',
-  kannada: 'Noto Sans Kannada',
-  symbol: ['Noto Sans Symbols', 'Noto Sans Symbols 2', 'Noto Sans Math', 'Noto Sans'],
-  math: 'Noto Sans Math',
-  unknown: 'Noto Sans',
-};
+const fallbackFamilies = new Map<string, string | string[]>(
+  Object.entries({
+    'ja-JP': 'Noto Sans JP',
+    'ko-KR': 'Noto Sans KR',
+    'zh-CN': 'Noto Sans SC',
+    'zh-TW': 'Noto Sans TC',
+    'zh-HK': 'Noto Sans HK',
+    'th-TH': 'Noto Sans Thai',
+    'bn-IN': 'Noto Sans Bengali',
+    'ar-AR': 'Noto Sans Arabic',
+    'ta-IN': 'Noto Sans Tamil',
+    'ml-IN': 'Noto Sans Malayalam',
+    'he-IL': 'Noto Sans Hebrew',
+    'te-IN': 'Noto Sans Telugu',
+    devanagari: 'Noto Sans Devanagari',
+    kannada: 'Noto Sans Kannada',
+    symbol: ['Noto Sans Symbols', 'Noto Sans Symbols 2', 'Noto Sans Math', 'Noto Sans'],
+    math: 'Noto Sans Math',
+    unknown: 'Noto Sans',
+  }),
+);
 
 const fallbackFontCache = new Map<string, CacheEntry<ArrayBuffer | null>>();
 const emojiCache = new Map<string, CacheEntry<string | null>>();
@@ -179,15 +185,20 @@ async function loadFallbackAsset(code: string, segment: string): Promise<string 
     cacheSet(emojiCache, file, dataUrl, fallbackCacheLimit, fallbackTtlMs);
     return dataUrl ?? '';
   }
-  const families = code.split('|').flatMap((part) => fallbackFamilies[part] ?? []);
+  const families = code.split('|').flatMap((part) => fallbackFamilies.get(part) ?? []);
   if (families.length === 0) return [];
   const loaded = await Promise.all(
     families.map(async (family) => {
       const data = await fetchFallbackFont(family, segment);
       // unique name per subset: satori dedupes by name and would drop later segments
-      return data === null
-        ? null
-        : { name: `${family} ${segment}`, data, weight: 400 as const, style: 'normal' as const };
+      if (data === null) return null;
+      const font: SatoriOptions['fonts'][number] = {
+        name: `${family} ${segment}`,
+        data,
+        weight: 400,
+        style: 'normal',
+      };
+      return font;
     }),
   );
   return loaded.filter((font) => font !== null);
@@ -249,13 +260,13 @@ function blurredBackground(coverUrl: string, coverDataUrl: string) {
   return dataUrl;
 }
 
-const difficultyLabels: Record<number, { label: string; color: string }> = {
-  1: { label: 'Easy', color: '#3cb371' },
-  3: { label: 'Normal', color: '#59b0f4' },
-  5: { label: 'Hard', color: '#ff6347' },
-  7: { label: 'Expert', color: '#bf2a42' },
-  9: { label: 'Expert+', color: '#8f48db' },
-};
+const difficultyLabels = new Map([
+  [1, { label: 'Easy', color: '#3cb371' }],
+  [3, { label: 'Normal', color: '#59b0f4' }],
+  [5, { label: 'Hard', color: '#ff6347' }],
+  [7, { label: 'Expert', color: '#bf2a42' }],
+  [9, { label: 'Expert+', color: '#8f48db' }],
+]);
 
 const integerFormat = new Intl.NumberFormat('en-US');
 const ppFormat = new Intl.NumberFormat('en-US', {
@@ -334,7 +345,7 @@ function ReplayPreviewCard({
 }) {
   const { score, leaderboard } = data;
   const map = leaderboard.map;
-  const difficulty = difficultyLabels[leaderboard.difficulty.difficulty] ?? {
+  const difficulty = difficultyLabels.get(leaderboard.difficulty.difficulty) ?? {
     label: 'Unknown',
     color: '#5a6172',
   };

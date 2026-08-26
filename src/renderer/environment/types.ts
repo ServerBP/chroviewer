@@ -43,6 +43,12 @@ export interface EnvironmentMeshData {
   groups?: { start: number; count: number; materialIndex: number }[];
 }
 
+export const particleEmitterTypeProperty = 'shapeType';
+export const particleEmitterRadiusProperty = 'shapeRadius';
+export const particleEmitterPositionProperty = 'shapePosition';
+export const particleEmitterRotationProperty = 'shapeRotation';
+export const particleEmitterScaleProperty = 'shapeScale';
+
 export interface EnvironmentParticleSystemData {
   name: string;
   path: string;
@@ -56,11 +62,11 @@ export interface EnvironmentParticleSystemData {
   speed: [number, number];
   size: [number, number];
   rotationRange: [number, number];
-  shapeType: number;
-  shapeRadius: number;
-  shapePosition: [number, number, number];
-  shapeRotation: [number, number, number];
-  shapeScale: [number, number, number];
+  [particleEmitterTypeProperty]: number;
+  [particleEmitterRadiusProperty]: number;
+  [particleEmitterPositionProperty]: [number, number, number];
+  [particleEmitterRotationProperty]: [number, number, number];
+  [particleEmitterScaleProperty]: [number, number, number];
   randomDirection: number;
   alphaKeys: [number, number][];
   texture: string;

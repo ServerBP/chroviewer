@@ -52,7 +52,7 @@ function noteActions(frames: LegacyScoreSaberFrame[], changes: ComboChange[]) {
   const actions: NoteAction[] = [];
   const combo = { multiplier: 0, progress: 0 };
 
-  for (let index = 0; index < changes.length; ) {
+  for (let index = 0; index < changes.length;) {
     const change = changes[index];
     if (change === undefined) break;
     if (change.miss) {

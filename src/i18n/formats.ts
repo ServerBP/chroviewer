@@ -1,34 +1,48 @@
-import { createFormatter, type Formats, type NumberFormatOptions } from 'use-intl';
+import { createFormatter, type DateTimeFormatOptions, type NumberFormatOptions } from 'use-intl';
 
 import type { Locale } from './config';
 
-export const intlFormats = {
+interface DateTimeFormats extends Record<string, DateTimeFormatOptions> {
+  date: DateTimeFormatOptions;
+  dateLong: DateTimeFormatOptions;
+  dateTime: DateTimeFormatOptions;
+}
+
+interface NumberFormats extends Record<string, NumberFormatOptions> {
+  beat: NumberFormatOptions;
+  decimal: NumberFormatOptions;
+  integer: NumberFormatOptions;
+  percent: NumberFormatOptions;
+  precisePercent: NumberFormatOptions;
+}
+
+const dateTimeFormats: DateTimeFormats = {
+  date: { dateStyle: 'medium' },
+  dateLong: { dateStyle: 'long' },
   dateTime: {
-    date: { dateStyle: 'medium' },
-    dateLong: { dateStyle: 'long' },
-    dateTime: {
-      dateStyle: 'medium',
-      timeStyle: 'medium',
-    },
+    dateStyle: 'medium',
+    timeStyle: 'medium',
   },
-  number: {
-    beat: {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 3,
-    },
-    decimal: { maximumFractionDigits: 2 },
-    integer: { maximumFractionDigits: 0 },
-    percent: {
-      style: 'percent',
-      maximumFractionDigits: 1,
-    },
-    precisePercent: {
-      style: 'percent',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    },
+};
+const numberFormats: NumberFormats = {
+  beat: {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 3,
   },
-} satisfies Formats;
+  decimal: { maximumFractionDigits: 2 },
+  integer: { maximumFractionDigits: 0 },
+  percent: {
+    style: 'percent',
+    maximumFractionDigits: 1,
+  },
+  precisePercent: {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  },
+};
+
+export const intlFormats = { dateTime: dateTimeFormats, number: numberFormats };
 
 const formatters = new Map<Locale, ReturnType<typeof createFormatter>>();
 const durationNumberFormat: NumberFormatOptions = {

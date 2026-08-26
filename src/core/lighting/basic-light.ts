@@ -1,12 +1,16 @@
 import { z } from 'zod';
 
 import type { BasicEvent } from '../beatmap/types';
-import { beatSaberNumberSchema as numberSchema, beatSaberStringSchema as stringSchema } from '../beatmap/value-schema';
+import {
+  beatSaberJsonValueSchema,
+  beatSaberNumberSchema as numberSchema,
+  beatSaberStringSchema as stringSchema,
+} from '../beatmap/value-schema';
 import { chromaColor, type ChromaColor } from '../chroma';
 import type { ColorScheme, Rgb } from '../colors';
 import { easingFromId, easingFromName, type EasingFunction } from '../easing';
 
-const lightGradientSchema = z.record(z.string(), z.json());
+const lightGradientSchema = z.record(z.string(), beatSaberJsonValueSchema);
 
 export type BasicLightColor = 'red' | 'blue' | 'white';
 export type LightshowMode = 'full' | 'full-lightshow' | 'static' | 'none';
@@ -244,25 +248,19 @@ export function sampleBasicLightTimeline(
       next.floatValue * normalAlpha * (nextCustomAlpha ?? 1),
       time,
     );
-    const sample: BasicLightSample = {
-      color,
-      ...(customColor === undefined ? {} : { customColor }),
-      ...(customAlpha === undefined ? {} : { customAlpha }),
-      alpha: stateAlpha,
-      ...(resolvedAlpha === stateAlpha ? {} : { resolvedAlpha }),
-      transition:
-        color === nextColor && sameColor(customColor, nextCustomColor) && customAlpha === nextCustomAlpha
-          ? undefined
-          : {
-              color: nextColor,
-              ...(nextCustomColor === undefined ? {} : { customColor: nextCustomColor }),
-              ...(nextCustomAlpha === undefined ? {} : { customAlpha: nextCustomAlpha }),
-              progress: time,
-              ...(stringSchema.parse(next.customData?._lerpType ?? next.customData?.lerpType) === 'HSV'
-                ? { useHsv: true }
-                : {}),
-            },
-    };
+    const sample: BasicLightSample = { color, alpha: stateAlpha };
+    if (customColor !== undefined) sample.customColor = customColor;
+    if (customAlpha !== undefined) sample.customAlpha = customAlpha;
+    if (resolvedAlpha !== stateAlpha) sample.resolvedAlpha = resolvedAlpha;
+    if (color !== nextColor || !sameColor(customColor, nextCustomColor) || customAlpha !== nextCustomAlpha) {
+      const transition: NonNullable<BasicLightSample['transition']> = { color: nextColor, progress: time };
+      if (nextCustomColor !== undefined) transition.customColor = nextCustomColor;
+      if (nextCustomAlpha !== undefined) transition.customAlpha = nextCustomAlpha;
+      if (stringSchema.parse(next.customData?._lerpType ?? next.customData?.lerpType) === 'HSV') {
+        transition.useHsv = true;
+      }
+      sample.transition = transition;
+    }
     const gradient = sampleGradient(timeline.gradients, event.songBpmTime, beat);
     if (gradient === undefined) return sample;
     return {
@@ -294,12 +292,9 @@ export function sampleBasicLightTimeline(
     customColor = [gradient[0], gradient[1], gradient[2]];
     customAlpha = gradient[3];
   }
-  const sample: BasicLightSample = {
-    color,
-    ...(customColor === undefined ? {} : { customColor }),
-    ...(customAlpha === undefined ? {} : { customAlpha }),
-    alpha,
-  };
+  const sample: BasicLightSample = { color, alpha };
+  if (customColor !== undefined) sample.customColor = customColor;
+  if (customAlpha !== undefined) sample.customAlpha = customAlpha;
   if (isFade(event.value)) sample.fading = true;
   return sample;
 }

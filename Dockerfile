@@ -1,27 +1,17 @@
 # syntax=docker/dockerfile:1.7
 
-ARG BUN_VERSION=1.3.14
-ARG NODE_VERSION=24.15.0
-ARG BUILD_CACHE_SCOPE=shared
+ARG VITE_PLUS_VERSION=0.2.8
 
-FROM oven/bun:${BUN_VERSION}-alpine AS deps
+FROM ghcr.io/voidzero-dev/vite-plus:${VITE_PLUS_VERSION} AS builder
 
 WORKDIR /app
 
-ARG BUILD_CACHE_SCOPE
+ENV VP_GIT_HOOKS=0
 
-COPY package.json bun.lock ./
-COPY patches ./patches
-RUN --mount=type=cache,id=chroviewer-${BUILD_CACHE_SCOPE}-bun,target=/root/.bun/install/cache,sharing=locked \
-    bun install --frozen-lockfile --ignore-scripts
+COPY --chown=vp:vp package.json pnpm-lock.yaml pnpm-workspace.yaml .node-version ./
+COPY --chown=vp:vp patches ./patches
+RUN vp install --frozen-lockfile
 
-FROM deps AS builder
-
-WORKDIR /app
-
-COPY . .
-
-ARG BUILD_CACHE_SCOPE
 ARG VITE_BEATSAVER_API_URL=https://api.beatsaver.com
 ARG VITE_SCORESABER_API_URL=https://scoresaber.com
 ARG VITE_BEATLEADER_API_URL=https://api.beatleader.com
@@ -37,20 +27,26 @@ ENV NODE_ENV=production \
     VITE_ENABLED_SOURCES=${VITE_ENABLED_SOURCES} \
     VITE_TA_LIVE_SOCKET_URL=${VITE_TA_LIVE_SOCKET_URL}
 
-RUN --mount=type=cache,id=chroviewer-${BUILD_CACHE_SCOPE}-vite,target=/app/node_modules/.vite,sharing=locked \
-    bun run build
+COPY --chown=vp:vp . .
+RUN vp build
+RUN cp "$(vp env which node | head -1)" /tmp/node
 
-FROM node:${NODE_VERSION}-alpine AS runner
+FROM debian:bookworm-slim AS runner
 
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=4000
 
-COPY --from=builder --chown=node:node /app/.output ./.output
+COPY --from=builder /tmp/node /usr/local/bin/node
+COPY --from=builder --chown=nobody:nogroup /app/.output ./.output
 
-USER node
+USER nobody
 
 EXPOSE 4000
 

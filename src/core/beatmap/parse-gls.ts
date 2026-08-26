@@ -14,6 +14,7 @@ import type {
 } from './types';
 import {
   beatSaberIntegerSchema as integerSchema,
+  type BeatSaberJsonValue,
   beatSaberJsonObjectSchema as customDataSchema,
   beatSaberNumberSchema as numberSchema,
 } from './value-schema';
@@ -295,7 +296,7 @@ function parseGroup<T>(node: V3Group, boxes: T[]): EventBoxGroup<T> {
   };
 }
 
-export function parseV3Gls(input: unknown, difficulty: Difficulty): void {
+export function parseV3Gls(input: BeatSaberJsonValue, difficulty: Difficulty): void {
   const root = v3GlsSchema.parse(input);
 
   for (const group of root.lightColorEventBoxGroups) {
@@ -374,7 +375,7 @@ function v4Groups(root: V4Gls, type: number, boxData: V4BoxData[], filters: Inde
     }));
 }
 
-export function loadV4Gls(input: unknown, difficulty: Difficulty): void {
+export function loadV4Gls(input: BeatSaberJsonValue, difficulty: Difficulty): void {
   const root = v4GlsSchema.parse(input);
   const filters = root.indexFilters.map(parseIndexFilter);
 

@@ -9,7 +9,7 @@ const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 const blockedIpv4Addresses = new BlockList();
 const blockedIpv6Addresses = new BlockList();
 
-for (const [network, prefix] of [
+const blockedIpv4Subnets: readonly [string, number][] = [
   ['0.0.0.0', 8],
   ['10.0.0.0', 8],
   ['100.64.0.0', 10],
@@ -25,11 +25,12 @@ for (const [network, prefix] of [
   ['203.0.113.0', 24],
   ['224.0.0.0', 4],
   ['240.0.0.0', 4],
-] as const) {
+];
+for (const [network, prefix] of blockedIpv4Subnets) {
   blockedIpv4Addresses.addSubnet(network, prefix, 'ipv4');
 }
 
-for (const [network, prefix] of [
+const blockedIpv6Subnets: readonly [string, number][] = [
   ['::', 128],
   ['::1', 128],
   ['::ffff:0:0', 96],
@@ -41,7 +42,8 @@ for (const [network, prefix] of [
   ['fc00::', 7],
   ['fe80::', 10],
   ['ff00::', 8],
-] as const) {
+];
+for (const [network, prefix] of blockedIpv6Subnets) {
   blockedIpv6Addresses.addSubnet(network, prefix, 'ipv6');
 }
 
@@ -84,7 +86,7 @@ async function validateSourceUrl(value: string) {
     }
     const addresses = yield* Result.await(
       Result.tryPromise({
-        try: () => lookup(hostname, { all: true, verbatim: true }),
+        try: () => lookup(hostname, { all: true, order: 'verbatim' }),
         catch: (cause) => proxyError('Source hostname could not be resolved', 502, cause),
       }),
     );

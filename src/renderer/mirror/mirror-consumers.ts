@@ -1,6 +1,9 @@
 import { Mesh, type Camera, type Material, type Object3D } from 'three';
+import { z } from 'zod';
 
 import { environmentMaterialFamily } from '../environment/materials/create-environment-material';
+
+const meshSchema = z.custom<Mesh>((value) => value instanceof Mesh);
 
 function materialsFor(mesh: Mesh): Material[] {
   return Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -26,9 +29,8 @@ function hasVisibleMirrorMaterial(mesh: Mesh) {
 export function collectMirrorConsumers(root: Object3D) {
   const consumers: Mesh[] = [];
   root.traverse((object) => {
-    if (!(object instanceof Mesh)) return;
-    const mesh = object as Mesh;
-    if (hasMirrorMaterial(mesh)) consumers.push(mesh);
+    const mesh = meshSchema.safeParse(object);
+    if (mesh.success && hasMirrorMaterial(mesh.data)) consumers.push(mesh.data);
   });
   return consumers;
 }

@@ -72,7 +72,7 @@ export function useViewerControls({
         else void document.exitFullscreen();
       } else if (event.key === '?') {
         triggerRef.current = null;
-        setActivePanel((panel) => (panel === 'shortcuts' ? null : 'shortcuts'));
+        setActivePanel((panel) => (panel === 'about' ? null : 'about'));
       }
     }
 

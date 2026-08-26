@@ -40,7 +40,7 @@ const mapPreviewVersionSchema = z.object({
   diffs: z.array(mapPreviewDifficultySchema),
 });
 
-const mapPreviewSchema = z.object({
+const mapPreviewSchema: z.ZodType<MapPreviewData> = z.object({
   metadata: z.object({
     bpm: z.number().positive(),
     duration: z.int().nonnegative(),
@@ -56,7 +56,7 @@ const mapPreviewSchema = z.object({
   }),
   tags: z.array(z.string()),
   versions: z.tuple([mapPreviewVersionSchema], mapPreviewVersionSchema),
-}) satisfies z.ZodType<MapPreviewData>;
+});
 
 const mapTimeoutMs = 4_000;
 

@@ -75,5 +75,5 @@ export function replayColorScheme(metadata: ReplayMetadata | undefined, mapSchem
     environmentLeftBoost: rgb(metadata.environmentColor0Boost, base.environmentLeftBoost),
     environmentRightBoost: rgb(metadata.environmentColor1Boost, base.environmentRightBoost),
     environmentWhiteBoost: rgb(metadata.environmentColorWBoost, base.environmentWhiteBoost),
-  } satisfies InfoColorScheme;
+  };
 }

@@ -319,7 +319,7 @@ export function useWatchPartyExperience(options: UseWatchPartyExperienceOptions)
       runtime.heartbeatId = 0;
     }
 
-    function send(bytes: Uint8Array) {
+    function send(bytes: Uint8Array<ArrayBuffer>) {
       const socket = runtime.socket;
       if (socket?.readyState !== WebSocket.OPEN) return false;
       return Result.try(() => {
@@ -804,7 +804,7 @@ export type WatchPartyExperience = ReturnType<typeof useWatchPartyExperience>;
 
 function sendRuntimeEnvelope(
   runtime: WatchPartyRuntime,
-  encode: (sequence: bigint, connectionId: string) => Uint8Array,
+  encode: (sequence: bigint, connectionId: string) => Uint8Array<ArrayBuffer>,
 ) {
   const socket = runtime.socket;
   if (socket?.readyState !== WebSocket.OPEN || runtime.connectionId === '') return false;
