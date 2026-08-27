@@ -18,6 +18,10 @@ export type LightshowMode = 'full' | 'full-lightshow' | 'static' | 'none';
 export const isFullLightshowMode = (mode: LightshowMode) => mode === 'full' || mode === 'full-lightshow';
 export const isForcedLightshowMode = (mode: LightshowMode) => mode === 'full-lightshow';
 
+export function shouldShowMapObjects(mode: LightshowMode, gameplayObjectsVisible: boolean) {
+  return !isForcedLightshowMode(mode) || !gameplayObjectsVisible;
+}
+
 export interface BasicLightSample {
   color: BasicLightColor;
   customColor?: Rgb;

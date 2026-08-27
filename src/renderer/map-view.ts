@@ -6,7 +6,7 @@ import { songBpmTimeToSeconds } from '../core/beatmap/bpm';
 import type { InfoColorScheme } from '../core/beatmap/info';
 import type { ChromaEnvironmentData } from '../core/chroma-environment';
 import { DEFAULT_COLORS, resolveColorScheme, type ColorScheme, type Rgb } from '../core/colors';
-import { isForcedLightshowMode, type LightshowMode } from '../core/lighting/basic-light';
+import { isForcedLightshowMode, shouldShowMapObjects, type LightshowMode } from '../core/lighting/basic-light';
 import { sampleNoodlePlayerTrack } from '../core/noodle-runtime';
 import { applyReplayHeightEvents, applyReplayNoteEvents, type MapRenderData } from '../core/placement/map-render-data';
 import type { HitScoreVisualizerConfig } from '../core/replay/hit-score-visualizer';
@@ -85,6 +85,7 @@ export class MapView implements RenderView {
   } | null = null;
 
   private lightshowMode: LightshowMode = 'full';
+  private gameplayObjectsVisible = true;
   private colors: ColorScheme = DEFAULT_COLORS;
   private songDuration = 0;
   private menuLightshowSeed: number | null = null;
@@ -250,8 +251,7 @@ export class MapView implements RenderView {
   setLightshowMode(mode: LightshowMode) {
     this.lightshowMode = mode;
     this.environmentLights.setLightshowMode(mode);
-    const forced = isForcedLightshowMode(mode);
-    this.mapRoot.visible = !forced;
+    this.updateMapRootVisibility();
     this.replayView.setLightshowMode(mode);
     this.mapObjects.invalidate();
   }
@@ -278,7 +278,15 @@ export class MapView implements RenderView {
   }
 
   setGameplayNotesVisible(visible: boolean) {
+    this.gameplayObjectsVisible = visible;
+    this.updateMapRootVisibility();
     this.mapObjects.setGameplayNotesVisible(visible);
+  }
+
+  private updateMapRootVisibility() {
+    // A showcase hides gameplay objects inside MapObjectRenderer, but its fake
+    // walls are part of the lightshow and must keep the map root rendered.
+    this.mapRoot.visible = shouldShowMapObjects(this.lightshowMode, this.gameplayObjectsVisible);
   }
 
   setSongDuration(duration: number | null) {
@@ -426,7 +434,7 @@ export class MapView implements RenderView {
       if (fog !== undefined) this.pipeline.setFogParams(fog);
     }
     if (data === null) return;
-    if (isForcedLightshowMode(this.lightshowMode)) return;
+    if (!shouldShowMapObjects(this.lightshowMode, this.gameplayObjectsVisible)) return;
     const replayTime = songBpmTimeToSeconds(now, data.songBpm);
     this.playerCameraRoot.position.set(0, 0, 0);
     this.playerCameraRoot.quaternion.identity();

@@ -1,0 +1,12 @@
+services:
+  chroviewer:
+    build:
+      context: .
+    image: chroviewer:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4000

@@ -31,12 +31,44 @@ function isMap(value: unknown): value is LightshowShowcaseMap {
   );
 }
 
+function recoverMapsFromTruncatedConfig(value: string): unknown[] | null {
+  const mapsKey = /"maps"\s*:/.exec(value);
+  if (mapsKey === null) return null;
+  const start = value.indexOf('[', mapsKey.index + mapsKey[0].length);
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index++) {
+    const character = value[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === '[') depth++;
+    else if (character === ']' && --depth === 0) {
+      try {
+        const maps: unknown = JSON.parse(value.slice(start, index + 1));
+        return Array.isArray(maps) ? maps : null;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
 export function parseLightshowShowcaseConfig(value: unknown): LightshowShowcaseConfig | null {
   if (typeof value === 'string') {
     try {
       return parseLightshowShowcaseConfig(JSON.parse(value));
     } catch {
-      return null;
+      const maps = recoverMapsFromTruncatedConfig(value);
+      return maps === null ? null : parseLightshowShowcaseConfig({ maps });
     }
   }
   if (typeof value !== 'object' || value === null) return null;
