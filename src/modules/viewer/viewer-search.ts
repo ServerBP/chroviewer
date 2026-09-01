@@ -1,10 +1,11 @@
 import * as z from 'zod/mini';
 
+import type { DifficultyRank } from '../../core/beatmap/info';
 import type { SharedViewerSettings } from '../../core/share-link';
 import { viewerSettingsPatchSchema } from '../../core/viewer-settings';
 
 export type ViewerShareSource =
-  | { type: 'map'; mapKey: string; difficultyIndex?: number }
+  | { type: 'map'; mapKey: string; difficulty?: DifficultyRank; characteristic?: string }
   | { type: 'replay'; replayUrl: string }
   | { type: 'score'; scoreId: string }
   | { type: 'score-bl'; scoreId: string }
@@ -29,7 +30,8 @@ const remoteSourceUrlSchema = z.pipe(
 );
 const mapSourceSchema = z.union([mapKeySchema, remoteSourceUrlSchema]);
 const nonnegativeNumberSchema = z.number().check(z.nonnegative());
-const difficultyIndexSchema = z.int().check(z.nonnegative());
+const difficultyRankSchema = z.union([z.literal(1), z.literal(3), z.literal(5), z.literal(7), z.literal(9)]);
+const characteristicSchema = z.string().check(z.minLength(1), z.maxLength(128));
 const liveIdSchema = searchIdentifierSchema.check(z.minLength(1), z.maxLength(128));
 const livePlayerIdSchema = liveIdSchema.check(z.regex(/^\d+$/));
 
@@ -40,7 +42,8 @@ export const viewerSearchSchema = z.pipe(
     replayUrl: z.catch(z.optional(remoteSourceUrlSchema), undefined),
     scoreId: z.catch(z.optional(scoreIdSchema), undefined),
     scoreIdBL: z.catch(z.optional(scoreIdSchema), undefined),
-    difficulty: z.catch(z.optional(difficultyIndexSchema), undefined),
+    difficulty: z.catch(z.optional(difficultyRankSchema), undefined),
+    characteristic: z.catch(z.optional(characteristicSchema), undefined),
     beat: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     autoplay: z.catch(z.optional(z.boolean()), undefined),
     lightshow: z.catch(z.optional(z.literal('full-lightshow')), undefined),
@@ -61,6 +64,7 @@ export const viewerSearchSchema = z.pipe(
         scoreId: undefined,
         scoreIdBL: undefined,
         difficulty: undefined,
+        characteristic: undefined,
         beat: undefined,
         autoplay: undefined,
         playerId: undefined,
@@ -79,13 +83,23 @@ export const viewerSearchSchema = z.pipe(
         scoreId: undefined,
         scoreIdBL: undefined,
         difficulty: undefined,
+        characteristic: undefined,
         beat: undefined,
       };
     }
     if (search.replayUrl !== undefined)
-      return { ...search, map: undefined, scoreId: undefined, scoreIdBL: undefined, difficulty: undefined };
-    if (search.scoreId !== undefined) return { ...search, map: undefined, scoreIdBL: undefined, difficulty: undefined };
-    if (search.scoreIdBL !== undefined) return { ...search, map: undefined, scoreId: undefined, difficulty: undefined };
+      return {
+        ...search,
+        map: undefined,
+        scoreId: undefined,
+        scoreIdBL: undefined,
+        difficulty: undefined,
+        characteristic: undefined,
+      };
+    if (search.scoreId !== undefined)
+      return { ...search, map: undefined, scoreIdBL: undefined, difficulty: undefined, characteristic: undefined };
+    if (search.scoreIdBL !== undefined)
+      return { ...search, map: undefined, scoreId: undefined, difficulty: undefined, characteristic: undefined };
     return search;
   }),
 );
@@ -116,7 +130,8 @@ export function viewerSearchForShare(
   if (source.type === 'map') {
     return {
       map: source.mapKey,
-      difficulty: source.difficultyIndex,
+      difficulty: source.difficulty,
+      characteristic: source.characteristic,
       beat: sharedBeat,
       settings,
       lightshow,

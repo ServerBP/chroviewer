@@ -28,6 +28,7 @@ type ViewerSources = ReturnType<typeof useViewerSources>;
 interface ViewerSessionOptions {
   lightshowMode: LightshowMode;
   lightshowModeRef: RefObject<LightshowMode>;
+  requestedMapRow?: DifficultyRow;
   skipInitialMenuEnvironment: boolean;
   setActivePanel: Dispatch<SetStateAction<ViewerPanel>>;
   setError: (message: string) => void;
@@ -53,6 +54,7 @@ interface ViewerSessionOptions {
 export function useViewerSession({
   lightshowMode,
   lightshowModeRef,
+  requestedMapRow,
   skipInitialMenuEnvironment,
   setActivePanel,
   setError,
@@ -370,18 +372,23 @@ export function useViewerSession({
 
   useEffect(() => {
     const pending = sources.pendingSharedViewRef.current;
-    if (!viewerReady || pending === null || sources.rows.length === 0 || sources.songBpm <= 0) return;
-    const indexedRow = pending.difficultyIndex === undefined ? undefined : sources.rows[pending.difficultyIndex];
+    if (
+      !viewerReady ||
+      (pending === null && requestedMapRow === undefined) ||
+      sources.rows.length === 0 ||
+      sources.songBpm <= 0
+    )
+      return;
     const row =
-      (indexedRow?.difficulty === undefined ? undefined : indexedRow) ??
+      requestedMapRow ??
       sources.rows.find((candidate) => sources.replayRef.current !== null && candidate.replayMatch === true) ??
       sources.rows.find((candidate) => candidate.difficulty !== undefined);
     if (row === undefined) return;
     sources.pendingSharedViewRef.current = null;
-    void applyPendingView(row, pending.beat).then(() => {
-      if (pending.autoplay === true) transport.play({ autoplay: true });
+    void applyPendingView(row, pending?.beat).then(() => {
+      if (pending?.autoplay === true) transport.play({ autoplay: true });
     });
-  }, [sources.rows, sources.songBpm, viewerReady]);
+  }, [requestedMapRow, sources.rows, sources.songBpm, viewerReady]);
 
   function clearViewer() {
     selectionGenerationRef.current = ++selectionRequestRef.current;
@@ -479,7 +486,6 @@ export function useViewerSession({
     leaderboardPlatform,
     orthoOverlayRef,
     selectDifficulty,
-    selectedDifficultyIndex,
     selectedKey,
     viewerReady,
   };

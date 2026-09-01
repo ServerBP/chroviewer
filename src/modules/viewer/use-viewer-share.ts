@@ -4,6 +4,7 @@ import { useRouter } from '@tanstack/react-router';
 import { Result } from 'better-result';
 import { useTranslations } from 'use-intl';
 
+import { difficultyRank, type InfoDifficulty } from '../../core/beatmap/info';
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import { settingsForShareCategories, type ShareSettingsCategory } from '../../core/share-link';
 import type { ViewerSettings } from '../../core/viewer-settings';
@@ -18,7 +19,7 @@ interface UseViewerShareOptions {
   mapIdentity: MapIdentity | null;
   scoreId: string | null;
   scoreIdBL: string | null;
-  selectedDifficultyIndex: number;
+  selectedDifficulty?: InfoDifficulty;
   settings: ViewerSettings;
   sourceLink: ViewerSourceLink | null;
   setError: Dispatch<SetStateAction<string>>;
@@ -31,7 +32,7 @@ export function useViewerShare({
   mapIdentity,
   scoreId,
   scoreIdBL,
-  selectedDifficultyIndex,
+  selectedDifficulty,
   settings,
   sourceLink,
   setError,
@@ -42,6 +43,11 @@ export function useViewerShare({
   const [includeTimecode, setIncludeTimecode] = useState(true);
   const [timelineCopied, setTimelineCopied] = useState<'time' | 'beat' | null>(null);
   const timelineCopyTimeoutRef = useRef(0);
+  const selectedRank = selectedDifficulty === undefined ? -1 : difficultyRank(selectedDifficulty.difficulty);
+  const mapSelection =
+    selectedDifficulty === undefined || selectedRank === -1
+      ? {}
+      : { difficulty: selectedRank, characteristic: selectedDifficulty.characteristic };
 
   useEffect(
     () => () => {
@@ -68,7 +74,7 @@ export function useViewerShare({
         ? {
             type: 'map',
             mapKey: sourceLink.url,
-            difficultyIndex: selectedDifficultyIndex < 0 ? undefined : selectedDifficultyIndex,
+            ...mapSelection,
           }
         : { type: 'replay', replayUrl: sourceLink.url };
   }
@@ -76,7 +82,7 @@ export function useViewerShare({
     source = {
       type: 'map',
       mapKey: mapIdentity.key,
-      difficultyIndex: selectedDifficultyIndex < 0 ? undefined : selectedDifficultyIndex,
+      ...mapSelection,
     };
   }
 
