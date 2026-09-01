@@ -21,6 +21,9 @@ import { noodleTrackControlsTime, sampleNoodlePlayerTrack, type NoodleTransform 
 import { NOTE_Y_OFFSET, Y_OFFSET, Z_OFFSET } from '../../core/placement/grid';
 import {
   aheadDistance,
+  currentHalfJumpDurationInBeats,
+  currentSpawnBeat,
+  currentUnitsPerBeat,
   isVisibleBeforeHit,
   noteJumpAheadDistance,
   spawnFlipProgress,
@@ -39,6 +42,7 @@ import type {
   WallInstance,
 } from '../../core/placement/map-render-data';
 import type { ReplayPose } from '../../core/replay/types';
+import type { SpawnState } from '../../core/spawn/variable-njs';
 import type { FogUniforms } from '../bloomfog/pipeline';
 import {
   createArcMaterial,
@@ -355,7 +359,7 @@ export class MapObjectRenderer {
     );
     this.arcWindows = new ActiveWindowIndex(
       data.arcs.length,
-      (index) => data.arcs[index]?.spawnBeat ?? Infinity,
+      (index) => data.arcs[index]?.enterBeat ?? Infinity,
       (index) => {
         const arc = data.arcs[index];
         return noodleTrackControlsTime(arc?.noodle, data.noodle) ? Infinity : (arc?.despawnBeat ?? -Infinity);
@@ -433,6 +437,7 @@ export class MapObjectRenderer {
     this.root.updateWorldMatrix(true, false);
     this.camera.getWorldPosition(this.cameraPosition);
     const replayTime = songBpmTimeToSeconds(now, data.songBpm);
+    const movementState = data.movementStateAt(now);
     for (const group of this.instanceGroups) group.begin();
     const replayLoaded = replayView.hasReplay;
     const hitPreviewNotes = !replayLoaded && this.previewHitNotes;
@@ -444,16 +449,19 @@ export class MapObjectRenderer {
       for (const index of activeNotes) {
         const note = data.notes[index];
         if (note?.colorIndex !== colorIndex) continue;
-        const duration = note.hjdBeats * 2;
+        const duration = currentHalfJumpDurationInBeats(note, movementState) * 2;
         const noodle = sampleNoodleRenderObject(note, data.noodle, now, duration, context, data.leftHanded);
         const movementBeat = noodleMovementBeat(note, now, noodle, duration);
-        const jump = spawnProgress(note, movementBeat);
-        const x = note.startX + (note.x - note.startX) * spawnFlipProgress(note, movementBeat);
+        const jump = spawnProgress(note, movementBeat, movementState);
+        const x = note.startX + (note.x - note.startX) * spawnFlipProgress(note, movementBeat, movementState);
         const y = note.noodle?.disableGravity
           ? note.y
-          : note.startY + (note.y - note.startY) * jump + spawnFlipYOffset(note, movementBeat, note.flipYSide);
+          : note.startY +
+            (note.y - note.startY) * jump +
+            spawnFlipYOffset(note, movementBeat, note.flipYSide, movementState);
         const rotation =
-          note.rotationDeg * (note.noodle?.disableLook === true ? 1 : spawnRotationProgress(note, movementBeat));
+          note.rotationDeg *
+          (note.noodle?.disableLook === true ? 1 : spawnRotationProgress(note, movementBeat, movementState));
         const interactable = noodle.interactable === undefined ? note.interactable : noodle.interactable >= 1;
         const visible =
           noodleObjectVisible(note, now, movementBeat, noodle) &&
@@ -471,6 +479,7 @@ export class MapObjectRenderer {
             noteTime,
             replayTime,
             data,
+            movementState,
             poseFrames,
             replayView.headPosition,
             replayView,
@@ -480,10 +489,11 @@ export class MapObjectRenderer {
             context,
           );
         } else {
-          this.composeAt(note, movementBeat, x, y, rotation, noteModelScale, true);
+          this.composeAt(note, movementBeat, x, y, rotation, noteModelScale, true, movementState);
+          const spawnBeat = currentSpawnBeat(note, movementState);
           const preJumpPosition =
-            now < note.spawnBeat && noodle.definitePosition !== undefined
-              ? this.spawnPosition.set(note.startX, note.startY, -aheadDistance(note, note.spawnBeat))
+            now < spawnBeat && noodle.definitePosition !== undefined
+              ? this.spawnPosition.set(note.startX, note.startY, -aheadDistance(note, spawnBeat, movementState))
               : undefined;
           this.noodleObjectTransform.apply(
             this.pose,
@@ -502,7 +512,8 @@ export class MapObjectRenderer {
           note.customColor ?? (note.colorIndex === 1 ? colors.rightNote : colors.leftNote),
         );
         if (bodyDissolve > 0) this.noteBodies[colorIndex]?.push(this.matrix, color, bodyDissolve, index + 1);
-        const faceVisible = noodle.dissolveArrow !== undefined || movementBeat < note.spawnBeat + duration * 0.75;
+        const faceVisible =
+          noodle.dissolveArrow !== undefined || movementBeat < currentSpawnBeat(note, movementState) + duration * 0.75;
         if (arrowDissolve > 0 && faceVisible) {
           if (note.dot) {
             this.circleGlows[colorIndex]?.push(this.matrix, color, arrowDissolve, -index - 1);
@@ -520,7 +531,7 @@ export class MapObjectRenderer {
     for (const index of this.bombWindows?.at(now) ?? []) {
       const bomb = data.bombs[index];
       if (bomb === undefined) continue;
-      const duration = bomb.hjdBeats * 2;
+      const duration = currentHalfJumpDurationInBeats(bomb, movementState) * 2;
       const noodle = sampleNoodleRenderObject(bomb, data.noodle, now, duration, context, data.leftHanded);
       const movementBeat = noodleMovementBeat(bomb, now, noodle, duration);
       if (
@@ -531,12 +542,13 @@ export class MapObjectRenderer {
       }
       const y = bomb.noodle?.disableGravity
         ? bomb.y
-        : bomb.startY + (bomb.y - bomb.startY) * spawnProgress(bomb, movementBeat);
+        : bomb.startY + (bomb.y - bomb.startY) * spawnProgress(bomb, movementBeat, movementState);
       if ((noodle.dissolve ?? 1) <= 0) continue;
-      this.composeAt(bomb, movementBeat, bomb.x, y, 0, 1, true);
+      this.composeAt(bomb, movementBeat, bomb.x, y, 0, 1, true, movementState);
+      const spawnBeat = currentSpawnBeat(bomb, movementState);
       const preJumpPosition =
-        now < bomb.spawnBeat && noodle.definitePosition !== undefined
-          ? this.spawnPosition.set(bomb.x, bomb.startY, -aheadDistance(bomb, bomb.spawnBeat))
+        now < spawnBeat && noodle.definitePosition !== undefined
+          ? this.spawnPosition.set(bomb.x, bomb.startY, -aheadDistance(bomb, spawnBeat, movementState))
           : undefined;
       this.noodleObjectTransform.apply(
         this.pose,
@@ -561,22 +573,23 @@ export class MapObjectRenderer {
       for (const index of activeLinks) {
         const link = data.chainLinks[index];
         if (link?.colorIndex !== colorIndex) continue;
-        const duration = link.hjdBeats * 2;
+        const duration = currentHalfJumpDurationInBeats(link, movementState) * 2;
         const noodle = sampleNoodleRenderObject(link, data.noodle, now, duration, context, data.leftHanded);
         const movementBeat = noodleMovementBeat(link, now, noodle, duration);
-        const jump = spawnProgress(link, movementBeat);
+        const jump = spawnProgress(link, movementBeat, movementState);
         const y = link.noodle?.disableGravity ? link.y : Y_OFFSET + (link.y - Y_OFFSET) * jump;
-        const rotation = link.rotationDeg * spawnRotationProgress(link, movementBeat);
+        const rotation = link.rotationDeg * spawnRotationProgress(link, movementBeat, movementState);
         const interactable = noodle.interactable === undefined ? link.interactable : noodle.interactable >= 1;
         const visible =
           noodleObjectVisible(link, now, movementBeat, noodle) &&
           (!hitPreviewNotes || !interactable || isVisibleBeforeHit(link, movementBeat));
         if (!visible || (link.replayEndTime !== undefined && replayTime >= link.replayEndTime)) continue;
         if ((noodle.dissolve ?? 1) <= 0) continue;
-        this.composeAt(link, movementBeat, link.x, y, rotation, noteModelScale);
+        this.composeAt(link, movementBeat, link.x, y, rotation, noteModelScale, false, movementState);
+        const spawnBeat = currentSpawnBeat(link, movementState);
         const preJumpPosition =
-          now < link.spawnBeat && noodle.definitePosition !== undefined
-            ? this.spawnPosition.set(link.x, Y_OFFSET, -aheadDistance(link, link.spawnBeat))
+          now < spawnBeat && noodle.definitePosition !== undefined
+            ? this.spawnPosition.set(link.x, Y_OFFSET, -aheadDistance(link, spawnBeat, movementState))
             : undefined;
         this.noodleObjectTransform.apply(
           this.pose,
@@ -601,27 +614,43 @@ export class MapObjectRenderer {
     for (const index of this.wallWindows?.at(now) ?? []) {
       const wall = data.walls[index];
       if (wall === undefined) continue;
-      const duration = wall.hjdBeats * 2 + (wall.durationBeats ?? wall.pullBeat - wall.beat);
+      const duration =
+        currentHalfJumpDurationInBeats(wall, movementState) * 2 + (wall.durationBeats ?? wall.pullBeat - wall.beat);
       const noodle = sampleNoodleRenderObject(wall, data.noodle, now, duration, context, data.leftHanded);
       const movementBeat = noodleMovementBeat(wall, now, noodle, duration);
       if (!noodleObjectVisible(wall, now, movementBeat, noodle)) continue;
       const reveal =
         wall.durationBeats !== undefined && wall.durationBeats < 0
           ? 1
-          : wallSpawnScale(wall, movementBeat, data.movementStateAt?.(now).halfJumpDurationInBeats);
+          : wallSpawnScale(wall, movementBeat, movementState);
       if (reveal === 0) continue;
       if ((noodle.dissolve ?? 1) <= 0) continue;
-      const transform = wallTransform(wall, wallAheadDistance(wall, wall.pullBeat, movementBeat), reveal);
-      this.setWallRootPosition(wall, transform.position, reveal, this.position);
+      const wallLength =
+        wall.durationBeats !== undefined && wall.usesGlobalNjs
+          ? wall.durationBeats * currentUnitsPerBeat(wall, movementState)
+          : wall.lengthUnits;
+      const transform = wallTransform(
+        wall,
+        wallAheadDistance(wall, wall.pullBeat, movementBeat, movementState),
+        reveal,
+        wallLength,
+      );
+      this.setWallRootPosition(wall, transform.position, reveal, wallLength, this.position);
       this.quaternion.setFromAxisAngle(yAxis, transform.yawDeg * degToRad);
       this.noodleObjectTransform.applyWorldRotation(this.pose, wall.worldRotation);
       this.scale.set(1, 1, 1);
       const preJumpPosition =
-        now < wall.spawnBeat && noodle.definitePosition !== undefined
+        now < currentSpawnBeat(wall, movementState) && noodle.definitePosition !== undefined
           ? this.setWallRootPosition(
               wall,
-              wallTransform(wall, wallAheadDistance(wall, wall.pullBeat, wall.spawnBeat), 1).position,
+              wallTransform(
+                wall,
+                wallAheadDistance(wall, wall.pullBeat, currentSpawnBeat(wall, movementState), movementState),
+                1,
+                wallLength,
+              ).position,
               1,
+              wallLength,
               this.spawnPosition,
             )
           : undefined;
@@ -643,7 +672,7 @@ export class MapObjectRenderer {
         obstacleEdgeScale = this.wallEdgeScale;
       }
       this.wallRootMatrix.copy(this.matrix);
-      this.wallOffset.set(0, (wall.height * reveal) / 2, -Math.abs(wall.lengthUnits) / 2);
+      this.wallOffset.set(0, (wall.height * reveal) / 2, -Math.abs(wallLength) / 2);
       this.quaternion.identity();
       this.scale.fromArray(transform.outlineScale);
       this.wallGeometryMatrix.compose(this.wallOffset, this.quaternion, this.scale);
@@ -700,12 +729,16 @@ export class MapObjectRenderer {
       const entry = this.arcEntries[index];
       if (entry === undefined) continue;
       const arc = entry.arc;
-      const duration = arc.hjdBeats * 1.5 + arc.tailBeat - arc.headBeat;
+      const hjdBeats = arc.usesGlobalNjs ? movementState.halfJumpDurationInBeats : arc.hjdBeats;
+      const unitsPerBeat = arc.usesGlobalNjs
+        ? movementState.halfJumpDistance / movementState.halfJumpDurationInBeats
+        : arc.unitsPerBeat;
+      const duration = hjdBeats * 1.5 + arc.tailBeat - arc.headBeat;
       const noodle = sampleNoodleRenderObject(arc, data.noodle, now, duration, context, data.leftHanded, arc.spawnBeat);
       const movementBeat = noodleMovementBeat(arc, now, noodle, duration);
       entry.mesh.visible = noodleObjectVisible(arc, now, movementBeat, noodle) && (noodle.dissolve ?? 1) > 0;
       if (!entry.mesh.visible) continue;
-      const headAhead = Z_OFFSET + (arc.headBeat - movementBeat) * arc.unitsPerBeat;
+      const headAhead = Z_OFFSET + (arc.headBeat - movementBeat) * unitsPerBeat;
       this.position.set(0, NOTE_Y_OFFSET, -headAhead);
       this.quaternion.identity();
       this.noodleObjectTransform.applyWorldRotation(this.pose, arc.worldRotation);
@@ -713,9 +746,10 @@ export class MapObjectRenderer {
       entry.mesh.quaternion.copy(this.quaternion);
       this.scale.set(1, 1, 1);
       entry.mesh.scale.copy(this.scale);
+      const arcSpawnBeat = arc.headBeat - hjdBeats;
       const preJumpPosition =
-        now < arc.spawnBeat && noodle.definitePosition !== undefined
-          ? this.spawnPosition.set(0, NOTE_Y_OFFSET, -(Z_OFFSET + (arc.headBeat - arc.spawnBeat) * arc.unitsPerBeat))
+        now < arcSpawnBeat && noodle.definitePosition !== undefined
+          ? this.spawnPosition.set(0, NOTE_Y_OFFSET, -(Z_OFFSET + (arc.headBeat - arcSpawnBeat) * unitsPerBeat))
           : undefined;
       this.noodleObjectTransform.apply(
         this.pose,
@@ -740,8 +774,12 @@ export class MapObjectRenderer {
       shaderUniformValue(entry.mesh.material, '_ArcColor')?.set(linear.r, linear.g, linear.b, noodle.color?.[3] ?? 1);
       const nowBeat = entry.mesh.material.uniforms._PlaybackBeat;
       const timeSeconds = entry.mesh.material.uniforms._ClockSeconds;
+      const jumpBeats = entry.mesh.material.uniforms._JumpBeats;
+      const travelPerBeat = entry.mesh.material.uniforms._TravelPerBeat;
       if (nowBeat !== undefined) nowBeat.value = movementBeat;
       if (timeSeconds !== undefined) timeSeconds.value = (now * 60) / data.songBpm;
+      if (jumpBeats !== undefined) jumpBeats.value = hjdBeats;
+      if (travelPerBeat !== undefined) travelPerBeat.value = unitsPerBeat;
     }
     for (const group of this.instanceGroups) group.end();
   }
@@ -794,8 +832,11 @@ export class MapObjectRenderer {
     rotationDeg: number,
     scale: number,
     terminalRetreat = false,
+    movementState: SpawnState,
   ) {
-    const distance = terminalRetreat ? noteJumpAheadDistance(motion, now) : aheadDistance(motion, now);
+    const distance = terminalRetreat
+      ? noteJumpAheadDistance(motion, now, movementState)
+      : aheadDistance(motion, now, movementState);
     this.position.set(x, y, -distance);
     this.quaternion.setFromAxisAngle(zAxis, rotationDeg * degToRad);
     this.noodleObjectTransform.applyWorldRotation(this.pose, motion.worldRotation);
@@ -811,6 +852,7 @@ export class MapObjectRenderer {
     noteTime: number,
     replayTime: number,
     data: MapRenderData,
+    movementState: SpawnState,
     poseFrames: readonly ReplayPose[],
     currentHeadPosition: Vector3,
     replayView: ReplayView,
@@ -828,10 +870,11 @@ export class MapObjectRenderer {
       this.advancePreviewNoteLook(state, note, noteTime, now, data, context);
     }
 
-    this.composeAt(note, now, x, y, 0, scale, true);
+    this.composeAt(note, now, x, y, 0, scale, true, movementState);
+    const spawnBeat = currentSpawnBeat(note, movementState);
     const preJumpPosition =
-      now < note.spawnBeat && noodle.definitePosition !== undefined
-        ? this.spawnPosition.set(note.startX, note.startY, -aheadDistance(note, note.spawnBeat))
+      now < spawnBeat && noodle.definitePosition !== undefined
+        ? this.spawnPosition.set(note.startX, note.startY, -aheadDistance(note, spawnBeat, movementState))
         : undefined;
     this.noodleObjectTransform.apply(
       this.pose,
@@ -987,18 +1030,22 @@ export class MapObjectRenderer {
   }
 
   private composeLookNoteBaseAt(note: NoteInstance, now: number, data: MapRenderData, context?: PointSampleContext) {
-    const duration = note.hjdBeats * 2;
+    const movementState = data.movementStateAt(now);
+    const duration = currentHalfJumpDurationInBeats(note, movementState) * 2;
     const noodle = sampleNoodleRenderObject(note, data.noodle, now, duration, context, data.leftHanded);
     const movementBeat = noodleMovementBeat(note, now, noodle, duration);
-    const jump = spawnProgress(note, movementBeat);
-    const x = note.startX + (note.x - note.startX) * spawnFlipProgress(note, movementBeat);
+    const jump = spawnProgress(note, movementBeat, movementState);
+    const x = note.startX + (note.x - note.startX) * spawnFlipProgress(note, movementBeat, movementState);
     const y = note.noodle?.disableGravity
       ? note.y
-      : note.startY + (note.y - note.startY) * jump + spawnFlipYOffset(note, movementBeat, note.flipYSide);
-    this.composeAt(note, movementBeat, x, y, 0, noteModelScale, true);
+      : note.startY +
+        (note.y - note.startY) * jump +
+        spawnFlipYOffset(note, movementBeat, note.flipYSide, movementState);
+    this.composeAt(note, movementBeat, x, y, 0, noteModelScale, true, movementState);
+    const spawnBeat = currentSpawnBeat(note, movementState);
     const preJumpPosition =
-      now < note.spawnBeat && noodle.definitePosition !== undefined
-        ? this.spawnPosition.set(note.startX, note.startY, -aheadDistance(note, note.spawnBeat))
+      now < spawnBeat && noodle.definitePosition !== undefined
+        ? this.spawnPosition.set(note.startX, note.startY, -aheadDistance(note, spawnBeat, movementState))
         : undefined;
     this.noodleObjectTransform.apply(
       this.pose,
@@ -1017,12 +1064,11 @@ export class MapObjectRenderer {
     wall: WallInstance,
     center: readonly [number, number, number],
     reveal: number,
+    lengthUnits: number,
     target: Vector3,
   ) {
     this.quaternion.setFromAxisAngle(yAxis, -wall.rotationDeg * degToRad);
-    this.wallOffset
-      .set(0, (wall.height * reveal) / 2, -Math.abs(wall.lengthUnits) / 2)
-      .applyQuaternion(this.quaternion);
+    this.wallOffset.set(0, (wall.height * reveal) / 2, -Math.abs(lengthUnits) / 2).applyQuaternion(this.quaternion);
     return target.fromArray(center).sub(this.wallOffset);
   }
 }

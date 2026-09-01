@@ -10,13 +10,13 @@ export interface WallTransform {
   coreScale: readonly [number, number, number];
 }
 
-export function wallTransform(wall: WallInstance, ahead: number, reveal: number): WallTransform {
-  const nominalLength = Math.abs(wall.lengthUnits);
+export function wallTransform(wall: WallInstance, ahead: number, reveal: number, lengthUnits: number): WallTransform {
+  const nominalLength = Math.abs(lengthUnits);
   const length = Math.max(nominalLength, minimumScale);
   const width = Math.max(wall.width * 0.98 * reveal, minimumScale);
   const height = Math.max(wall.height * reveal, minimumScale);
   const centerX = wall.x;
-  const centerZ = -ahead - Math.min(wall.lengthUnits, 0) - nominalLength / 2;
+  const centerZ = -ahead - Math.min(lengthUnits, 0) - nominalLength / 2;
   const yawDeg = -wall.rotationDeg;
   const yaw = yawDeg * degToRad;
   const cos = Math.cos(yaw);
