@@ -264,6 +264,7 @@ export function ViewerShell() {
     };
   }, [remoteActive]);
   function toggleHitsounds() {
+    if (!settingsRef.current.hitsounds) transport.unlockHitsounds();
     setSettings((current) => ({ ...current, hitsounds: !current.hitsounds }));
   }
 
