@@ -390,8 +390,10 @@ export class MapView implements RenderView {
     const data = this.data;
     const color = (value: Rgb): readonly [number, number, number, number] => [value[0], value[1], value[2], 1];
     const colors = this.colors;
-    if (name === 'baseNote0Color') return color(data?.leftHanded === true ? colors.rightNote : colors.leftNote);
-    if (name === 'baseNote1Color') return color(data?.leftHanded === true ? colors.leftNote : colors.rightNote);
+    // Map render data already swaps each note's colour index in left-handed
+    // mode. Swapping the palette here as well cancelled that transformation.
+    if (name === 'baseNote0Color') return color(colors.leftNote);
+    if (name === 'baseNote1Color') return color(colors.rightNote);
     if (name === 'baseObstaclesColor') return color(colors.obstacle);
     if (name === 'baseSaberAColor') return color(colors.leftNote);
     if (name === 'baseSaberBColor') return color(colors.rightNote);
