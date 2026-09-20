@@ -20,6 +20,7 @@ import { DEFAULT_VIEWER_SETTINGS, loadViewerSettings, sanitizeViewerSettings } f
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
+import { useMapPoolShowcase } from '../map-pool-showcase/use-map-pool-showcase';
 import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '../live/embedded-realtime-score-sync';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
 import { replayLightshowMode } from '../live/live-replay';
@@ -50,6 +51,7 @@ import { useViewerSession } from './use-viewer-session';
 import { useViewerShare } from './use-viewer-share';
 import { useViewerSources } from './use-viewer-sources';
 import {
+  hasConfiguredPoolShowcase,
   hasConfiguredShowcase,
   renderPerformanceForSearch,
   replaceRenderPerformance,
@@ -220,6 +222,8 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const hideUI = search.hideUI === true;
   const taLiveSource = search.liveSource === 'ta' || search.liveSource === 'cocu';
   const configuredShowcase = hasConfiguredShowcase(search);
+  const configuredPoolShowcase = hasConfiguredPoolShowcase(search);
+  const configuredSequence = configuredShowcase || configuredPoolShowcase;
   const [performance, setPerformance] = useState(() => renderPerformanceForSearch(search));
   const [settings, setSettings] = useState(() => {
     const saved = loadViewerSettings();
@@ -306,7 +310,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     // TA and configured showcases own the map/replay lifecycle. Keeping generic
     // remote sources disabled also prevents hidden requests from competing with
     // those authoritative sources. Standalone showcase previews still use map=.
-    remoteSourcesEnabled: !taLiveSource && !configuredShowcase,
+    remoteSourcesEnabled: !taLiveSource && !configuredSequence,
     setError,
     setSettings,
     onClearViewer() {
@@ -371,7 +375,8 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
         };
   const liveActive = liveTarget !== null;
   const taLive = liveTarget?.source === 'ta' || liveTarget?.source === 'cocu';
-  const embeddedSource = taLive || search.previewSource !== undefined || search.showcase === true;
+  const embeddedSource =
+    taLive || search.previewSource !== undefined || search.showcase === true || search.poolShowcase === true;
   const remoteActive = liveActive || partyActive;
   useEffect(() => {
     if (!embeddedSource) return;
@@ -496,6 +501,13 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   useLightshowShowcase({
     enabled: configuredShowcase,
     configValue: search.showcaseConfig,
+    session,
+    sources,
+    transport,
+  });
+  useMapPoolShowcase({
+    enabled: configuredPoolShowcase,
+    configValue: search.poolShowcaseConfig,
     session,
     sources,
     transport,

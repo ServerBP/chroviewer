@@ -2,10 +2,23 @@ import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
 import { Result } from 'better-result';
 
-import type { Replay } from '../../core/replay/types';
+import { replayMapHash, type Replay } from '../../core/replay/types';
 import type { ViewerSettings } from '../../core/viewer-settings';
+import {
+  fetchBeatLeaderLeaderboards,
+  fetchBeatLeaderReplayFile,
+  fetchBeatLeaderReplayMetadata,
+  fetchTopBeatLeaderScore,
+} from '../../sources/beatleader/provider';
 import { fetchBeatSaverHash, fetchBeatSaverMap } from '../../sources/beatsaver/provider';
-import type { BeatSaverMapSource, DownloadProgress, MapLookup } from '../../sources/source-types';
+import { isViewerSourceEnabled } from '../../sources/source-config';
+import { SourceError } from '../../sources/source-error';
+import type {
+  BeatSaverMapSource,
+  DownloadProgress,
+  MapLookup,
+  ScoreSaberReplayPlayer,
+} from '../../sources/source-types';
 import { LiveMapCache } from '../live/live-map-cache';
 import type { PendingSharedView } from './use-viewer-file-source';
 import { useViewerFileSource } from './use-viewer-file-source';
@@ -17,6 +30,36 @@ interface UseViewerSourcesOptions {
   setSettings: Dispatch<SetStateAction<ViewerSettings>>;
   onClearViewer: () => void;
   onMapLoaded: () => void;
+}
+
+export interface PreparedBeatLeaderShowcase {
+  map: BeatSaverMapSource;
+  player: ScoreSaberReplayPlayer;
+  previewStartSeconds: number;
+  replay: Replay;
+  scoreId: string;
+}
+
+function normalizedCharacteristic(value: string) {
+  return value.toLowerCase().replace(/^solo/, '').replace(/[^a-z0-9]/g, '');
+}
+
+async function mapPreviewStartSeconds(source: BeatSaverMapSource) {
+  const info = source.files.find((file) => file.name.toLowerCase() === 'info.dat');
+  if (info === undefined) return 0;
+  try {
+    const value: unknown = JSON.parse(await info.text());
+    if (typeof value !== 'object' || value === null) return 0;
+    const root = value as Record<string, unknown>;
+    const legacy = Number(root._previewStartTime);
+    if (Number.isFinite(legacy)) return Math.max(0, legacy);
+    const audio = root.audio;
+    if (typeof audio !== 'object' || audio === null) return 0;
+    const modern = Number((audio as Record<string, unknown>).previewStartTime);
+    return Number.isFinite(modern) ? Math.max(0, modern) : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export function useViewerSources({
@@ -70,6 +113,83 @@ export function useViewerSources({
       files.pendingSharedViewRef.current = pending;
       const loaded = await files.loadSourceFiles(requestId, source.files, null, {
         identity: { key: source.key, hash: source.hash },
+      });
+      return loaded.isErr() ? Result.err(loaded.error) : Result.ok(undefined);
+    },
+    async fetchPreparedBeatLeaderShowcase(
+      reference: string,
+      difficultyRank: number,
+      characteristic: string,
+      signal?: AbortSignal,
+    ) {
+      if (!isViewerSourceEnabled('beatleader')) {
+        return Result.err(
+          new SourceError({
+            message: 'BeatLeader is disabled',
+            source: 'beatleader',
+            operation: 'validate-source-enabled',
+          }),
+        );
+      }
+      const mapResult = await (reference.trim().length >= 10
+        ? fetchBeatSaverHash(reference.trim(), { signal })
+        : fetchBeatSaverMap(reference.trim(), { signal }));
+      if (mapResult.isErr()) return Result.err(mapResult.error);
+      const map = mapResult.value;
+      const [leaderboardsResult, previewStartSeconds] = await Promise.all([
+        fetchBeatLeaderLeaderboards(map.hash, { signal }),
+        mapPreviewStartSeconds(map),
+      ]);
+      if (leaderboardsResult.isErr()) return Result.err(leaderboardsResult.error);
+      const requestedCharacteristic = normalizedCharacteristic(characteristic);
+      const leaderboard = leaderboardsResult.value.find(
+        (candidate) =>
+          candidate.difficulty === difficultyRank &&
+          normalizedCharacteristic(candidate.gameMode) === requestedCharacteristic,
+      );
+      if (leaderboard === undefined) {
+        return Result.err(
+          new SourceError({
+            message: 'No BeatLeader leaderboard is available for this map difficulty',
+            source: 'beatleader',
+            operation: 'find-leaderboard',
+          }),
+        );
+      }
+      const scoreResult = await fetchTopBeatLeaderScore(leaderboard.id, { signal });
+      if (scoreResult.isErr()) return Result.err(scoreResult.error);
+      const metadataResult = await fetchBeatLeaderReplayMetadata(scoreResult.value, { signal });
+      if (metadataResult.isErr()) return Result.err(metadataResult.error);
+      const metadata = metadataResult.value;
+      const replayFileResult = await fetchBeatLeaderReplayFile(metadata.replayUrl, { signal });
+      if (replayFileResult.isErr()) return Result.err(replayFileResult.error);
+      const replayResult = await files.parseReplay(replayFileResult.value, 'beatleader');
+      if (replayResult.isErr()) return Result.err(replayResult.error);
+      const replayHash = replayMapHash(replayResult.value);
+      if (replayHash?.toLowerCase() !== map.hash.toLowerCase()) {
+        return Result.err(
+          new SourceError({
+            message: 'The top BeatLeader replay belongs to a different map',
+            source: 'beatleader',
+            operation: 'validate-replay-map',
+          }),
+        );
+      }
+      return Result.ok<PreparedBeatLeaderShowcase>({
+        map,
+        player: metadata.player,
+        previewStartSeconds,
+        replay: replayResult.value,
+        scoreId: metadata.scoreId,
+      });
+    },
+    async loadPreparedBeatLeaderShowcase(source: PreparedBeatLeaderShowcase, pending: PendingSharedView) {
+      const requestId = files.beginSourceRequest();
+      files.pendingSharedViewRef.current = pending;
+      const loaded = await files.loadSourceFiles(requestId, source.map.files, source.replay, {
+        identity: { key: source.map.key, hash: source.map.hash },
+        scoreIdBL: source.scoreId,
+        player: source.player,
       });
       return loaded.isErr() ? Result.err(loaded.error) : Result.ok(undefined);
     },

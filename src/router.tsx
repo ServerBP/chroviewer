@@ -71,6 +71,10 @@ const searchKeyAliases = new Map(
     autoplay: 'autoplay',
     hideui: 'hideUI',
     multiview: 'multiview',
+    showcase: 'showcase',
+    showcaseconfig: 'showcaseConfig',
+    poolshowcase: 'poolShowcase',
+    poolshowcaseconfig: 'poolShowcaseConfig',
     disablegameui: 'disableGameUI',
     lightshow: 'lightshow',
     lights: 'lights',
@@ -119,6 +123,7 @@ const stringSearchAliases = {
   watcherPlayerId: ['watcherplayerid'],
   authToken: ['authtoken'],
   showcaseConfig: ['showcaseconfig'],
+  poolShowcaseConfig: ['poolshowcaseconfig'],
 };
 
 export function parseUrlSearch(search: string) {

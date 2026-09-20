@@ -75,6 +75,8 @@ export const viewerSearchSchema = z.pipe(
     multiview: z.catch(z.optional(z.boolean()), undefined),
     showcase: z.catch(z.optional(z.boolean()), undefined),
     showcaseConfig: z.catch(z.optional(z.string().check(z.maxLength(250_000))), undefined),
+    poolShowcase: z.catch(z.optional(z.boolean()), undefined),
+    poolShowcaseConfig: z.catch(z.optional(z.string().check(z.maxLength(250_000))), undefined),
     disableGameUI: z.catch(z.optional(z.boolean()), undefined),
     lightshow: z.catch(z.optional(z.literal('full-lightshow')), undefined),
     lights: z.catch(z.optional(z.enum(['full', 'full-lightshow', 'static', 'none'])), undefined),
@@ -166,6 +168,10 @@ export type ViewerSearch = z.infer<typeof viewerSearchSchema>;
 
 export function hasConfiguredShowcase(search: Pick<ViewerSearch, 'showcase' | 'showcaseConfig'>) {
   return search.showcase === true && search.showcaseConfig !== undefined;
+}
+
+export function hasConfiguredPoolShowcase(search: Pick<ViewerSearch, 'poolShowcase' | 'poolShowcaseConfig'>) {
+  return search.poolShowcase === true && search.poolShowcaseConfig !== undefined;
 }
 
 export function renderPerformanceForSearch(search: ViewerSearch): RenderPerformanceOptions {
