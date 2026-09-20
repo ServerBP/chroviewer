@@ -197,7 +197,7 @@ export async function fetchBeatLeaderLeaderboards(hash: string, options: Resolve
 
 export async function fetchTopBeatLeaderScore(leaderboardId: string, options: ResolveOptions = {}) {
   const response = await requestJson(
-    `${env.VITE_BEATLEADER_API_URL}/leaderboard/${leaderboardId}?page=1&count=10&sortBy=rank&order=asc`,
+    `${env.VITE_BEATLEADER_API_URL}/leaderboard/${leaderboardId}?page=1&count=10&sortBy=rank&order=desc`,
     leaderboardScoresSchema,
     {
       ...options,
@@ -207,9 +207,9 @@ export async function fetchTopBeatLeaderScore(leaderboardId: string, options: Re
     },
   );
   return response.andThen(({ scores }) => {
-    // BeatLeader documents rank ascending as the top-score order. Sort the
-    // returned page as well so an upstream ordering regression cannot make a
-    // map preview select the worst entry from that page.
+    // BeatLeader's `rank` sorting orders the score/PP calculation itself, so
+    // descending returns the strongest page. Select its smallest published
+    // rank as a second guard against a response-order regression.
     const score = scores?.toSorted(
       (left, right) => (left.rank ?? Number.MAX_SAFE_INTEGER) - (right.rank ?? Number.MAX_SAFE_INTEGER),
     )[0];

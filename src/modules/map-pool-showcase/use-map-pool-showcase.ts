@@ -14,6 +14,10 @@ type Session = ReturnType<typeof useViewerSession>;
 type Transport = ReturnType<typeof useSongTransport>;
 type PreparedEntry = { kind: 'ready'; value: PreparedBeatLeaderShowcase } | { kind: 'missing' };
 type ActiveEntry = { map: MapPoolShowcaseMap; replayAvailable: boolean };
+type TransitionPhase = 'idle' | 'preparing' | 'fading-out' | 'loading' | 'fading-in';
+
+const TRANSITION_DURATION_MS = 1400;
+const TRANSITION_DURATION_SECONDS = TRANSITION_DURATION_MS / 1000;
 
 function isMap(value: unknown): value is MapPoolShowcaseMap {
   if (typeof value !== 'object' || value === null) return false;
@@ -71,6 +75,8 @@ export function useMapPoolShowcase({
   transport: Transport;
 }) {
   const [active, setActive] = useState<ActiveEntry | null>(null);
+  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
+  const [visualFaded, setVisualFaded] = useState(false);
   const configRef = useRef<MapPoolShowcaseConfig | null>(null);
   const indexRef = useRef(-1);
   const generationRef = useRef(0);
@@ -82,6 +88,11 @@ export function useMapPoolShowcase({
   function publish(song: Record<string, unknown> | null) {
     if (window.parent === window) return;
     window.parent.postMessage({ type: 'beatkhana:map-pool-showcase-current-song', song }, '*');
+  }
+
+  function setPhase(phase: TransitionPhase) {
+    transitioningRef.current = phase !== 'idle';
+    setTransitionPhase(phase);
   }
 
   function clearAdvanceTimer() {
@@ -138,33 +149,44 @@ export function useMapPoolShowcase({
     let resolvedIndex = index;
     if (resolvedIndex >= config.maps.length) {
       if (!config.loop) {
+        setPhase('fading-out');
+        setVisualFaded(true);
+        await transport.fadeTransitionGain(0, TRANSITION_DURATION_MS);
+        if (generation !== generationRef.current) return;
         indexRef.current = -1;
         setActive(null);
         publish(null);
         sources.clearSource();
+        setPhase('idle');
         return;
       }
       resolvedIndex = 0;
     }
     const map = config.maps[resolvedIndex];
     if (map === undefined) return;
-    transitioningRef.current = true;
+    setPhase('preparing');
     indexRef.current = resolvedIndex;
     maintainWindow(resolvedIndex, generation);
     const prepared = await ensurePrepared(map, generation);
     if (generation !== generationRef.current) {
-      transitioningRef.current = false;
       return;
     }
+    setPhase('fading-out');
+    setVisualFaded(true);
+    const fadeDuration = transport.clockRef.current === null ? 0 : TRANSITION_DURATION_MS;
+    await transport.fadeTransitionGain(0, fadeDuration);
+    if (generation !== generationRef.current) return;
     if (prepared.kind === 'missing') {
       sources.clearSource();
-      transitioningRef.current = false;
+      setVisualFaded(false);
+      setPhase('idle');
       setActive({ map, replayAvailable: false });
       publish({ ...map, currentSeconds: 0, progressPercent: 0, replayAvailable: false });
       maintainWindow(resolvedIndex, generation);
       advanceTimerRef.current = window.setTimeout(() => void activate(resolvedIndex + 1, generation), 4000);
       return;
     }
+    setPhase('loading');
     const infoPreviewStart = prepared.value.previewStartSeconds;
     const configuredPreviewStart = Number(map.previewStartSeconds);
     const startSeconds =
@@ -177,9 +199,10 @@ export function useMapPoolShowcase({
       difficultyRank: difficultyRank(map.difficulty),
       characteristic: map.characteristic,
     });
-    transitioningRef.current = false;
     if (generation !== generationRef.current) return;
     if (loaded.isErr()) {
+      setVisualFaded(false);
+      setPhase('idle');
       setActive({ map, replayAvailable: false });
       publish({ ...map, currentSeconds: 0, progressPercent: 0, replayAvailable: false });
       advanceTimerRef.current = window.setTimeout(() => void activate(resolvedIndex + 1, generation), 4000);
@@ -195,7 +218,9 @@ export function useMapPoolShowcase({
     const config = enabled ? parseMapPoolShowcaseConfig(configValue) : null;
     configRef.current = config;
     preparedRef.current.clear();
-    transitioningRef.current = false;
+    setPhase('idle');
+    setVisualFaded(false);
+    transport.setTransitionGain(1);
     clearAdvanceTimer();
     setActive(null);
     publish(null);
@@ -209,23 +234,53 @@ export function useMapPoolShowcase({
   }, [configValue, enabled]);
 
   useEffect(() => {
-    if (!enabled || active === null || !active.replayAvailable || session.selectedKey === '') return;
+    if (
+      !enabled ||
+      transitionPhase !== 'loading' ||
+      active === null ||
+      !active.replayAvailable ||
+      session.selectedKey === ''
+    )
+      return;
+    const generation = generationRef.current;
+    setPhase('fading-in');
+    setVisualFaded(false);
+    void transport.fadeTransitionGain(1, TRANSITION_DURATION_MS).then((completed) => {
+      if (completed && generation === generationRef.current) setPhase('idle');
+    });
+  }, [active, enabled, session.selectedKey, transitionPhase]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      transitionPhase !== 'idle' ||
+      active === null ||
+      !active.replayAvailable ||
+      session.selectedKey === ''
+    )
+      return;
     clearAdvanceTimer();
     const config = configRef.current;
     if (config?.durationMode !== 'seconds') return;
     const requested = config.durationSeconds;
     const remaining = transport.duration > 0 ? Math.max(0.1, transport.duration - transport.time) : requested;
-    const delaySeconds = Math.min(requested, remaining);
+    const delaySeconds = Math.max(0.1, Math.min(requested, remaining) - TRANSITION_DURATION_SECONDS);
     const generation = generationRef.current;
     const index = indexRef.current;
     advanceTimerRef.current = window.setTimeout(() => void activate(index + 1, generation), delaySeconds * 1000);
     return clearAdvanceTimer;
-  }, [active, enabled, session.selectedKey]);
+  }, [active, enabled, session.selectedKey, transitionPhase]);
 
   useEffect(() => {
-    if (!enabled || !transport.ended || active === null || !active.replayAvailable || transitioningRef.current) return;
-    void activate(indexRef.current + 1, generationRef.current);
-  }, [active, enabled, transport.ended]);
+    if (!enabled || active === null || !active.replayAvailable || transitioningRef.current) return;
+    const config = configRef.current;
+    const shouldAdvance =
+      transport.ended ||
+      (config?.durationMode === 'full' &&
+        transport.duration > 0 &&
+        transport.duration - transport.time <= TRANSITION_DURATION_SECONDS);
+    if (shouldAdvance) void activate(indexRef.current + 1, generationRef.current);
+  }, [active, enabled, transport.duration, transport.ended, transport.time]);
 
   useEffect(() => {
     if (!enabled || active === null) return;
@@ -250,8 +305,11 @@ export function useMapPoolShowcase({
     () => () => {
       generationRef.current++;
       clearAdvanceTimer();
+      transport.setTransitionGain(1);
       publish(null);
     },
     [],
   );
+
+  return { visualFaded };
 }

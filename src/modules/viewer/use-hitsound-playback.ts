@@ -33,9 +33,12 @@ export function useHitsoundPlayback({
   const eventsRef = useRef<HitsoundEvent[]>([]);
   const timeRef = useRef(0);
   const indexRef = useRef(0);
+  const volumeRef = useRef(volume);
+  const transitionGainRef = useRef(1);
 
   useEffect(() => {
-    player.setVolume(volume);
+    volumeRef.current = volume;
+    player.setVolume(volume * transitionGainRef.current);
   }, [player, volume]);
 
   useEffect(() => {
@@ -190,11 +193,17 @@ export function useHitsoundPlayback({
     indexRef.current = firstHitsoundAfter(eventsRef.current, time - audioOffset * rate);
   }
 
+  function setTransitionGain(gain: number) {
+    transitionGainRef.current = Math.min(Math.max(gain, 0), 1);
+    player.setVolume(volumeRef.current * transitionGainRef.current);
+  }
+
   return {
     clear,
     disable,
     load,
     resume,
     seek,
+    setTransitionGain,
   };
 }

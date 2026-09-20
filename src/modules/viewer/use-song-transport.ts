@@ -38,6 +38,8 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
   const audioSwitchGenerationRef = useRef(0);
   const audioActiveRef = useRef(false);
   const audioProcessingEnabledRef = useRef(settings.masterVolume > 0);
+  const transitionGainRef = useRef(1);
+  const transitionFadeGenerationRef = useRef(0);
   const retainedAudioRef = useRef<RetainedAudioSource | null>(null);
   const songBpmRef = useRef(120);
   const [duration, setDuration] = useState(0);
@@ -62,9 +64,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
   hitsoundsRef.current = hitsounds;
 
   useEffect(() => {
-    clockRef.current?.setVolume(
-      settings.masterMuted || settings.songMuted ? 0 : settings.masterVolume * settings.songVolume,
-    );
+    applyTransitionGain(transitionGainRef.current);
   }, [settings.masterMuted, settings.masterVolume, settings.songMuted, settings.songVolume]);
 
   useEffect(() => {
@@ -135,6 +135,50 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     clockRef.current = null;
   }
 
+  function songVolume(gain = transitionGainRef.current) {
+    const currentSettings = settingsRef.current;
+    return currentSettings.masterMuted || currentSettings.songMuted
+      ? 0
+      : currentSettings.masterVolume * currentSettings.songVolume * gain;
+  }
+
+  function applyTransitionGain(gain: number) {
+    const clamped = Math.min(Math.max(gain, 0), 1);
+    transitionGainRef.current = clamped;
+    clockRef.current?.setVolume(songVolume(clamped));
+    hitsoundsRef.current.setTransitionGain(clamped);
+  }
+
+  function setTransitionGain(gain: number) {
+    transitionFadeGenerationRef.current++;
+    applyTransitionGain(gain);
+  }
+
+  function fadeTransitionGain(target: number, durationMs: number) {
+    const generation = ++transitionFadeGenerationRef.current;
+    const from = transitionGainRef.current;
+    const to = Math.min(Math.max(target, 0), 1);
+    if (durationMs <= 0 || from === to) {
+      applyTransitionGain(to);
+      return Promise.resolve(true);
+    }
+    const startedAt = performance.now();
+    return new Promise<boolean>((resolve) => {
+      function step(now: number) {
+        if (generation !== transitionFadeGenerationRef.current) {
+          resolve(false);
+          return;
+        }
+        const progress = Math.min(1, Math.max(0, (now - startedAt) / durationMs));
+        const eased = progress * progress * (3 - 2 * progress);
+        applyTransitionGain(from + (to - from) * eased);
+        if (progress >= 1) resolve(true);
+        else requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
   function clear() {
     loadGenerationRef.current++;
     audioSwitchGenerationRef.current++;
@@ -195,7 +239,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     clock.setVolume(
       settingsRef.current.masterMuted || settingsRef.current.songMuted
         ? 0
-        : settingsRef.current.masterVolume * settingsRef.current.songVolume,
+        : settingsRef.current.masterVolume * settingsRef.current.songVolume * transitionGainRef.current,
     );
     clockRef.current = clock;
     autoplayRef.current = false;
@@ -233,7 +277,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
       volume:
         currentSettings.masterMuted || currentSettings.songMuted
           ? 0
-          : currentSettings.masterVolume * currentSettings.songVolume,
+          : currentSettings.masterVolume * currentSettings.songVolume * transitionGainRef.current,
     });
     if (
       generation !== audioSwitchGenerationRef.current ||
@@ -358,6 +402,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     clockRef,
     duration,
     ended: duration > 0 && time >= duration && !playing,
+    fadeTransitionGain,
     load,
     playbackRate,
     pause,
@@ -369,6 +414,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     setBeatStepNumerator,
     setHitsoundEvents,
     setPlaybackRate,
+    setTransitionGain,
     started,
     stop,
     time,

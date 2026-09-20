@@ -505,7 +505,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     sources,
     transport,
   });
-  useMapPoolShowcase({
+  const mapPoolShowcase = useMapPoolShowcase({
     enabled: configuredPoolShowcase,
     configValue: search.poolShowcaseConfig,
     session,
@@ -847,6 +847,16 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
           }}
         />
       </div>
+
+      {configuredPoolShowcase && (
+        <div
+          aria-hidden="true"
+          className={cn(
+            'pointer-events-none absolute inset-0 z-[25] bg-black transition-opacity duration-[1400ms] ease-in-out',
+            mapPoolShowcase.visualFaded ? 'opacity-100' : 'opacity-0',
+          )}
+        />
+      )}
 
       {!hideUI &&
         settings.orthoCameraEnabled &&
