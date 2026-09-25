@@ -49,13 +49,21 @@ export function MultiviewShell() {
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
 
   useEffect(() => {
+    const root = document.getElementById('root');
     const previousHtmlBackground = document.documentElement.style.background;
     const previousBodyBackground = document.body.style.background;
+    const previousRootBackground = root?.style.background;
+    const previousGlobalBackground = document.documentElement.style.getPropertyValue('--background');
+    document.documentElement.style.setProperty('--background', 'transparent');
     document.documentElement.style.background = 'transparent';
     document.body.style.background = 'transparent';
+    if (root !== null) root.style.background = 'transparent';
     return () => {
+      if (previousGlobalBackground === '') document.documentElement.style.removeProperty('--background');
+      else document.documentElement.style.setProperty('--background', previousGlobalBackground);
       document.documentElement.style.background = previousHtmlBackground;
       document.body.style.background = previousBodyBackground;
+      if (root !== null) root.style.background = previousRootBackground ?? '';
     };
   }, []);
 

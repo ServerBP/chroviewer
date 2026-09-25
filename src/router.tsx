@@ -147,9 +147,14 @@ export function parseUrlSearch(search: string) {
     typeof parsed.settings === 'object' && parsed.settings !== null && !Array.isArray(parsed.settings)
       ? { ...parsed.settings }
       : {};
+  const legacyReplayTrailShape = nestedSettings.replayTrailShape;
+  if (nestedSettings.replayTrailStyle === undefined && legacyReplayTrailShape !== undefined) {
+    nestedSettings.replayTrailStyle = legacyReplayTrailShape;
+  }
+  delete nestedSettings.replayTrailShape;
   for (const key of replaySaberSearchKeys) {
     if (parsed[key] === undefined) continue;
-    nestedSettings[key] = parsed[key];
+    nestedSettings[key === 'replayTrailShape' ? 'replayTrailStyle' : key] = parsed[key];
   }
   if (Object.keys(nestedSettings).length > 0) parsed.settings = nestedSettings;
   return parsed;
