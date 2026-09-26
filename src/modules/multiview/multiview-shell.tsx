@@ -7,6 +7,17 @@ import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
 import type { MultiviewConfigMessage, MultiviewPlayerConfig, MultiviewStateMessage } from './multiview-protocol';
 
+interface NativeCompositorBridge {
+  send(message: unknown): void;
+  onMessage(listener: (message: unknown) => void): () => void;
+}
+
+declare global {
+  interface Window {
+    beatKhanaNativeCompositor?: NativeCompositorBridge;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -51,6 +62,7 @@ export function MultiviewShell() {
   const playbackRef = useRef(new Map<string, MultiviewPlaybackSnapshot>());
   const lastCorrectionRef = useRef(new Map<string, number>());
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
+  const nativeBridge = typeof window === 'undefined' ? undefined : window.beatKhanaNativeCompositor;
 
   useEffect(() => {
     const sharedParser = new BeatmapParser();
@@ -70,18 +82,26 @@ export function MultiviewShell() {
   }, []);
 
   useEffect(() => {
-    function receive(event: MessageEvent) {
-      if (event.source !== window.parent || !sameBaseSite(event.origin) || !isRecord(event.data)) return;
-      if (event.data.type !== 'beatkhana:multiview-config' || event.data.version !== 1) return;
-      const next = (event.data as unknown as MultiviewConfigMessage).players;
+    function applyConfig(data: unknown) {
+      if (!isRecord(data) || data.type !== 'beatkhana:multiview-config' || data.version !== 1) return;
+      const next = (data as unknown as MultiviewConfigMessage).players;
       if (!Array.isArray(next) || next.length > 12 || !next.every(validPlayer)) return;
-      parentOriginRef.current = event.origin;
       setPlayers(next);
+    }
+    if (nativeBridge !== undefined) {
+      const removeListener = nativeBridge.onMessage(applyConfig);
+      nativeBridge.send({ type: 'beatkhana:multiview-ready', version: 1 });
+      return removeListener;
+    }
+    function receive(event: MessageEvent) {
+      if (event.source !== window.parent || !sameBaseSite(event.origin)) return;
+      parentOriginRef.current = event.origin;
+      applyConfig(event.data);
     }
     window.addEventListener('message', receive);
     window.parent.postMessage({ type: 'beatkhana:multiview-ready', version: 1 }, '*');
     return () => window.removeEventListener('message', receive);
-  }, []);
+  }, [nativeBridge]);
 
   useEffect(() => {
     if (host === null) return;
@@ -130,8 +150,6 @@ export function MultiviewShell() {
           lastCorrectionRef.current.set(entry.player.id, now);
         }
       }
-      const origin = parentOriginRef.current;
-      if (origin === null) return;
       const message: MultiviewStateMessage = {
         type: 'beatkhana:multiview-state',
         version: 1,
@@ -147,10 +165,14 @@ export function MultiviewShell() {
           score: scoreTimelinesRef.current.get(player.id)?.at(primary.playback.time)?.score ?? player.score,
         })),
       };
-      window.parent.postMessage(message, origin);
+      if (nativeBridge !== undefined) nativeBridge.send(message);
+      else {
+        const origin = parentOriginRef.current;
+        if (origin !== null) window.parent.postMessage(message, origin);
+      }
     }, 100);
     return () => window.clearInterval(timer);
-  }, [players]);
+  }, [nativeBridge, players]);
 
   const handlePlayback = useCallback((id: string, snapshot: MultiviewPlaybackSnapshot) => {
     playbackRef.current.set(id, snapshot);
