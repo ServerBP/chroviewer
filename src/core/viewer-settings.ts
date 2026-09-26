@@ -477,9 +477,7 @@ export function loadViewerSettings(
   storage: Pick<Storage, 'getItem'> = localStorage,
   mobile = isMobileDevice(),
 ): ViewerSettings {
-  const defaults: ViewerSettings = mobile
-    ? { ...DEFAULT_VIEWER_SETTINGS, graphicsQuality: 'medium' }
-    : DEFAULT_VIEWER_SETTINGS;
+  const defaults = defaultViewerSettings(mobile);
   const text = storage.getItem(storageKey);
   if (text !== null) {
     const parsed = parseStoredViewerSettings(text);
@@ -544,6 +542,10 @@ export function loadViewerSettings(
   if (parsed.isErr()) return defaults;
   const settings = resetSaberSettings(migrateLegacyColorOverrides(parsed.value));
   return settings.graphicsQuality === 'high' ? { ...settings, graphicsQuality: defaults.graphicsQuality } : settings;
+}
+
+export function defaultViewerSettings(mobile = isMobileDevice()): ViewerSettings {
+  return mobile ? { ...DEFAULT_VIEWER_SETTINGS, graphicsQuality: 'medium' } : { ...DEFAULT_VIEWER_SETTINGS };
 }
 
 function resetSaberSettings(settings: ViewerSettings): ViewerSettings {

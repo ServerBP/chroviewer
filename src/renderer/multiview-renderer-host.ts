@@ -45,7 +45,10 @@ export class MultiviewRendererHost {
       alpha: true,
       antialias: false,
       depth: false,
-      premultipliedAlpha: false,
+      // Chromium/Electron composites WebGL surfaces as premultiplied textures.
+      // Matching that representation prevents zero-alpha sky RGB from becoming
+      // a visible grey rectangle when this canvas sits inside an iframe.
+      premultipliedAlpha: true,
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(1);

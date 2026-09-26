@@ -70,6 +70,7 @@ const searchKeyAliases = new Map(
     beat: 'beat',
     autoplay: 'autoplay',
     hideui: 'hideUI',
+    isolatedsettings: 'isolatedSettings',
     multiview: 'multiview',
     showcase: 'showcase',
     showcaseconfig: 'showcaseConfig',

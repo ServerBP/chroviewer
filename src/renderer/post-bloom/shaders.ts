@@ -115,5 +115,9 @@ void main() {
   gl_FragColor = vec4(color * _Fade, compositeAlpha);
   #include <colorspace_fragment>
   gl_FragColor.a = compositeAlpha;
+  // The multiview canvas is composited by Chromium/Electron as a premultiplied
+  // surface. In transparent mode, remove all hidden RGB from zero-alpha sky
+  // pixels so it cannot appear as a grey iframe background.
+  gl_FragColor.rgb *= mix(1.0, compositeAlpha, _TransparentOutput);
 }
 `;

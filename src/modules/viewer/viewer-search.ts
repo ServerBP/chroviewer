@@ -72,6 +72,7 @@ export const viewerSearchSchema = z.pipe(
     previewStartSeconds: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     autoplay: z.catch(z.optional(z.boolean()), undefined),
     hideUI: z.catch(z.optional(z.boolean()), undefined),
+    isolatedSettings: z.catch(z.optional(z.boolean()), undefined),
     multiview: z.catch(z.optional(z.boolean()), undefined),
     showcase: z.catch(z.optional(z.boolean()), undefined),
     showcaseConfig: z.catch(z.optional(z.string().check(z.maxLength(250_000))), undefined),
@@ -165,6 +166,34 @@ export const viewerSearchSchema = z.pipe(
 );
 
 export type ViewerSearch = z.infer<typeof viewerSearchSchema>;
+
+export function hasExternallyConfiguredSettings(search: ViewerSearch) {
+  return (
+    search.settings !== undefined ||
+    search.qualityPreset !== undefined ||
+    search.maxFps !== undefined ||
+    search.renderScale !== undefined ||
+    search.graphicsQuality !== undefined ||
+    search.mirrorQuality !== undefined ||
+    search.mirrorResolution !== undefined ||
+    search.mirrorMsaaSamples !== undefined ||
+    search.msaaSamples !== undefined ||
+    search.postBloomWidth !== undefined ||
+    search.bloomFogSize !== undefined ||
+    search.screenDisplacement !== undefined ||
+    search.outputWidth !== undefined ||
+    search.outputHeight !== undefined ||
+    search.masterVolume !== undefined ||
+    search.songVolume !== undefined ||
+    search.hitsoundVolume !== undefined ||
+    search.hitsounds !== undefined ||
+    search.camera !== undefined ||
+    search.fov !== undefined ||
+    search.audioOffsetMs !== undefined ||
+    search.lights !== undefined ||
+    search.lightshow !== undefined
+  );
+}
 
 export function hasConfiguredShowcase(search: Pick<ViewerSearch, 'showcase' | 'showcaseConfig'>) {
   return search.showcase === true && search.showcaseConfig !== undefined;

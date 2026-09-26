@@ -54,6 +54,7 @@ interface ViewerSessionOptions {
   >;
   transport: Pick<SongTransport, 'clear' | 'clockRef' | 'load' | 'play' | 'seek' | 'setHitsoundEvents'>;
   performance: RenderPerformanceOptions;
+  persistSettings?: boolean;
   sharedRenderer?: { host: MultiviewRendererHost; id: string };
 }
 
@@ -74,6 +75,7 @@ export function useViewerSession({
   sources,
   transport,
   performance,
+  persistSettings = true,
   sharedRenderer,
 }: ViewerSessionOptions) {
   const t = useTranslations('viewer');
@@ -96,8 +98,9 @@ export function useViewerSession({
   });
 
   useEffect(() => {
+    if (!persistSettings) return;
     saveViewerSettings(persistedSettings);
-  }, [persistedSettings]);
+  }, [persistSettings, persistedSettings]);
 
   useEffect(() => {
     viewerRef.current?.lifecycle.setRenderScale(settings.renderScale);

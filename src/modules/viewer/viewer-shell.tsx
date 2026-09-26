@@ -17,7 +17,12 @@ import { useTranslations } from 'use-intl';
 
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import type { BeatmapParser } from '../../core/beatmap/worker/client';
-import { DEFAULT_VIEWER_SETTINGS, loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
+import {
+  DEFAULT_VIEWER_SETTINGS,
+  defaultViewerSettings,
+  loadViewerSettings,
+  sanitizeViewerSettings,
+} from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
@@ -53,6 +58,7 @@ import { useViewerSession } from './use-viewer-session';
 import { useViewerShare } from './use-viewer-share';
 import { useViewerSources } from './use-viewer-sources';
 import {
+  hasExternallyConfiguredSettings,
   hasConfiguredPoolShowcase,
   hasConfiguredShowcase,
   renderPerformanceForSearch,
@@ -228,9 +234,15 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const configuredShowcase = hasConfiguredShowcase(search);
   const configuredPoolShowcase = hasConfiguredPoolShowcase(search);
   const configuredSequence = configuredShowcase || configuredPoolShowcase;
+  const isolatedSettings = search.isolatedSettings === true || multiview !== undefined;
+  const embeddedSource =
+    taLiveSource || search.previewSource !== undefined || search.showcase === true || search.poolShowcase === true;
+  const externallyConfiguredSettings = embeddedSource || multiview !== undefined || hasExternallyConfiguredSettings(search);
   const [performance, setPerformance] = useState(() => renderPerformanceForSearch(search));
   const [settings, setSettings] = useState(() => {
-    const saved = loadViewerSettings();
+    // Isolated embeds must be deterministic: defaults first, then URL/message
+    // overrides. They neither read from nor write to another viewer's settings.
+    const saved = isolatedSettings ? defaultViewerSettings() : loadViewerSettings();
     const broadcastSettings =
       search.qualityPreset === 'broadcast'
         ? {
@@ -345,6 +357,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     sources,
     transport,
     performance,
+    persistSettings: !isolatedSettings && !externallyConfiguredSettings,
     sharedRenderer: multiview === undefined ? undefined : { host: multiview.host, id: multiview.id },
   });
   const multiviewSettingsSignature =
@@ -381,8 +394,6 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
         };
   const liveActive = liveTarget !== null;
   const taLive = liveTarget?.source === 'ta' || liveTarget?.source === 'cocu';
-  const embeddedSource =
-    taLive || search.previewSource !== undefined || search.showcase === true || search.poolShowcase === true;
   const remoteActive = liveActive || partyActive;
   useEffect(() => {
     if (!embeddedSource) return;

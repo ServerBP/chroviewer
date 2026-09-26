@@ -18,3 +18,9 @@ test('canonicalizes the legacy replay trail shape inside the settings object', (
   expect(parsed.settings).toEqual({ replayTrailStyle: 'rectangle' });
   expect(z.parse(viewerSearchSchema, parsed).settings).toEqual(parsed.settings);
 });
+
+test('parses isolated settings mode case-insensitively', () => {
+  const parsed = parseUrlSearch('?ISOLATEDSETTINGS=true');
+
+  expect(z.parse(viewerSearchSchema, parsed).isolatedSettings).toBe(true);
+});
