@@ -178,7 +178,7 @@ function appendSearchValue(searchParams: URLSearchParams, key: string, value: Ro
 
 function PendingFallback() {
   return (
-    <main className="flex h-dvh items-center justify-center bg-black text-white">
+    <main className="flex h-dvh items-center justify-center bg-transparent text-white">
       <LoaderCircle className="size-11 animate-spin" strokeWidth={1.75} aria-label="Loading" />
     </main>
   );
@@ -186,7 +186,7 @@ function PendingFallback() {
 
 function ErrorFallback({ error }: { error: unknown }) {
   return (
-    <main className="flex h-dvh flex-col items-center justify-center gap-4 bg-black text-white">
+    <main className="flex h-dvh flex-col items-center justify-center gap-4 bg-transparent text-white">
       <AlertCircle className="size-11" strokeWidth={1.75} />
       <span className="text-lg font-semibold tracking-wide">Something went wrong</span>
       {error instanceof Error && error.message !== '' && (
