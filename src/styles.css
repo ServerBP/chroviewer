@@ -133,16 +133,17 @@
   html,
   body,
   #root {
-    @apply bg-background text-foreground size-full overflow-hidden overscroll-none;
+    @apply text-foreground size-full overflow-hidden overscroll-none;
+    background: transparent !important;
   }
 
   body {
     @apply m-0 font-sans antialiased;
   }
 
-  html:has([data-multiview-root]),
-  html:has([data-multiview-root]) body,
-  html:has([data-multiview-root]) #root,
+  /* The document is embedded by broadcast overlays. Never let the application
+     shell contribute an opaque frame behind a renderer canvas. Ordinary viewer
+     canvases remain opaque through RendererLifecycle's alpha:false context. */
   [data-multiview-root],
   [data-multiview-root] canvas {
     background: transparent !important;

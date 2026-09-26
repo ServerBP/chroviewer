@@ -86,8 +86,8 @@ function blueNoiseTexture() {
 export class PostBloomPipeline {
   private readonly sceneTarget = renderTarget(1, 1, true);
   private readonly screenDisplacementTarget = renderTarget(1, 1, true);
-  private readonly downs = Array.from({ length: 16 }, () => renderTarget(1, 1));
-  private readonly ups = Array.from({ length: 16 }, () => renderTarget(1, 1));
+  private readonly downs: WebGLRenderTarget[] = [];
+  private readonly ups: WebGLRenderTarget[] = [];
   private readonly noiseTexture = blueNoiseTexture();
 
   private readonly passScene = new Scene();
@@ -122,7 +122,7 @@ export class PostBloomPipeline {
   };
   private readonly compositeUniforms = {
     _SourceTex: { value: this.sceneTarget.texture },
-    _BloomTex: { value: this.ups[0]?.texture ?? this.downs[0]?.texture },
+    _BloomTex: { value: this.sceneTarget.texture },
     _BlueNoiseTex: { value: this.noiseTexture },
     _SourceTexelSize: { value: new Vector2(1, 1) },
     _BlueNoiseScale: { value: new Vector2(1, 1) },
@@ -131,6 +131,7 @@ export class PostBloomPipeline {
     _BaseColorBoost: { value: POST_BLOOM_BASE_COLOR_BOOST },
     _BaseColorBoostThreshold: { value: POST_BLOOM_BASE_COLOR_BOOST_THRESHOLD },
     _Fade: { value: 1 },
+    _TransparentOutput: { value: 0 },
   };
 
   private readonly prefilterMaterial = passMaterial(POST_BLOOM_PREFILTER_13_FRAG, this.prefilterUniforms);
@@ -152,6 +153,10 @@ export class PostBloomPipeline {
   setSize(width: number, height: number) {
     this.screenDisplacementTarget.setSize(width, height);
     this.layout = postBloomLayout(width, height, this.textureWidth);
+    while (this.downs.length < this.layout.levels.length) this.downs.push(renderTarget(1, 1));
+    while (this.ups.length < this.layout.levels.length) this.ups.push(renderTarget(1, 1));
+    while (this.downs.length > this.layout.levels.length) this.downs.pop()?.dispose();
+    while (this.ups.length > this.layout.levels.length) this.ups.pop()?.dispose();
     this.upsampleUniforms._SampleScale.value = this.layout.sampleScale;
     this.layout.levels.forEach((level, index) => {
       this.downs[index]?.setSize(level.width, level.height);
@@ -244,6 +249,9 @@ export class PostBloomPipeline {
 
     this.noiseFrame++;
     this.compositeUniforms._BloomTex.value = bloomTarget.texture;
+    // Viewport output is only used by the alpha-enabled multiview compositor.
+    // Keep the ordinary viewer's historical opaque post-bloom output intact.
+    this.compositeUniforms._TransparentOutput.value = output === undefined ? 0 : 1;
     this.compositeUniforms._SourceTexelSize.value.set(1 / width, 1 / height);
     this.compositeUniforms._BlueNoiseScale.value.set(width / 64, height / 64);
     this.compositeUniforms._RandomValue.value = (this.noiseFrame * 0.61803398875) % 1;

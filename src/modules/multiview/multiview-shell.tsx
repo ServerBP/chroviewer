@@ -59,25 +59,6 @@ export function MultiviewShell() {
   }, []);
 
   useEffect(() => {
-    const root = document.getElementById('root');
-    const previousHtmlBackground = document.documentElement.style.background;
-    const previousBodyBackground = document.body.style.background;
-    const previousRootBackground = root?.style.background;
-    const previousGlobalBackground = document.documentElement.style.getPropertyValue('--background');
-    document.documentElement.style.setProperty('--background', 'transparent');
-    document.documentElement.style.background = 'transparent';
-    document.body.style.background = 'transparent';
-    if (root !== null) root.style.background = 'transparent';
-    return () => {
-      if (previousGlobalBackground === '') document.documentElement.style.removeProperty('--background');
-      else document.documentElement.style.setProperty('--background', previousGlobalBackground);
-      document.documentElement.style.background = previousHtmlBackground;
-      document.body.style.background = previousBodyBackground;
-      if (root !== null) root.style.background = previousRootBackground ?? '';
-    };
-  }, []);
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
     const rendererHost = new MultiviewRendererHost(canvas);
@@ -177,11 +158,13 @@ export function MultiviewShell() {
 
   const runtimePlayers = useMemo(() => {
     let audioClaimed = false;
-    return players.map((player) => {
-      const audible = !audioClaimed && player.masterVolume > 0;
-      if (audible) audioClaimed = true;
-      return { ...player, masterVolume: audible ? player.masterVolume : 0 };
-    });
+    return players
+      .filter((player) => player.visible)
+      .map((player) => {
+        const audible = !audioClaimed && player.masterVolume > 0;
+        if (audible) audioClaimed = true;
+        return { ...player, masterVolume: audible ? player.masterVolume : 0 };
+      });
   }, [players]);
 
   return (

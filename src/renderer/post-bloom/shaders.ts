@@ -94,6 +94,7 @@ uniform float _BloomIntensity;
 uniform float _BaseColorBoost;
 uniform float _BaseColorBoostThreshold;
 uniform float _Fade;
+uniform float _TransparentOutput;
 varying vec2 vUv;
 void main() {
   vec2 d = _SourceTexelSize * 0.5;
@@ -109,7 +110,8 @@ void main() {
   float noise = (texture2D(_BlueNoiseTex, noiseUv).r - 0.5) / 255.0;
   vec4 bloom = texture2D(_BloomTex, vUv);
   color += bloom.rgb * _BloomIntensity + vec3(noise);
-  float compositeAlpha = clamp(max(alpha, bloom.a), 0.0, 1.0) * _Fade;
+  float transparentAlpha = clamp(max(alpha, bloom.a), 0.0, 1.0) * _Fade;
+  float compositeAlpha = mix(1.0, transparentAlpha, _TransparentOutput);
   gl_FragColor = vec4(color * _Fade, compositeAlpha);
   #include <colorspace_fragment>
   gl_FragColor.a = compositeAlpha;

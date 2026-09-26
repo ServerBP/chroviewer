@@ -109,6 +109,7 @@ export class MultiviewRendererHost {
     const entry = this.entries.get(id);
     if (entry === undefined) return;
     entry.tile = normalized;
+    this.nextFrameAt = 0;
   }
 
   private readonly resize = () => {
@@ -126,7 +127,8 @@ export class MultiviewRendererHost {
     if (this.contextLost || document.hidden) return;
     this.scheduleFrame();
     this.resize();
-    const maxFps = Math.max(1, ...[...this.entries.values()].map((entry) => entry.performance.maxFps));
+    const visibleEntries = [...this.entries.values()].filter((entry) => entry.tile.visible);
+    const maxFps = Math.max(1, ...visibleEntries.map((entry) => entry.performance.maxFps));
     const nextFrameAt = nextRenderDeadline(timestamp, this.nextFrameAt, maxFps);
     if (nextFrameAt === null) return;
     this.nextFrameAt = nextFrameAt;
@@ -134,9 +136,17 @@ export class MultiviewRendererHost {
     this.renderer.setScissorTest(false);
     this.renderer.setClearColor(this.clearColor, 0);
     this.renderer.clear(true, true, true);
-    for (const entry of this.entries.values()) {
+    for (const entry of visibleEntries) {
       const tile = entry.tile;
-      if (!tile.visible || tile.width <= 0 || tile.height <= 0) continue;
+      if (
+        tile.width <= 0 ||
+        tile.height <= 0 ||
+        tile.x >= this.width ||
+        tile.y >= this.height ||
+        tile.x + tile.width <= 0 ||
+        tile.y + tile.height <= 0
+      )
+        continue;
       const renderWidth = Math.max(1, Math.round(tile.width * entry.renderScale));
       const renderHeight = Math.max(1, Math.round(tile.height * entry.renderScale));
       if (renderWidth !== entry.sizedWidth || renderHeight !== entry.sizedHeight) {
