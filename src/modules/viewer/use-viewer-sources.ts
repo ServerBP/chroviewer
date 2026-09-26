@@ -30,6 +30,8 @@ interface UseViewerSourcesOptions {
   setSettings: Dispatch<SetStateAction<ViewerSettings>>;
   onClearViewer: () => void;
   onMapLoaded: () => void;
+  liveMapCache?: LiveMapCache;
+  sharedParser?: import('../../core/beatmap/worker/client').BeatmapParser;
 }
 
 export interface PreparedBeatLeaderShowcase {
@@ -68,10 +70,13 @@ export function useViewerSources({
   setSettings,
   onClearViewer,
   onMapLoaded,
+  liveMapCache: sharedLiveMapCache,
+  sharedParser,
 }: UseViewerSourcesOptions) {
   const [sourceChoices, setSourceChoices] = useState<MapLookup[]>([]);
   const [liveDownloadProgress, setLiveDownloadProgress] = useState<DownloadProgress>(null);
-  const liveMapCache = useRef(new LiveMapCache());
+  const ownedLiveMapCache = useRef(new LiveMapCache());
+  const liveMapCache = sharedLiveMapCache ?? ownedLiveMapCache.current;
   const files = useViewerFileSource({
     setError,
     onClearViewer,
@@ -79,6 +84,7 @@ export function useViewerSources({
     onSourceLoaded: () => {
       setSourceChoices([]);
     },
+    sharedParser,
   });
   const remote = useViewerRemoteSource({
     beginSourceRequest: files.beginSourceRequest,
@@ -98,7 +104,7 @@ export function useViewerSources({
     clearSource: files.clearSource,
     coverUrl: files.coverUrl,
     hasLiveMap(hash: string) {
-      return liveMapCache.current.has(hash);
+      return liveMapCache.has(hash);
     },
     loadFiles(selectedFiles: File[]) {
       return files.loadFiles(selectedFiles, remote.resolveReplayMap);
@@ -196,7 +202,7 @@ export function useViewerSources({
     async loadLiveReplay(hash: string, replay: Replay) {
       const requestId = files.beginSourceRequest();
       files.pendingSharedViewRef.current = {};
-      const cached = liveMapCache.current.get(hash);
+      const cached = liveMapCache.get(hash);
       if (cached !== undefined) {
         setLiveDownloadProgress(null);
         const loaded = await files.loadSourceFiles(requestId, cached.files, replay, {
@@ -205,18 +211,19 @@ export function useViewerSources({
         return loaded.isErr() ? Result.err(loaded.error) : Result.ok(undefined);
       }
       setLiveDownloadProgress(null);
-      const source = await fetchBeatSaverHash(hash, {
-        onProgress(progress) {
-          if (files.isSourceRequestCurrent(requestId)) setLiveDownloadProgress(progress);
-        },
-      });
+      const source = await liveMapCache.getOrLoad(hash, () =>
+        fetchBeatSaverHash(hash, {
+          onProgress(progress) {
+            if (files.isSourceRequestCurrent(requestId)) setLiveDownloadProgress(progress);
+          },
+        }),
+      );
       if (!files.isSourceRequestCurrent(requestId)) return Result.ok(undefined);
       if (source.isErr()) return Result.err(source.error);
       const loaded = await files.loadSourceFiles(requestId, source.value.files, replay, {
         identity: { key: source.value.key, hash: source.value.hash },
       });
       if (loaded.isErr()) return Result.err(loaded.error);
-      if (files.isSourceRequestCurrent(requestId)) liveMapCache.current.set(source.value);
       return Result.ok(undefined);
     },
     async loadWatchPartyMapByHash(hash: string, signal?: AbortSignal) {
@@ -236,7 +243,7 @@ export function useViewerSources({
       });
       if (loaded.isErr()) return Result.err(loaded.error);
       if (!files.isSourceRequestCurrent(requestId)) return Result.ok(null);
-      liveMapCache.current.set(source.value);
+      liveMapCache.set(source.value);
       return Result.ok({ identity: { key: source.value.key, hash: source.value.hash }, rows: loaded.value });
     },
     async loadWatchPartyMapById(input: string, signal?: AbortSignal) {
@@ -256,7 +263,7 @@ export function useViewerSources({
       });
       if (loaded.isErr()) return Result.err(loaded.error);
       if (!files.isSourceRequestCurrent(requestId)) return Result.ok(null);
-      liveMapCache.current.set(source.value);
+      liveMapCache.set(source.value);
       return Result.ok({ identity: { key: source.value.key, hash: source.value.hash }, rows: loaded.value });
     },
     loadSource: remote.loadSource,

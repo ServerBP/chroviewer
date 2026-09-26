@@ -24,6 +24,8 @@ export class BeatmapParser {
   private readonly worker: BeatmapParserWorker;
   private nextId = 0;
   private readonly pending = new Map<number, PendingRequest>();
+  private readonly infoCache = new Map<string, Promise<WorkerSuccess>>();
+  private readonly difficultyCache = new Map<string, Promise<WorkerSuccess>>();
   private failure: Error | null = null;
 
   constructor(worker?: BeatmapParserWorker) {
@@ -63,22 +65,47 @@ export class BeatmapParser {
     });
   }
 
+  private cachedRequest(
+    cache: Map<string, Promise<WorkerSuccess>>,
+    key: string,
+    limit: number,
+    create: () => Promise<WorkerSuccess>,
+  ) {
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+    const request = create();
+    cache.set(key, request);
+    if (cache.size > limit) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined && oldest !== key) cache.delete(oldest);
+    }
+    void request.catch(() => {
+      if (cache.get(key) === request) cache.delete(key);
+    });
+    return request;
+  }
+
   async parseInfo(text: string) {
-    const response = await this.request({ id: this.nextId++, kind: 'info', text });
+    const response = await this.cachedRequest(this.infoCache, text, 4, () =>
+      this.request({ id: this.nextId++, kind: 'info', text }),
+    );
     if (response.kind !== 'info') throw new Error('mismatched worker response');
     return response.result;
   }
 
   async parseDifficulty(text: string, songBpm: number, options: ParseDifficultyOptions = {}) {
-    const response = await this.request({
-      id: this.nextId++,
-      kind: 'difficulty',
-      text,
-      songBpm,
-      lightshowText: options.lightshowText,
-      audioDataText: options.audioDataText,
-      bookmarkText: options.bookmarkText,
-    });
+    const key = `${String(songBpm)}\0${options.lightshowText ?? ''}\0${options.audioDataText ?? ''}\0${options.bookmarkText ?? ''}\0${text}`;
+    const response = await this.cachedRequest(this.difficultyCache, key, 16, () =>
+      this.request({
+        id: this.nextId++,
+        kind: 'difficulty',
+        text,
+        songBpm,
+        lightshowText: options.lightshowText,
+        audioDataText: options.audioDataText,
+        bookmarkText: options.bookmarkText,
+      }),
+    );
     if (response.kind !== 'difficulty') throw new Error('mismatched worker response');
     return response.result;
   }
@@ -91,6 +118,8 @@ export class BeatmapParser {
 
   dispose() {
     this.fail(new Error('beatmap parser disposed'));
+    this.infoCache.clear();
+    this.difficultyCache.clear();
     this.worker.terminate();
   }
 }

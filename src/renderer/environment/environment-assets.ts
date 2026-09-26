@@ -26,6 +26,14 @@ export interface LoadedEnvironmentAssets {
 
 type EnvironmentDataLoader = (id: string, signal?: AbortSignal) => Promise<EnvironmentData>;
 
+interface CachedEnvironmentAssets {
+  refs: number;
+  assets?: LoadedEnvironmentAssets;
+  promise: Promise<LoadedEnvironmentAssets>;
+}
+
+const environmentAssetsCache = new Map<string, CachedEnvironmentAssets>();
+
 function materialTextureAssets(data: EnvironmentData) {
   return [
     ...Object.values(data.materials).flatMap((material) =>
@@ -71,7 +79,7 @@ function linearTextureAssets(data: EnvironmentData) {
   return linearAssets;
 }
 
-export async function loadEnvironmentAssets(
+async function loadEnvironmentAssetsUncached(
   id: string,
   signal?: AbortSignal,
   loadData: EnvironmentDataLoader = loadEnvironmentData,
@@ -151,6 +159,76 @@ export async function loadEnvironmentAssets(
     return { data, textures, reflectionProbe, bakedReflectionProbe, dispose };
   } catch (error) {
     dispose();
+    throw error;
+  }
+}
+
+function cloneBakedReflectionProbe(probe: EnvironmentBakedReflectionProbe | undefined) {
+  if (probe === undefined) return undefined;
+  return {
+    ...probe,
+    textures: probe.textures,
+    position: probe.position.clone(),
+    boxMin: probe.boxMin.clone(),
+    boxMax: probe.boxMax.clone(),
+    lightColors: probe.lightColors.map((color) => color.clone()),
+  };
+}
+
+function releaseCachedAssets(id: string, entry: CachedEnvironmentAssets) {
+  entry.refs = Math.max(0, entry.refs - 1);
+  if (entry.refs !== 0 || entry.assets === undefined) return;
+  if (environmentAssetsCache.get(id) === entry) environmentAssetsCache.delete(id);
+  entry.assets.dispose();
+}
+
+export async function loadEnvironmentAssets(
+  id: string,
+  signal?: AbortSignal,
+  loadData: EnvironmentDataLoader = loadEnvironmentData,
+): Promise<LoadedEnvironmentAssets> {
+  // Injected loaders are predominantly used by isolated callers/tests and may
+  // return mutable fixture data, so only production assets participate in the
+  // cross-view cache.
+  if (loadData !== loadEnvironmentData) return loadEnvironmentAssetsUncached(id, signal, loadData);
+
+  let entry = environmentAssetsCache.get(id);
+  if (entry === undefined) {
+    const promise = loadEnvironmentAssetsUncached(id, undefined, loadEnvironmentData);
+    entry = { refs: 0, promise };
+    environmentAssetsCache.set(id, entry);
+    const created = entry;
+    void promise
+      .then((assets) => {
+        created.assets = assets;
+        if (created.refs === 0) {
+          if (environmentAssetsCache.get(id) === created) environmentAssetsCache.delete(id);
+          assets.dispose();
+        }
+      })
+      .catch(() => {
+        if (environmentAssetsCache.get(id) === created) environmentAssetsCache.delete(id);
+      });
+  }
+
+  entry.refs++;
+  try {
+    const assets = await entry.promise;
+    signal?.throwIfAborted();
+    let disposed = false;
+    return {
+      data: assets.data,
+      textures: assets.textures,
+      reflectionProbe: assets.reflectionProbe,
+      bakedReflectionProbe: cloneBakedReflectionProbe(assets.bakedReflectionProbe),
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        releaseCachedAssets(id, entry);
+      },
+    };
+  } catch (error) {
+    releaseCachedAssets(id, entry);
     throw error;
   }
 }

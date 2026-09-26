@@ -1,6 +1,7 @@
 import { Color, WebGLRenderer } from 'three';
 
 import type { MapView } from './map-view';
+import { nextRenderDeadline } from './render-frame-pacing';
 import type { RenderPerformanceOptions } from './render-performance';
 import { clampRenderScale } from './render-scale';
 
@@ -34,6 +35,7 @@ export class MultiviewRendererHost {
   private resizeObserver: ResizeObserver | null = null;
   private frameHandle: number | null = null;
   private contextLost = false;
+  private nextFrameAt = 0;
   private width = 1;
   private height = 1;
 
@@ -72,11 +74,13 @@ export class MultiviewRendererHost {
       sizedHeight: -1,
     };
     this.entries.set(id, entry);
+    this.nextFrameAt = 0;
     return {
       setPerformance: (next) => {
         entry.performance = { ...next };
         view.setRenderPerformance(next);
         entry.sizedWidth = -1;
+        this.nextFrameAt = 0;
       },
       setRenderScale: (scale) => {
         entry.renderScale = clampRenderScale(scale);
@@ -87,7 +91,10 @@ export class MultiviewRendererHost {
 
   unregister(id: string, view: MapView) {
     const entry = this.entries.get(id);
-    if (entry?.view === view) this.entries.delete(id);
+    if (entry?.view === view) {
+      this.entries.delete(id);
+      this.nextFrameAt = 0;
+    }
   }
 
   setTile(id: string, tile: MultiviewTile) {
@@ -114,11 +121,15 @@ export class MultiviewRendererHost {
     this.renderer.setSize(width, height, false);
   };
 
-  private readonly frame = () => {
+  private readonly frame = (timestamp: number) => {
     this.frameHandle = null;
     if (this.contextLost || document.hidden) return;
     this.scheduleFrame();
     this.resize();
+    const maxFps = Math.max(1, ...[...this.entries.values()].map((entry) => entry.performance.maxFps));
+    const nextFrameAt = nextRenderDeadline(timestamp, this.nextFrameAt, maxFps);
+    if (nextFrameAt === null) return;
+    this.nextFrameAt = nextFrameAt;
     this.renderer.setRenderTarget(null);
     this.renderer.setScissorTest(false);
     this.renderer.setClearColor(this.clearColor, 0);
@@ -158,6 +169,7 @@ export class MultiviewRendererHost {
 
   private readonly handleContextRestored = () => {
     this.contextLost = false;
+    this.nextFrameAt = 0;
     for (const entry of this.entries.values()) entry.view.contextRestored();
     this.scheduleFrame();
   };
@@ -167,6 +179,7 @@ export class MultiviewRendererHost {
       if (this.frameHandle !== null) cancelAnimationFrame(this.frameHandle);
       this.frameHandle = null;
     } else {
+      this.nextFrameAt = 0;
       this.resize();
       this.scheduleFrame();
     }

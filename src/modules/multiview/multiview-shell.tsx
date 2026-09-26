@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { BeatmapParser } from '../../core/beatmap/worker/client';
 import { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-sync';
+import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
 import type { MultiviewConfigMessage, MultiviewPlayerConfig, MultiviewStateMessage } from './multiview-protocol';
 
@@ -42,11 +44,19 @@ function validPlayer(value: unknown): value is MultiviewPlayerConfig {
 export function MultiviewShell() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [host, setHost] = useState<MultiviewRendererHost | null>(null);
+  const [parser, setParser] = useState<BeatmapParser | null>(null);
   const [players, setPlayers] = useState<MultiviewPlayerConfig[]>([]);
+  const mapCache = useMemo(() => new LiveMapCache(), []);
   const parentOriginRef = useRef<string | null>(null);
   const playbackRef = useRef(new Map<string, MultiviewPlaybackSnapshot>());
   const lastCorrectionRef = useRef(new Map<string, number>());
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
+
+  useEffect(() => {
+    const sharedParser = new BeatmapParser();
+    setParser(sharedParser);
+    return () => sharedParser.dispose();
+  }, []);
 
   useEffect(() => {
     const root = document.getElementById('root');
@@ -157,7 +167,7 @@ export function MultiviewShell() {
         })),
       };
       window.parent.postMessage(message, origin);
-    }, 50);
+    }, 100);
     return () => window.clearInterval(timer);
   }, [players]);
 
@@ -175,9 +185,9 @@ export function MultiviewShell() {
   }, [players]);
 
   return (
-    <main className="relative size-full overflow-hidden bg-transparent">
+    <main data-multiview-root className="relative size-full overflow-hidden bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 size-full" />
-      {host !== null &&
+      {host !== null && parser !== null &&
         runtimePlayers.map((player) => (
           <ViewerShell
             key={player.id}
@@ -185,11 +195,13 @@ export function MultiviewShell() {
               id: player.id,
               playerId: player.playerId,
               host,
+              mapCache,
               masterVolume: player.masterVolume,
               hitsoundVolume: player.hitsoundVolume,
               disableGameUI: player.disableGameUI,
               lights: player.lights,
               settings: player.settings,
+              parser,
               onPlayback: (snapshot) => handlePlayback(player.id, snapshot),
             }}
           />

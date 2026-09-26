@@ -16,6 +16,7 @@ import {
 import { useTranslations } from 'use-intl';
 
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
+import type { BeatmapParser } from '../../core/beatmap/worker/client';
 import { DEFAULT_VIEWER_SETTINGS, loadViewerSettings, sanitizeViewerSettings } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
@@ -24,6 +25,7 @@ import { useMapPoolShowcase } from '../map-pool-showcase/use-map-pool-showcase';
 import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '../live/embedded-realtime-score-sync';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
 import { replayLightshowMode } from '../live/live-replay';
+import type { LiveMapCache } from '../live/live-map-cache';
 import type { LiveTarget } from '../live/live-types';
 import { LiveViewerPanel } from '../live/live-viewer-panel';
 import { useLiveExperience } from '../live/use-live-experience';
@@ -192,6 +194,8 @@ interface ViewerShellProps {
     disableGameUI: boolean;
     lights: 'full' | 'static' | 'none';
     settings?: Record<string, string | number | boolean>;
+    mapCache: LiveMapCache;
+    parser: BeatmapParser;
     onPlayback(snapshot: MultiviewPlaybackSnapshot): void;
   };
 }
@@ -213,7 +217,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
           disableGameUI: multiview.disableGameUI,
           lights: multiview.lights,
           qualityPreset: 'broadcast' as const,
-          maxFps: 60,
+          maxFps: typeof multiview.settings?.maxFps === 'number' ? multiview.settings.maxFps : 60,
         };
   const t = useTranslations('viewer');
   const commonT = useTranslations('common');
@@ -320,6 +324,8 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     onMapLoaded() {
       session.clearMapSelection();
     },
+    liveMapCache: multiview?.mapCache,
+    sharedParser: multiview?.parser,
   });
   const session = useViewerSession({
     disableGameUI: search.disableGameUI === true,

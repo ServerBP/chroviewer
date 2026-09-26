@@ -140,6 +140,14 @@
     @apply m-0 font-sans antialiased;
   }
 
+  html:has([data-multiview-root]),
+  html:has([data-multiview-root]) body,
+  html:has([data-multiview-root]) #root,
+  [data-multiview-root],
+  [data-multiview-root] canvas {
+    background: transparent !important;
+  }
+
   button,
   select,
   input {

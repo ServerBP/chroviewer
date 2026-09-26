@@ -42,6 +42,7 @@ interface UseViewerFileSourceOptions {
   onClearViewer: () => void;
   onMapLoaded: () => void;
   onSourceLoaded: () => void;
+  sharedParser?: BeatmapParser;
 }
 
 const legacyDifficultyRanks = new Map(
@@ -70,6 +71,7 @@ export function useViewerFileSource({
   onClearViewer,
   onMapLoaded,
   onSourceLoaded,
+  sharedParser,
 }: UseViewerFileSourceOptions) {
   const t = useTranslations('viewer');
   const parserRef = useRef<BeatmapParser | null>(null);
@@ -95,15 +97,15 @@ export function useViewerFileSource({
   }
 
   useEffect(() => {
-    const parser = new BeatmapParser();
+    const parser = sharedParser ?? new BeatmapParser();
     parserRef.current = parser;
     return () => {
       sourceGenerationRef.current++;
-      parser.dispose();
+      if (sharedParser === undefined) parser.dispose();
       parserRef.current = null;
       revokeCover();
     };
-  }, []);
+  }, [sharedParser]);
 
   function beginSourceRequest() {
     sourceGenerationRef.current++;

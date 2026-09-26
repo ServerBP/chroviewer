@@ -107,9 +107,11 @@ void main() {
   vec3 color = min(texture2D(_SourceTex, vUv).rgb + vec3(whiteBoost), vec3(1.0));
   vec2 noiseUv = (vUv + vec2(0.103, 0.197)) * _BlueNoiseScale + vec2(_RandomValue);
   float noise = (texture2D(_BlueNoiseTex, noiseUv).r - 0.5) / 255.0;
-  color += texture2D(_BloomTex, vUv).rgb * _BloomIntensity + vec3(noise);
-  gl_FragColor = vec4(color * _Fade, 1.0);
+  vec4 bloom = texture2D(_BloomTex, vUv);
+  color += bloom.rgb * _BloomIntensity + vec3(noise);
+  float compositeAlpha = clamp(max(alpha, bloom.a), 0.0, 1.0) * _Fade;
+  gl_FragColor = vec4(color * _Fade, compositeAlpha);
   #include <colorspace_fragment>
-  gl_FragColor.a = 1.0;
+  gl_FragColor.a = compositeAlpha;
 }
 `;
