@@ -11,6 +11,9 @@ export interface MultiviewPlayerConfig {
   hitsoundVolume: number;
   disableGameUI: boolean;
   lights: 'full' | 'static' | 'none';
+  backgroundColor?: string;
+  waitingColor?: string;
+  waitingText?: string;
   settings: Record<string, string | number | boolean>;
   score: unknown;
 }

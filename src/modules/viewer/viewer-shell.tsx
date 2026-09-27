@@ -31,7 +31,7 @@ import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '.
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
 import { replayLightshowMode } from '../live/live-replay';
 import type { LiveMapCache } from '../live/live-map-cache';
-import type { LiveTarget } from '../live/live-types';
+import type { LiveStatus, LiveTarget } from '../live/live-types';
 import { LiveViewerPanel } from '../live/live-viewer-panel';
 import { useLiveExperience } from '../live/use-live-experience';
 import { ReplayPlayerCard } from '../replay/replay-player-card';
@@ -186,6 +186,8 @@ export interface MultiviewPlaybackSnapshot {
   beat: number;
   bpm: number;
   playing: boolean;
+  status: LiveStatus;
+  error: string;
   map: MapMeta | null;
   seek(time: number): void;
 }
@@ -820,10 +822,12 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
       beat: quantizedBeatAt(transport.time, sources.songBpm, 1 / 1000),
       bpm: sources.songBpm,
       playing: transport.playing,
+      status: live.status,
+      error,
       map: sources.mapMeta,
       seek: transport.seek,
     });
-  }, [multiview, sources.mapMeta, sources.songBpm, transport.duration, transport.playing, transport.time]);
+  }, [error, live.status, multiview, sources.mapMeta, sources.songBpm, transport.duration, transport.playing, transport.time]);
 
   if (multiview !== undefined) return null;
   return (
@@ -889,6 +893,25 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
             }}
           />
         )}
+
+      {hideUI && taLive && !(live.status === 'watching' && transport.playing && sources.mapMeta !== null && transport.duration > 0) && (
+        <ViewerOverlay
+          backdropBlur={false}
+          className="!bg-black"
+          icon={live.status === 'error' ? AlertCircle : LoaderCircle}
+          iconClassName={live.status === 'error' || live.status === 'paused' ? '' : 'animate-spin'}
+          label={
+            live.status === 'error' ? error || 'Replay stream unavailable'
+              : live.status === 'connecting' ? 'Connecting to TournamentAssistant'
+                : live.status === 'reconnecting' ? 'Reconnecting to TournamentAssistant'
+                  : live.status === 'loading' ? t('liveDownloadingMap')
+                    : live.status === 'buffering' ? 'Preparing replay stream'
+                      : live.status === 'paused' ? t('livePaused')
+                        : 'Waiting for replay stream'
+          }
+          progress={live.status === 'loading' ? sources.liveDownloadProgress : undefined}
+        />
+      )}
 
       {!hideUI && liveActive && liveInterruption !== null && (
         <ViewerOverlay
