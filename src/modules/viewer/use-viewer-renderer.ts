@@ -145,7 +145,9 @@ export function useViewerRenderer({
         );
         view.setReplay(replayRef.current, hitScoreVisualizerForSettings(settingsRef.current, replayRef.current));
         view.setBeatSource(
-          () => sharedTimeline?.timeline.beatFor(sharedTimeline.id) ?? clockRef.current?.currentBeat() ?? 0,
+          // Prefer the local high-resolution clock. Shared timeline samples are
+          // intentionally only a fallback while a clock is being installed.
+          () => clockRef.current?.currentBeat() ?? sharedTimeline?.timeline.beatFor(sharedTimeline.id) ?? 0,
         );
       }
 

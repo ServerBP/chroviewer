@@ -368,7 +368,10 @@ export function useViewerSession({
 
     viewer.view.setSongDuration(clock.duration);
     viewer.view.setBeatSource(
-      () => sharedTimeline?.timeline.beatFor(sharedTimeline.id) ?? transport.clockRef.current?.currentBeat() ?? 0,
+      // Render from the POV's continuous clock. The multiview timeline is an
+      // observer used for rare drift correction; its 100 ms status snapshots
+      // must never become the per-frame animation clock.
+      () => transport.clockRef.current?.currentBeat() ?? sharedTimeline?.timeline.beatFor(sharedTimeline.id) ?? 0,
     );
     setSelectedKey(row.key);
     if (requestId === selectionRequestRef.current) setDifficultyLoading(false);
