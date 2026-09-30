@@ -45,10 +45,10 @@ export class MultiviewRendererHost {
       alpha: true,
       antialias: false,
       depth: false,
-      // Chromium/Electron composites WebGL surfaces as premultiplied textures.
-      // Matching that representation prevents zero-alpha sky RGB from becoming
-      // a visible grey rectangle when this canvas sits inside an iframe.
-      premultipliedAlpha: true,
+      // Post-bloom writes straight-alpha color. Let Chromium convert that
+      // drawing buffer for composition instead of treating it as already
+      // premultiplied, which would dim translucent glow and environment pixels.
+      premultipliedAlpha: false,
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(1);
