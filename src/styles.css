@@ -58,7 +58,12 @@
 }
 
 :root {
-  color-scheme: dark;
+  /* Keep the document canvas transparent when ChroViewer is embedded. The CSS
+     Color Adjustment spec requires Chromium to paint an opaque Canvas-color
+     backplate when an iframe element and its document use different schemes.
+     BeatKhana's embedding iframe uses the initial `normal` scheme, so opting
+     this root into `dark` turned transparent pixels into Chromium's #121212. */
+  color-scheme: normal;
   --font-sans:
     'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
     'Noto Color Emoji';
