@@ -25,6 +25,34 @@ interface TimelineEntry {
   entry: TimedSnapshot;
 }
 
+export interface MultiviewCorrectionState {
+  aheadSince: number | null;
+  armed: boolean;
+}
+
+export const multiviewSyncThresholdSeconds = 0.5;
+const multiviewSyncRearmSeconds = 0.2;
+const multiviewSyncSustainMs = 1000;
+
+export function advanceMultiviewCorrection(
+  current: MultiviewCorrectionState | undefined,
+  aheadBy: number,
+  now: number,
+) {
+  const state = current ?? { aheadSince: null, armed: true };
+  if (aheadBy <= multiviewSyncThresholdSeconds) {
+    state.aheadSince = null;
+    if (aheadBy <= multiviewSyncRearmSeconds) state.armed = true;
+    return { correct: false, state };
+  }
+  if (!state.armed) return { correct: false, state };
+  state.aheadSince ??= now;
+  if (now - state.aheadSince < multiviewSyncSustainMs) return { correct: false, state };
+  state.aheadSince = null;
+  state.armed = false;
+  return { correct: true, state };
+}
+
 export interface MultiviewTimelineSample extends MultiviewTimelineSnapshot {
   id: string;
 }
@@ -118,9 +146,12 @@ export class MultiviewTimeline {
       return mapReference;
     }
     const currentAnchor = candidates.find((candidate) => candidate.id === this.anchorId);
-    // Avoid changing the beat source for harmless sub-frame clock jitter. The
-    // anchor changes only when another healthy POV is materially farther back.
-    if (currentAnchor !== undefined && sampleAt(currentAnchor.entry, now).time <= slowestTime + 0.1) {
+    // Keep the reference stable while the POVs remain within the allowed sync
+    // window. Small clock differences must not influence normal rendering.
+    if (
+      currentAnchor !== undefined &&
+      sampleAt(currentAnchor.entry, now).time <= slowestTime + multiviewSyncThresholdSeconds
+    ) {
       return currentAnchor;
     }
     this.anchorId = slowest.id;
@@ -138,11 +169,7 @@ export class MultiviewTimeline {
   }
 
   sampleFor(id: string, now = performance.now()): MultiviewTimelineSample | null {
-    const own = this.snapshots.get(id);
-    if (own === undefined || own.snapshot.duration <= 0) return null;
-    const primary = this.primaryEntry(now);
-    const selected = primary !== null && sameMap(own.snapshot, primary.entry.snapshot) ? primary : { id, entry: own };
-    return { id: selected.id, ...sampleAt(selected.entry, now) };
+    return this.ownSample(id, now);
   }
 
   beatFor(id: string) {

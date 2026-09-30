@@ -6,7 +6,12 @@ import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-s
 import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
 import type { MultiviewConfigMessage, MultiviewPlayerConfig, MultiviewStateMessage } from './multiview-protocol';
-import { MultiviewTimeline, multiviewAudioOwner } from './multiview-timeline';
+import {
+  advanceMultiviewCorrection,
+  MultiviewTimeline,
+  multiviewAudioOwner,
+  type MultiviewCorrectionState,
+} from './multiview-timeline';
 
 interface NativeCompositorBridge {
   send(message: unknown): void;
@@ -89,15 +94,6 @@ interface TilePlaybackState {
   status: MultiviewPlaybackSnapshot['status'];
 }
 
-interface TimelineCorrectionState {
-  aheadSince: number | null;
-  lastCorrection: number;
-}
-
-const syncDriftToleranceSeconds = 0.25;
-const syncDriftSustainMs = 750;
-const syncCorrectionCooldownMs = 2000;
-
 function waitingLabel(player: MultiviewPlayerConfig, playback: TilePlaybackState | undefined) {
   if (
     playback !== undefined &&
@@ -135,8 +131,9 @@ export function MultiviewShell() {
   const timeline = useMemo(() => new MultiviewTimeline(), []);
   const parentOriginRef = useRef<string | null>(null);
   const playbackRef = useRef(new Map<string, MultiviewPlaybackSnapshot>());
-  const correctionStateRef = useRef(new Map<string, TimelineCorrectionState>());
+  const correctionStateRef = useRef(new Map<string, MultiviewCorrectionState>());
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
+  const lastStatePublishRef = useRef(Number.NEGATIVE_INFINITY);
   const nativeBridge = typeof window === 'undefined' ? undefined : window.beatKhanaNativeCompositor;
 
   useEffect(() => {
@@ -247,25 +244,21 @@ export function MultiviewShell() {
           correctionStateRef.current.delete(entry.player.id);
           continue;
         }
-        const correction = correctionStateRef.current.get(entry.player.id) ?? {
-          aheadSince: null,
-          lastCorrection: Number.NEGATIVE_INFINITY,
-        };
-        correctionStateRef.current.set(entry.player.id, correction);
-        if (aheadBy <= syncDriftToleranceSeconds) {
-          correction.aheadSince = null;
-          continue;
-        }
-        correction.aheadSince ??= now;
-        if (
-          now - correction.aheadSince >= syncDriftSustainMs &&
-          now - correction.lastCorrection >= syncCorrectionCooldownMs
-        ) {
+        const correction = advanceMultiviewCorrection(
+          correctionStateRef.current.get(entry.player.id),
+          aheadBy,
+          now,
+        );
+        correctionStateRef.current.set(entry.player.id, correction.state);
+        if (correction.correct) {
           entry.playback.seek(primarySample.time);
-          correction.aheadSince = null;
-          correction.lastCorrection = now;
         }
       }
+      // Parent overlay state drives a large Svelte scene tree. Five updates per
+      // second are enough for score/progress consumers while keeping that work
+      // away from the WebGL frame loop. Drift observation remains at 10 Hz.
+      if (now - lastStatePublishRef.current < 200) return;
+      lastStatePublishRef.current = now;
       const message: MultiviewStateMessage = {
         type: 'beatkhana:multiview-state',
         version: 1,
