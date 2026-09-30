@@ -19,6 +19,7 @@ import { resolveEnvironmentId } from '../../renderer/environment/environment-cat
 import { EnvironmentLoadAborted, type EnvironmentLoadFailure } from '../../renderer/environment/environment-error';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import type { RenderPerformanceOptions } from '../../renderer/render-performance';
+import type { MultiviewTimeline } from '../multiview/multiview-timeline';
 import type { useSongTransport } from './use-song-transport';
 import { useViewerRenderer } from './use-viewer-renderer';
 import type { useViewerSources } from './use-viewer-sources';
@@ -56,6 +57,7 @@ interface ViewerSessionOptions {
   performance: RenderPerformanceOptions;
   persistSettings?: boolean;
   sharedRenderer?: { host: MultiviewRendererHost; id: string };
+  sharedTimeline?: { timeline: MultiviewTimeline; id: string };
 }
 
 export function useViewerSession({
@@ -77,6 +79,7 @@ export function useViewerSession({
   performance,
   persistSettings = true,
   sharedRenderer,
+  sharedTimeline,
 }: ViewerSessionOptions) {
   const t = useTranslations('viewer');
   const activeSelectionRef = useRef<ActiveSelection | null>(null);
@@ -95,6 +98,7 @@ export function useViewerSession({
     skipInitialMenuEnvironment,
     setError,
     sharedRenderer,
+    sharedTimeline,
   });
 
   useEffect(() => {
@@ -363,7 +367,9 @@ export function useViewerSession({
     }
 
     viewer.view.setSongDuration(clock.duration);
-    viewer.view.setBeatSource(() => transport.clockRef.current?.currentBeat() ?? 0);
+    viewer.view.setBeatSource(
+      () => sharedTimeline?.timeline.beatFor(sharedTimeline.id) ?? transport.clockRef.current?.currentBeat() ?? 0,
+    );
     setSelectedKey(row.key);
     if (requestId === selectionRequestRef.current) setDifficultyLoading(false);
     return true;

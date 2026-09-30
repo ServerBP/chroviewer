@@ -25,6 +25,7 @@ import {
 } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
+import type { MultiviewTimeline } from '../multiview/multiview-timeline';
 import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
 import { useMapPoolShowcase } from '../map-pool-showcase/use-map-pool-showcase';
 import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '../live/embedded-realtime-score-sync';
@@ -189,6 +190,8 @@ export interface MultiviewPlaybackSnapshot {
   status: LiveStatus;
   error: string;
   map: MapMeta | null;
+  mapHash: string | null;
+  playbackRate: number;
   seek(time: number): void;
 }
 
@@ -201,6 +204,7 @@ interface ViewerShellProps {
     hitsoundVolume: number;
     disableGameUI: boolean;
     lights: 'full' | 'static' | 'none';
+    timeline: MultiviewTimeline;
     settings?: Record<string, string | number | boolean>;
     mapCache: LiveMapCache;
     parser: BeatmapParser;
@@ -361,6 +365,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     performance,
     persistSettings: !isolatedSettings && !externallyConfiguredSettings,
     sharedRenderer: multiview === undefined ? undefined : { host: multiview.host, id: multiview.id },
+    sharedTimeline: multiview === undefined ? undefined : { timeline: multiview.timeline, id: multiview.id },
   });
   const multiviewSettingsSignature =
     multiview === undefined
@@ -540,6 +545,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const live = useLiveExperience({
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,
     appendReplayNoteEvents: session.appendLiveReplayNoteEvents,
+    externalTimeline: multiview !== undefined,
     hasLiveMap: (hash) => sources.hasLiveMap(hash),
     loadLiveReplay: (hash, replay) => {
       if (taLiveSource && embeddedLights === null && search.lights === undefined) {
@@ -825,9 +831,21 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
       status: live.status,
       error,
       map: sources.mapMeta,
+      mapHash: sources.mapIdentity?.hash ?? null,
+      playbackRate: transport.clockRef.current?.getRate() ?? 1,
       seek: transport.seek,
     });
-  }, [error, live.status, multiview, sources.mapMeta, sources.songBpm, transport.duration, transport.playing, transport.time]);
+  }, [
+    error,
+    live.status,
+    multiview,
+    sources.mapIdentity,
+    sources.mapMeta,
+    sources.songBpm,
+    transport.duration,
+    transport.playing,
+    transport.time,
+  ]);
 
   if (multiview !== undefined) return null;
   return (

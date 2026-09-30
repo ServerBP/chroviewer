@@ -51,6 +51,7 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
   const [playing, setPlaying] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const hitsounds = useHitsoundPlayback({
+    enabled: settings.masterVolume > 0,
     audioOffset: settings.audioOffsetMs / 1000,
     clockRef,
     lightshowModeRef,

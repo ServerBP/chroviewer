@@ -1,0 +1,107 @@
+export interface MultiviewTimelinePlayer {
+  id: string;
+  masterVolume: number;
+}
+
+export interface MultiviewTimelineSnapshot {
+  beat: number;
+  bpm: number;
+  duration: number;
+  mapHash: string | null;
+  mapTitle: string | null;
+  playbackRate: number;
+  playing: boolean;
+  time: number;
+}
+
+interface TimedSnapshot {
+  observedAt: number;
+  snapshot: MultiviewTimelineSnapshot;
+}
+
+interface TimelineEntry {
+  id: string;
+  entry: TimedSnapshot;
+}
+
+export interface MultiviewTimelineSample extends MultiviewTimelineSnapshot {
+  id: string;
+}
+
+function sameMap(left: MultiviewTimelineSnapshot, right: MultiviewTimelineSnapshot) {
+  if (left.mapHash !== null && right.mapHash !== null) return left.mapHash === right.mapHash;
+  return left.mapTitle !== null && left.mapTitle === right.mapTitle;
+}
+
+function sampleAt(entry: TimedSnapshot, now: number) {
+  const snapshot = entry.snapshot;
+  const elapsed = snapshot.playing ? (Math.max(0, now - entry.observedAt) / 1000) * snapshot.playbackRate : 0;
+  const time = Math.min(snapshot.duration, Math.max(0, snapshot.time + elapsed));
+  return {
+    ...snapshot,
+    beat: snapshot.beat + ((time - snapshot.time) * snapshot.bpm) / 60,
+    time,
+  };
+}
+
+export function multiviewAudioOwner(players: MultiviewTimelinePlayer[]) {
+  let owner: MultiviewTimelinePlayer | undefined;
+  for (const player of players) {
+    if (player.masterVolume <= 0) continue;
+    if (owner === undefined || player.masterVolume > owner.masterVolume) owner = player;
+  }
+  return owner?.id ?? null;
+}
+
+export class MultiviewTimeline {
+  private readonly snapshots = new Map<string, TimedSnapshot>();
+  private playerOrder: string[] = [];
+  private preferredId: string | null = null;
+
+  configure(players: MultiviewTimelinePlayer[]) {
+    this.playerOrder = players.map((player) => player.id);
+    this.preferredId = multiviewAudioOwner(players);
+    const active = new Set(this.playerOrder);
+    for (const id of this.snapshots.keys()) {
+      if (!active.has(id)) this.snapshots.delete(id);
+    }
+  }
+
+  update(id: string, snapshot: MultiviewTimelineSnapshot, observedAt = performance.now()) {
+    this.snapshots.set(id, { observedAt, snapshot: { ...snapshot } });
+  }
+
+  private primaryEntry(): TimelineEntry | null {
+    let first: TimelineEntry | null = null;
+    let firstPlaying: TimelineEntry | null = null;
+    let preferred: TimelineEntry | null = null;
+    for (const id of this.playerOrder) {
+      const entry = this.snapshots.get(id);
+      if (entry === undefined || entry.snapshot.duration <= 0) continue;
+      const candidate = { id, entry };
+      first ??= candidate;
+      if (entry.snapshot.playing) firstPlaying ??= candidate;
+      if (id !== this.preferredId) continue;
+      preferred = candidate;
+      if (entry.snapshot.playing) return candidate;
+    }
+    return firstPlaying ?? preferred ?? first;
+  }
+
+  primary(now = performance.now()): MultiviewTimelineSample | null {
+    const primary = this.primaryEntry();
+    return primary === null ? null : { id: primary.id, ...sampleAt(primary.entry, now) };
+  }
+
+  sampleFor(id: string, now = performance.now()): MultiviewTimelineSample | null {
+    const own = this.snapshots.get(id);
+    if (own === undefined || own.snapshot.duration <= 0) return null;
+    const primary = this.primaryEntry();
+    const selected = primary !== null && sameMap(own.snapshot, primary.entry.snapshot) ? primary : { id, entry: own };
+    return { id: selected.id, ...sampleAt(selected.entry, now) };
+  }
+
+  beatFor(id: string) {
+    return this.sampleFor(id)?.beat ?? 0;
+  }
+}

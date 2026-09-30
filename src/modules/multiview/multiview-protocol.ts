@@ -31,8 +31,16 @@ export interface MultiviewStateMessage {
   beat: number;
   duration: number;
   playing: boolean;
+  mapHash: string | null;
   map: { title: string; subtitle: string; author: string; mapper: string } | null;
-  players: Array<{ id: string; playerId: string; platformIds: string[]; score: unknown }>;
+  players: Array<{
+    id: string;
+    playerId: string;
+    platformIds: string[];
+    score: unknown;
+    status: string;
+    time: number;
+  }>;
 }
 
 export interface MultiviewReadyMessage {

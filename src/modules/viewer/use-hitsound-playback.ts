@@ -9,6 +9,7 @@ import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/b
 import type { HitsoundPreset, ViewerSettings } from '../../core/viewer-settings';
 
 interface HitsoundPlaybackOptions {
+  enabled: boolean;
   audioOffset: number;
   clockRef: RefObject<SongClock | null>;
   lightshowModeRef: RefObject<LightshowMode>;
@@ -20,6 +21,7 @@ interface HitsoundPlaybackOptions {
 }
 
 export function useHitsoundPlayback({
+  enabled,
   audioOffset,
   clockRef,
   lightshowModeRef,
@@ -44,6 +46,8 @@ export function useHitsoundPlayback({
   useEffect(() => {
     const controller = new AbortController();
     void player.setBuffers(null, null);
+
+    if (!enabled) return () => controller.abort();
 
     void (async () => {
       let goodBuffer: ArrayBuffer | null = null;
@@ -99,7 +103,7 @@ export function useHitsoundPlayback({
     return () => {
       controller.abort();
     };
-  }, [player, hitsoundPreset, customGoodHitsound, customBadHitsound]);
+  }, [customBadHitsound, customGoodHitsound, enabled, hitsoundPreset, player]);
 
   useEffect(() => {
     player.stop();
@@ -111,6 +115,10 @@ export function useHitsoundPlayback({
   }, [audioOffset, clockRef, player]);
 
   useEffect(() => {
+    if (!enabled) {
+      player.stop();
+      return;
+    }
     let frame = 0;
 
     function schedule() {
@@ -156,7 +164,7 @@ export function useHitsoundPlayback({
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [audioOffset, clockRef, lightshowModeRef, settingsRef]);
+  }, [audioOffset, clockRef, enabled, lightshowModeRef, player, settingsRef]);
 
   useEffect(
     () => () => {

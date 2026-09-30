@@ -6,6 +6,7 @@ import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-s
 import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
 import type { MultiviewConfigMessage, MultiviewPlayerConfig, MultiviewStateMessage } from './multiview-protocol';
+import { MultiviewTimeline, multiviewAudioOwner } from './multiview-timeline';
 
 interface NativeCompositorBridge {
   send(message: unknown): void;
@@ -35,6 +36,20 @@ function sameBaseSite(origin: string) {
   }
 }
 
+function trustedParentOrigin(origin: string) {
+  if (sameBaseSite(origin)) return true;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return (
+      (protocol === 'http:' &&
+        (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]')) ||
+      (protocol === 'https:' && (hostname === 'beatkhana.com' || hostname.endsWith('.beatkhana.com')))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function validPlayer(value: unknown): value is MultiviewPlayerConfig {
   if (!isRecord(value)) return false;
   return (
@@ -53,6 +68,17 @@ function validPlayer(value: unknown): value is MultiviewPlayerConfig {
     (value.waitingText === undefined || typeof value.waitingText === 'string') &&
     isRecord(value.settings)
   );
+}
+
+function samePlayerConfiguration(current: MultiviewPlayerConfig[], next: MultiviewPlayerConfig[]) {
+  if (current.length !== next.length) return false;
+  return current.every((player, index) => {
+    const candidate = next[index];
+    if (candidate === undefined) return false;
+    const { score: _currentScore, ...currentConfig } = player;
+    const { score: _nextScore, ...nextConfig } = candidate;
+    return JSON.stringify(currentConfig) === JSON.stringify(nextConfig);
+  });
 }
 
 interface TilePlaybackState {
@@ -97,6 +123,7 @@ export function MultiviewShell() {
   const [players, setPlayers] = useState<MultiviewPlayerConfig[]>([]);
   const [tilePlayback, setTilePlayback] = useState<Map<string, TilePlaybackState>>(() => new Map());
   const mapCache = useMemo(() => new LiveMapCache(), []);
+  const timeline = useMemo(() => new MultiviewTimeline(), []);
   const parentOriginRef = useRef<string | null>(null);
   const playbackRef = useRef(new Map<string, MultiviewPlaybackSnapshot>());
   const lastCorrectionRef = useRef(new Map<string, number>());
@@ -125,7 +152,17 @@ export function MultiviewShell() {
       if (!isRecord(data) || data.type !== 'beatkhana:multiview-config' || data.version !== 1) return;
       const next = (data as unknown as MultiviewConfigMessage).players;
       if (!Array.isArray(next) || next.length > 12 || !next.every(validPlayer)) return;
-      setPlayers(next);
+      for (const player of next) {
+        let scoreTimeline = scoreTimelinesRef.current.get(player.id);
+        if (scoreTimeline === undefined) {
+          scoreTimeline = new EmbeddedRealtimeScoreTimeline();
+          scoreTimelinesRef.current.set(player.id, scoreTimeline);
+        }
+        if (isRecord(player.score)) scoreTimeline.add(player.score);
+      }
+      // Scores update continuously. Keep them in the timeline without turning
+      // every packet into a React rerender of every POV.
+      setPlayers((current) => (samePlayerConfiguration(current, next) ? current : next));
     }
     if (nativeBridge !== undefined) {
       const removeListener = nativeBridge.onMessage(applyConfig);
@@ -133,7 +170,7 @@ export function MultiviewShell() {
       return removeListener;
     }
     function receive(event: MessageEvent) {
-      if (event.source !== window.parent || !sameBaseSite(event.origin)) return;
+      if (event.source !== window.parent || !trustedParentOrigin(event.origin)) return;
       parentOriginRef.current = event.origin;
       applyConfig(event.data);
     }
@@ -145,6 +182,8 @@ export function MultiviewShell() {
   useEffect(() => {
     if (host === null) return;
     const activeIds = new Set(players.map((player) => player.id));
+    const visiblePlayers = players.filter((player) => player.visible);
+    timeline.configure(visiblePlayers);
     for (const player of players) {
       host.setTile(player.id, {
         x: player.x,
@@ -153,15 +192,12 @@ export function MultiviewShell() {
         height: player.height,
         visible: player.visible,
       });
-      let timeline = scoreTimelinesRef.current.get(player.id);
-      if (timeline === undefined) {
-        timeline = new EmbeddedRealtimeScoreTimeline();
-        scoreTimelinesRef.current.set(player.id, timeline);
-      }
-      if (isRecord(player.score)) timeline.add(player.score);
     }
     for (const id of playbackRef.current.keys()) {
       if (!activeIds.has(id)) playbackRef.current.delete(id);
+    }
+    for (const id of lastCorrectionRef.current.keys()) {
+      if (!activeIds.has(id)) lastCorrectionRef.current.delete(id);
     }
     setTilePlayback((current) => {
       if ([...current.keys()].every((id) => activeIds.has(id))) return current;
@@ -170,7 +206,7 @@ export function MultiviewShell() {
     for (const id of scoreTimelinesRef.current.keys()) {
       if (!activeIds.has(id)) scoreTimelinesRef.current.delete(id);
     }
-  }, [host, players]);
+  }, [host, players, timeline]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -180,32 +216,40 @@ export function MultiviewShell() {
           (entry): entry is { player: MultiviewPlayerConfig; playback: MultiviewPlaybackSnapshot } =>
             entry.playback !== undefined && entry.playback.duration > 0,
         );
-      const primary = snapshots.find((entry) => entry.player.masterVolume > 0) ?? snapshots[0];
-      if (primary === undefined) return;
       const now = performance.now();
+      const primarySample = timeline.primary(now);
+      if (primarySample === null) return;
+      const primary = snapshots.find((entry) => entry.player.id === primarySample.id);
+      if (primary === undefined) return;
       for (const entry of snapshots) {
         if (entry.player.id === primary.player.id) continue;
-        const sameMap = entry.playback.map?.title === primary.playback.map?.title;
-        const drift = Math.abs(entry.playback.time - primary.playback.time);
+        const sameMap =
+          entry.playback.mapHash !== null && primary.playback.mapHash !== null
+            ? entry.playback.mapHash === primary.playback.mapHash
+            : entry.playback.map?.title === primary.playback.map?.title;
+        const drift = Math.abs(entry.playback.time - primarySample.time);
         const lastCorrection = lastCorrectionRef.current.get(entry.player.id) ?? 0;
         if (sameMap && drift > 0.04 && now - lastCorrection > 500) {
-          entry.playback.seek(primary.playback.time);
+          entry.playback.seek(primarySample.time);
           lastCorrectionRef.current.set(entry.player.id, now);
         }
       }
       const message: MultiviewStateMessage = {
         type: 'beatkhana:multiview-state',
         version: 1,
-        time: primary.playback.time,
-        beat: primary.playback.beat,
-        duration: primary.playback.duration,
-        playing: primary.playback.playing,
+        time: primarySample.time,
+        beat: primarySample.beat,
+        duration: primarySample.duration,
+        playing: primarySample.playing,
+        mapHash: primarySample.mapHash,
         map: primary.playback.map,
         players: players.map((player) => ({
           id: player.id,
           playerId: player.playerId,
           platformIds: player.platformIds,
-          score: scoreTimelinesRef.current.get(player.id)?.at(primary.playback.time)?.score ?? player.score,
+          score: scoreTimelinesRef.current.get(player.id)?.at(primarySample.time)?.score ?? player.score,
+          status: playbackRef.current.get(player.id)?.status ?? 'waiting',
+          time: timeline.sampleFor(player.id, now)?.time ?? 0,
         })),
       };
       if (nativeBridge !== undefined) nativeBridge.send(message);
@@ -215,10 +259,20 @@ export function MultiviewShell() {
       }
     }, 100);
     return () => window.clearInterval(timer);
-  }, [nativeBridge, players]);
+  }, [nativeBridge, players, timeline]);
 
   const handlePlayback = useCallback((id: string, snapshot: MultiviewPlaybackSnapshot) => {
     playbackRef.current.set(id, snapshot);
+    timeline.update(id, {
+      beat: snapshot.beat,
+      bpm: snapshot.bpm,
+      duration: snapshot.duration,
+      mapHash: snapshot.mapHash,
+      mapTitle: snapshot.map?.title ?? null,
+      playbackRate: snapshot.playbackRate,
+      playing: snapshot.playing,
+      time: snapshot.time,
+    });
     const next: TilePlaybackState = {
       duration: snapshot.duration,
       error: snapshot.error,
@@ -241,17 +295,15 @@ export function MultiviewShell() {
       updated.set(id, next);
       return updated;
     });
-  }, []);
+  }, [timeline]);
 
   const runtimePlayers = useMemo(() => {
-    let audioClaimed = false;
-    return players
-      .filter((player) => player.visible)
-      .map((player) => {
-        const audible = !audioClaimed && player.masterVolume > 0;
-        if (audible) audioClaimed = true;
-        return { ...player, masterVolume: audible ? player.masterVolume : 0 };
-      });
+    const visible = players.filter((player) => player.visible);
+    const audioOwner = multiviewAudioOwner(visible);
+    return visible.map((player) => ({
+      ...player,
+      masterVolume: player.id === audioOwner ? player.masterVolume : 0,
+    }));
   }, [players]);
 
   return (
@@ -292,6 +344,7 @@ export function MultiviewShell() {
               hitsoundVolume: player.hitsoundVolume,
               disableGameUI: player.disableGameUI,
               lights: player.lights,
+              timeline,
               settings: player.settings,
               parser,
               onPlayback: (snapshot) => handlePlayback(player.id, snapshot),

@@ -13,6 +13,7 @@ import type { MapView } from '../../renderer/map-view';
 import type { MultiviewRendererHost, SharedViewerLifecycle } from '../../renderer/multiview-renderer-host';
 import type { RenderPerformanceOptions } from '../../renderer/render-performance';
 import type { RendererLifecycle } from '../../renderer/renderer-lifecycle';
+import type { MultiviewTimeline } from '../multiview/multiview-timeline';
 import type { ActiveSelection } from './viewer-types';
 
 export interface ViewerHandle {
@@ -31,6 +32,7 @@ interface ViewerRendererOptions {
   skipInitialMenuEnvironment: boolean;
   setError: (message: string) => void;
   sharedRenderer?: { host: MultiviewRendererHost; id: string };
+  sharedTimeline?: { timeline: MultiviewTimeline; id: string };
 }
 
 function isCurrentViewer(viewerRef: RefObject<ViewerHandle | null>, view: MapView) {
@@ -48,6 +50,7 @@ export function useViewerRenderer({
   skipInitialMenuEnvironment,
   setError,
   sharedRenderer,
+  sharedTimeline,
 }: ViewerRendererOptions) {
   const t = useTranslations('viewer');
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -141,7 +144,9 @@ export function useViewerRenderer({
           colorOverride(settingsRef.current, selection.mapColorScheme, replayRef.current?.metadata),
         );
         view.setReplay(replayRef.current, hitScoreVisualizerForSettings(settingsRef.current, replayRef.current));
-        view.setBeatSource(() => clockRef.current?.currentBeat() ?? 0);
+        view.setBeatSource(
+          () => sharedTimeline?.timeline.beatFor(sharedTimeline.id) ?? clockRef.current?.currentBeat() ?? 0,
+        );
       }
 
       const clock = clockRef.current;
@@ -157,7 +162,13 @@ export function useViewerRenderer({
       cleanup?.();
       cleanup = null;
     };
-  }, [settings.graphicsQuality, sharedRenderer?.host, sharedRenderer?.id]);
+  }, [
+    settings.graphicsQuality,
+    sharedRenderer?.host,
+    sharedRenderer?.id,
+    sharedTimeline?.id,
+    sharedTimeline?.timeline,
+  ]);
 
   useEffect(() => {
     const viewer = viewerRef.current;

@@ -27,6 +27,14 @@ export interface SharedViewerLifecycle {
   setRenderScale(scale: number): void;
 }
 
+export function multiviewFrameRate(entries: Iterable<{ performance: RenderPerformanceOptions }>) {
+  let rate: number | null = null;
+  for (const entry of entries) {
+    rate = Math.min(rate ?? entry.performance.maxFps, entry.performance.maxFps);
+  }
+  return Math.max(1, rate ?? 1);
+}
+
 export class MultiviewRendererHost {
   private readonly renderer: WebGLRenderer;
   private readonly entries = new Map<string, Entry>();
@@ -131,7 +139,9 @@ export class MultiviewRendererHost {
     this.scheduleFrame();
     this.resize();
     const visibleEntries = [...this.entries.values()].filter((entry) => entry.tile.visible);
-    const maxFps = Math.max(1, ...visibleEntries.map((entry) => entry.performance.maxFps));
+    // A shared canvas renders every visible tile as one frame. Respect the
+    // strictest player cap so one override cannot silently multiply all POV work.
+    const maxFps = multiviewFrameRate(visibleEntries);
     const nextFrameAt = nextRenderDeadline(timestamp, this.nextFrameAt, maxFps);
     if (nextFrameAt === null) return;
     this.nextFrameAt = nextFrameAt;
