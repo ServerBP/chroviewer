@@ -11,6 +11,7 @@ export interface MultiviewTimelineSnapshot {
   mapTitle: string | null;
   playbackRate: number;
   playing: boolean;
+  syncReady: boolean;
   time: number;
 }
 
@@ -57,11 +58,13 @@ export class MultiviewTimeline {
   private readonly snapshots = new Map<string, TimedSnapshot>();
   private playerOrder: string[] = [];
   private preferredId: string | null = null;
+  private anchorId: string | null = null;
 
   configure(players: MultiviewTimelinePlayer[]) {
     this.playerOrder = players.map((player) => player.id);
     this.preferredId = multiviewAudioOwner(players);
     const active = new Set(this.playerOrder);
+    if (this.anchorId !== null && !active.has(this.anchorId)) this.anchorId = null;
     for (const id of this.snapshots.keys()) {
       if (!active.has(id)) this.snapshots.delete(id);
     }
@@ -71,7 +74,7 @@ export class MultiviewTimeline {
     this.snapshots.set(id, { observedAt, snapshot: { ...snapshot } });
   }
 
-  private primaryEntry(): TimelineEntry | null {
+  private primaryEntry(now: number): TimelineEntry | null {
     let first: TimelineEntry | null = null;
     let firstPlaying: TimelineEntry | null = null;
     let preferred: TimelineEntry | null = null;
@@ -83,20 +86,61 @@ export class MultiviewTimeline {
       if (entry.snapshot.playing) firstPlaying ??= candidate;
       if (id !== this.preferredId) continue;
       preferred = candidate;
-      if (entry.snapshot.playing) return candidate;
     }
-    return firstPlaying ?? preferred ?? first;
+    const mapReference = preferred ?? firstPlaying ?? first;
+    if (mapReference === null) return null;
+
+    // Synchronize to the slowest healthy POV on the selected map. A delayed
+    // stream must never be sought forward beyond replay data it has received.
+    const candidates: TimelineEntry[] = [];
+    let slowest: TimelineEntry | null = null;
+    let slowestTime = Number.POSITIVE_INFINITY;
+    for (const id of this.playerOrder) {
+      const entry = this.snapshots.get(id);
+      if (
+        entry === undefined ||
+        entry.snapshot.duration <= 0 ||
+        !entry.snapshot.playing ||
+        !entry.snapshot.syncReady ||
+        !sameMap(entry.snapshot, mapReference.entry.snapshot)
+      )
+        continue;
+      const candidate = { id, entry };
+      candidates.push(candidate);
+      const time = sampleAt(entry, now).time;
+      if (time < slowestTime) {
+        slowest = candidate;
+        slowestTime = time;
+      }
+    }
+    if (slowest === null) {
+      this.anchorId = mapReference.id;
+      return mapReference;
+    }
+    const currentAnchor = candidates.find((candidate) => candidate.id === this.anchorId);
+    // Avoid changing the beat source for harmless sub-frame clock jitter. The
+    // anchor changes only when another healthy POV is materially farther back.
+    if (currentAnchor !== undefined && sampleAt(currentAnchor.entry, now).time <= slowestTime + 0.1) {
+      return currentAnchor;
+    }
+    this.anchorId = slowest.id;
+    return slowest;
   }
 
   primary(now = performance.now()): MultiviewTimelineSample | null {
-    const primary = this.primaryEntry();
+    const primary = this.primaryEntry(now);
     return primary === null ? null : { id: primary.id, ...sampleAt(primary.entry, now) };
+  }
+
+  ownSample(id: string, now = performance.now()): MultiviewTimelineSample | null {
+    const own = this.snapshots.get(id);
+    return own === undefined || own.snapshot.duration <= 0 ? null : { id, ...sampleAt(own, now) };
   }
 
   sampleFor(id: string, now = performance.now()): MultiviewTimelineSample | null {
     const own = this.snapshots.get(id);
     if (own === undefined || own.snapshot.duration <= 0) return null;
-    const primary = this.primaryEntry();
+    const primary = this.primaryEntry(now);
     const selected = primary !== null && sameMap(own.snapshot, primary.entry.snapshot) ? primary : { id, entry: own };
     return { id: selected.id, ...sampleAt(selected.entry, now) };
   }

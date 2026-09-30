@@ -10,6 +10,7 @@ const base = {
   mapTitle: 'Map',
   playbackRate: 1,
   playing: true,
+  syncReady: true,
   time: 10,
 };
 
@@ -25,7 +26,7 @@ describe('multiview timeline', () => {
     expect(multiviewAudioOwner([{ id: 'muted', masterVolume: 0 }])).toBeNull();
   });
 
-  test('extrapolates one primary timeline for players on the same map', () => {
+  test('uses the slowest healthy player as the shared timeline', () => {
     const timeline = new MultiviewTimeline();
     timeline.configure([
       { id: 'one', masterVolume: 0.25 },
@@ -34,8 +35,36 @@ describe('multiview timeline', () => {
     timeline.update('one', { ...base, beat: 18, time: 9 }, 1_000);
     timeline.update('two', base, 1_000);
 
-    expect(timeline.sampleFor('one', 1_500)).toMatchObject({ id: 'two', time: 10.5, beat: 21 });
-    expect(timeline.primary(1_500)).toMatchObject({ id: 'two', time: 10.5, beat: 21 });
+    expect(timeline.sampleFor('two', 1_500)).toMatchObject({ id: 'one', time: 9.5, beat: 19 });
+    expect(timeline.primary(1_500)).toMatchObject({ id: 'one', time: 9.5, beat: 19 });
+    expect(timeline.ownSample('two', 1_500)).toMatchObject({ id: 'two', time: 10.5, beat: 21 });
+  });
+
+  test('does not let a buffering player hold back healthy players', () => {
+    const timeline = new MultiviewTimeline();
+    timeline.configure([
+      { id: 'one', masterVolume: 0 },
+      { id: 'two', masterVolume: 1 },
+    ]);
+    timeline.update('one', { ...base, syncReady: false, time: 5 }, 1_000);
+    timeline.update('two', base, 1_000);
+
+    expect(timeline.primary(1_500)).toMatchObject({ id: 'two', time: 10.5 });
+  });
+
+  test('keeps the anchor stable through harmless clock jitter', () => {
+    const timeline = new MultiviewTimeline();
+    timeline.configure([
+      { id: 'one', masterVolume: 0 },
+      { id: 'two', masterVolume: 1 },
+    ]);
+    timeline.update('one', { ...base, time: 9.95 }, 1_000);
+    timeline.update('two', base, 1_000);
+    expect(timeline.primary(1_000)?.id).toBe('one');
+
+    timeline.update('one', { ...base, time: 10.02 }, 1_100);
+    timeline.update('two', { ...base, time: 10 }, 1_100);
+    expect(timeline.primary(1_100)?.id).toBe('one');
   });
 
   test('does not apply a different map timeline to a player', () => {

@@ -545,6 +545,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const live = useLiveExperience({
     appendReplayHeightEvents: session.appendLiveReplayHeightEvents,
     appendReplayNoteEvents: session.appendLiveReplayNoteEvents,
+    refreshReplayDisplay: session.refreshLiveReplayDisplay,
     externalTimeline: multiview !== undefined,
     hasLiveMap: (hash) => sources.hasLiveMap(hash),
     loadLiveReplay: (hash, replay) => {

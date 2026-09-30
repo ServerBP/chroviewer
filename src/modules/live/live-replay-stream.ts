@@ -14,13 +14,17 @@ export function applyLiveReplayChunk(
   chunk: ReplayChunk,
   appendReplayNoteEvents: (events: ReplayNoteEvent[]) => void,
   appendReplayHeightEvents: (events: ReplayHeightEvent[]) => void,
+  refreshReplayDisplay: () => void,
 ) {
   const replay = runtime.replay;
   if (replay === null) return;
   if (runtime.taLive && runtime.taBufferingStartedAt === 0) runtime.taBufferingStartedAt = performance.now();
   runtime.playbackAttemptPending = true;
   runtime.latestSongTime = Math.max(runtime.latestSongTime, Number(chunk.cursor?.songTimeMs ?? 0n) / 1000);
+  const previousHsvConfig = replay.hsvConfig;
+  const previousHsvProfile = replay.hsvProfile;
   applyLiveReplayExtensions(replay, chunk.replayExtensions, true);
+  if (replay.hsvConfig !== previousHsvConfig || replay.hsvProfile !== previousHsvProfile) refreshReplayDisplay();
   const events = chunk.events;
   if (events === undefined) return;
   const notes = events.noteEvents.map(liveNote);

@@ -123,6 +123,13 @@ export class MultiviewRendererHost {
     this.nextFrameAt = 0;
   }
 
+  retainTiles(ids: Iterable<string>) {
+    const retained = new Set(ids);
+    for (const id of this.pendingTiles.keys()) {
+      if (!retained.has(id)) this.pendingTiles.delete(id);
+    }
+  }
+
   private readonly resize = () => {
     const parent = this.canvas.parentElement;
     const width = Math.max(1, Math.round(parent?.clientWidth ?? innerWidth));

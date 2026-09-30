@@ -62,6 +62,7 @@ interface LiveTransport {
 export interface LiveExperienceOptions {
   appendReplayHeightEvents: (events: ReplayHeightEvent[]) => void;
   appendReplayNoteEvents: (events: ReplayNoteEvent[]) => void;
+  refreshReplayDisplay: () => void;
   externalTimeline?: boolean;
   hasLiveMap: (hash: string) => boolean;
   loadLiveReplay: (hash: string, replay: Replay) => Promise<SourceResult<void>>;

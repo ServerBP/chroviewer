@@ -473,6 +473,16 @@ export function useViewerSession({
     viewerRef.current?.view.appendReplayHeightEvents(events);
   }
 
+  function refreshLiveReplayDisplay() {
+    const view = viewerRef.current?.view;
+    if (view === undefined) return;
+    const replay = sources.replayRef.current;
+    const currentSettings = settingsRef.current;
+    view.setHitScoreVisualizer(hitScoreVisualizerForSettings(currentSettings, replay));
+    const active = activeSelectionRef.current;
+    if (active !== null) view.refreshMapColors(colorOverride(currentSettings, active.mapColorScheme, replay?.metadata));
+  }
+
   const difficultyOptions = sources.rows.map((row) => ({
     key: row.key,
     label: row.label,
@@ -510,6 +520,7 @@ export function useViewerSession({
     canvasRef,
     appendLiveReplayHeightEvents,
     appendLiveReplayNoteEvents,
+    refreshLiveReplayDisplay,
     applyAuthoritativeLightshowMode,
     changeLightshowMode,
     clearMapSelection,

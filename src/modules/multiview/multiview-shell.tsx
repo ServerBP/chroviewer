@@ -89,6 +89,15 @@ interface TilePlaybackState {
   status: MultiviewPlaybackSnapshot['status'];
 }
 
+interface TimelineCorrectionState {
+  aheadSince: number | null;
+  lastCorrection: number;
+}
+
+const syncDriftToleranceSeconds = 0.25;
+const syncDriftSustainMs = 750;
+const syncCorrectionCooldownMs = 2000;
+
 function waitingLabel(player: MultiviewPlayerConfig, playback: TilePlaybackState | undefined) {
   if (
     playback !== undefined &&
@@ -126,7 +135,7 @@ export function MultiviewShell() {
   const timeline = useMemo(() => new MultiviewTimeline(), []);
   const parentOriginRef = useRef<string | null>(null);
   const playbackRef = useRef(new Map<string, MultiviewPlaybackSnapshot>());
-  const lastCorrectionRef = useRef(new Map<string, number>());
+  const correctionStateRef = useRef(new Map<string, TimelineCorrectionState>());
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
   const nativeBridge = typeof window === 'undefined' ? undefined : window.beatKhanaNativeCompositor;
 
@@ -193,11 +202,12 @@ export function MultiviewShell() {
         visible: player.visible,
       });
     }
+    host.retainTiles(activeIds);
     for (const id of playbackRef.current.keys()) {
       if (!activeIds.has(id)) playbackRef.current.delete(id);
     }
-    for (const id of lastCorrectionRef.current.keys()) {
-      if (!activeIds.has(id)) lastCorrectionRef.current.delete(id);
+    for (const id of correctionStateRef.current.keys()) {
+      if (!activeIds.has(id)) correctionStateRef.current.delete(id);
     }
     setTilePlayback((current) => {
       if ([...current.keys()].every((id) => activeIds.has(id))) return current;
@@ -222,16 +232,38 @@ export function MultiviewShell() {
       const primary = snapshots.find((entry) => entry.player.id === primarySample.id);
       if (primary === undefined) return;
       for (const entry of snapshots) {
-        if (entry.player.id === primary.player.id) continue;
+        if (entry.player.id === primary.player.id) {
+          correctionStateRef.current.delete(entry.player.id);
+          continue;
+        }
         const sameMap =
           entry.playback.mapHash !== null && primary.playback.mapHash !== null
             ? entry.playback.mapHash === primary.playback.mapHash
             : entry.playback.map?.title === primary.playback.map?.title;
-        const drift = Math.abs(entry.playback.time - primarySample.time);
-        const lastCorrection = lastCorrectionRef.current.get(entry.player.id) ?? 0;
-        if (sameMap && drift > 0.04 && now - lastCorrection > 500) {
+        const ownSample = timeline.ownSample(entry.player.id, now);
+        const syncReady = entry.playback.status === 'watching' && entry.playback.playing;
+        const aheadBy = ownSample === null ? 0 : ownSample.time - primarySample.time;
+        if (!sameMap || !syncReady) {
+          correctionStateRef.current.delete(entry.player.id);
+          continue;
+        }
+        const correction = correctionStateRef.current.get(entry.player.id) ?? {
+          aheadSince: null,
+          lastCorrection: Number.NEGATIVE_INFINITY,
+        };
+        correctionStateRef.current.set(entry.player.id, correction);
+        if (aheadBy <= syncDriftToleranceSeconds) {
+          correction.aheadSince = null;
+          continue;
+        }
+        correction.aheadSince ??= now;
+        if (
+          now - correction.aheadSince >= syncDriftSustainMs &&
+          now - correction.lastCorrection >= syncCorrectionCooldownMs
+        ) {
           entry.playback.seek(primarySample.time);
-          lastCorrectionRef.current.set(entry.player.id, now);
+          correction.aheadSince = null;
+          correction.lastCorrection = now;
         }
       }
       const message: MultiviewStateMessage = {
@@ -271,6 +303,7 @@ export function MultiviewShell() {
       mapTitle: snapshot.map?.title ?? null,
       playbackRate: snapshot.playbackRate,
       playing: snapshot.playing,
+      syncReady: snapshot.status === 'watching',
       time: snapshot.time,
     });
     const next: TilePlaybackState = {

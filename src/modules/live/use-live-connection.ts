@@ -232,6 +232,7 @@ export function useLiveConnection(
             packet.body.value,
             optionsRef.current.appendReplayNoteEvents,
             optionsRef.current.appendReplayHeightEvents,
+            optionsRef.current.refreshReplayDisplay,
           );
           if (!deferPlaybackAttempt) tickPlayback();
         }
