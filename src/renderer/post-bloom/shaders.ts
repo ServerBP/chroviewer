@@ -94,7 +94,6 @@ uniform float _BloomIntensity;
 uniform float _BaseColorBoost;
 uniform float _BaseColorBoostThreshold;
 uniform float _Fade;
-uniform float _TransparentOutput;
 varying vec2 vUv;
 void main() {
   vec2 d = _SourceTexelSize * 0.5;
@@ -110,10 +109,13 @@ void main() {
   float noise = (texture2D(_BlueNoiseTex, noiseUv).r - 0.5) / 255.0;
   vec4 bloom = texture2D(_BloomTex, vUv);
   color += bloom.rgb * _BloomIntensity + vec3(noise);
-  float transparentAlpha = clamp(max(alpha, bloom.a), 0.0, 1.0) * _Fade;
-  float compositeAlpha = mix(1.0, transparentAlpha, _TransparentOutput);
-  gl_FragColor = vec4(color * _Fade, compositeAlpha);
+  // The shared canvas is cleared to transparent before rendering. Each replay
+  // is then written into its own scissored rectangle and must be opaque inside
+  // that rectangle. Deriving output alpha from the scene/bloom textures makes
+  // emissive pixels translucent and causes Chromium to dim their RGB again
+  // while compositing the canvas over the overlay.
+  gl_FragColor = vec4(color * _Fade, 1.0);
   #include <colorspace_fragment>
-  gl_FragColor.a = compositeAlpha;
+  gl_FragColor.a = 1.0;
 }
 `;

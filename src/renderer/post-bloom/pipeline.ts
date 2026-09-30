@@ -131,7 +131,6 @@ export class PostBloomPipeline {
     _BaseColorBoost: { value: POST_BLOOM_BASE_COLOR_BOOST },
     _BaseColorBoostThreshold: { value: POST_BLOOM_BASE_COLOR_BOOST_THRESHOLD },
     _Fade: { value: 1 },
-    _TransparentOutput: { value: 0 },
   };
 
   private readonly prefilterMaterial = passMaterial(POST_BLOOM_PREFILTER_13_FRAG, this.prefilterUniforms);
@@ -249,9 +248,6 @@ export class PostBloomPipeline {
 
     this.noiseFrame++;
     this.compositeUniforms._BloomTex.value = bloomTarget.texture;
-    // Viewport output is only used by the alpha-enabled multiview compositor.
-    // Keep the ordinary viewer's historical opaque post-bloom output intact.
-    this.compositeUniforms._TransparentOutput.value = output === undefined ? 0 : 1;
     this.compositeUniforms._SourceTexelSize.value.set(1 / width, 1 / height);
     this.compositeUniforms._BlueNoiseScale.value.set(width / 64, height / 64);
     this.compositeUniforms._RandomValue.value = (this.noiseFrame * 0.61803398875) % 1;

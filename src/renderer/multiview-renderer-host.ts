@@ -53,9 +53,9 @@ export class MultiviewRendererHost {
       alpha: true,
       antialias: false,
       depth: false,
-      // Post-bloom writes straight-alpha color. Let Chromium convert that
-      // drawing buffer for composition instead of treating it as already
-      // premultiplied, which would dim translucent glow and environment pixels.
+      // The canvas remains transparent outside the scissored replay tiles.
+      // Tile output itself is opaque, so no premultiplication ambiguity is
+      // allowed to alter the post-bloom colors Chromium receives.
       premultipliedAlpha: false,
       powerPreference: 'high-performance',
     });
