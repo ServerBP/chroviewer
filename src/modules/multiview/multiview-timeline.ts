@@ -38,11 +38,12 @@ export function advanceMultiviewCorrection(
   current: MultiviewCorrectionState | undefined,
   aheadBy: number,
   now: number,
+  thresholdSeconds = multiviewSyncThresholdSeconds,
 ) {
   const state = current ?? { aheadSince: null, armed: true };
-  if (aheadBy <= multiviewSyncThresholdSeconds) {
+  if (aheadBy <= thresholdSeconds) {
     state.aheadSince = null;
-    if (aheadBy <= multiviewSyncRearmSeconds) state.armed = true;
+    if (aheadBy <= Math.min(multiviewSyncRearmSeconds, thresholdSeconds / 2)) state.armed = true;
     return { correct: false, state };
   }
   if (!state.armed) return { correct: false, state };

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BeatmapParser } from '../../core/beatmap/worker/client';
 import { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
+import { broadcastSettingsForPlayerCount } from '../../renderer/render-performance';
 import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-sync';
 import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
@@ -75,15 +76,8 @@ function validPlayer(value: unknown): value is MultiviewPlayerConfig {
   );
 }
 
-function samePlayerConfiguration(current: MultiviewPlayerConfig[], next: MultiviewPlayerConfig[]) {
-  if (current.length !== next.length) return false;
-  return current.every((player, index) => {
-    const candidate = next[index];
-    if (candidate === undefined) return false;
-    const { score: _currentScore, ...currentConfig } = player;
-    const { score: _nextScore, ...nextConfig } = candidate;
-    return JSON.stringify(currentConfig) === JSON.stringify(nextConfig);
-  });
+function configurationSignature(players: MultiviewPlayerConfig[]) {
+  return JSON.stringify(players.map(({ score: _score, ...configuration }) => configuration));
 }
 
 interface TilePlaybackState {
@@ -126,13 +120,17 @@ export function MultiviewShell() {
   const [host, setHost] = useState<MultiviewRendererHost | null>(null);
   const [parser, setParser] = useState<BeatmapParser | null>(null);
   const [players, setPlayers] = useState<MultiviewPlayerConfig[]>([]);
+  const configSignatureRef = useRef('');
   const [tilePlayback, setTilePlayback] = useState<Map<string, TilePlaybackState>>(() => new Map());
   const mapCache = useMemo(() => new LiveMapCache(), []);
   const timeline = useMemo(() => new MultiviewTimeline(), []);
   const parentOriginRef = useRef<string | null>(null);
   const playbackRef = useRef(new Map<string, MultiviewPlaybackSnapshot>());
   const correctionStateRef = useRef(new Map<string, MultiviewCorrectionState>());
+  const correctingRef = useRef(new Set<string>());
+  const nextSyncCheckRef = useRef(new Map<string, number>());
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
+  const playerIdentitiesRef = useRef(new Map<string, string>());
   const lastStatePublishRef = useRef(Number.NEGATIVE_INFINITY);
   const nativeBridge = typeof window === 'undefined' ? undefined : window.beatKhanaNativeCompositor;
 
@@ -157,9 +155,22 @@ export function MultiviewShell() {
     function applyConfig(data: unknown) {
       if (!isRecord(data) || data.type !== 'beatkhana:multiview-config' || data.version !== 1) return;
       const next = (data as unknown as MultiviewConfigMessage).players;
-      if (!Array.isArray(next) || next.length > 12 || !next.every(validPlayer)) return;
+      if (
+        !Array.isArray(next) ||
+        next.length > 12 ||
+        !next.every(validPlayer) ||
+        new Set(next.map((player) => player.id)).size !== next.length
+      )
+        return;
       for (const player of next) {
         let scoreTimeline = scoreTimelinesRef.current.get(player.id);
+        if (playerIdentitiesRef.current.get(player.id) !== player.playerId) {
+          scoreTimeline?.clear();
+          playerIdentitiesRef.current.set(player.id, player.playerId);
+          correctionStateRef.current.delete(player.id);
+          correctingRef.current.delete(player.id);
+          nextSyncCheckRef.current.delete(player.id);
+        }
         if (scoreTimeline === undefined) {
           scoreTimeline = new EmbeddedRealtimeScoreTimeline();
           scoreTimelinesRef.current.set(player.id, scoreTimeline);
@@ -168,7 +179,11 @@ export function MultiviewShell() {
       }
       // Scores update continuously. Keep them in the timeline without turning
       // every packet into a React rerender of every POV.
-      setPlayers((current) => (samePlayerConfiguration(current, next) ? current : next));
+      const signature = configurationSignature(next);
+      if (signature !== configSignatureRef.current) {
+        configSignatureRef.current = signature;
+        setPlayers(next);
+      }
     }
     if (nativeBridge !== undefined) {
       const removeListener = nativeBridge.onMessage(applyConfig);
@@ -206,12 +221,21 @@ export function MultiviewShell() {
     for (const id of correctionStateRef.current.keys()) {
       if (!activeIds.has(id)) correctionStateRef.current.delete(id);
     }
+    for (const id of correctingRef.current) {
+      if (!activeIds.has(id)) correctingRef.current.delete(id);
+    }
+    for (const id of nextSyncCheckRef.current.keys()) {
+      if (!activeIds.has(id)) nextSyncCheckRef.current.delete(id);
+    }
     setTilePlayback((current) => {
       if ([...current.keys()].every((id) => activeIds.has(id))) return current;
       return new Map([...current].filter(([id]) => activeIds.has(id)));
     });
     for (const id of scoreTimelinesRef.current.keys()) {
-      if (!activeIds.has(id)) scoreTimelinesRef.current.delete(id);
+      if (!activeIds.has(id)) {
+        scoreTimelinesRef.current.delete(id);
+        playerIdentitiesRef.current.delete(id);
+      }
     }
   }, [host, players, timeline]);
 
@@ -231,6 +255,8 @@ export function MultiviewShell() {
       for (const entry of snapshots) {
         if (entry.player.id === primary.player.id) {
           correctionStateRef.current.delete(entry.player.id);
+          nextSyncCheckRef.current.delete(entry.player.id);
+          if (correctingRef.current.delete(entry.player.id)) entry.playback.correctDrift(primarySample.time);
           continue;
         }
         const sameMap =
@@ -242,21 +268,40 @@ export function MultiviewShell() {
         const aheadBy = ownSample === null ? 0 : ownSample.time - primarySample.time;
         if (!sameMap || !syncReady) {
           correctionStateRef.current.delete(entry.player.id);
+          nextSyncCheckRef.current.delete(entry.player.id);
+          if (correctingRef.current.delete(entry.player.id) && ownSample !== null) {
+            entry.playback.correctDrift(ownSample.time);
+          }
           continue;
         }
-        const correction = advanceMultiviewCorrection(
-          correctionStateRef.current.get(entry.player.id),
-          aheadBy,
-          now,
-        );
-        correctionStateRef.current.set(entry.player.id, correction.state);
-        if (correction.correct) {
-          entry.playback.seek(primarySample.time);
+        if (
+          !correctingRef.current.has(entry.player.id) &&
+          now >= (nextSyncCheckRef.current.get(entry.player.id) ?? 0)
+        ) {
+          const threshold = Number(entry.player.settings.syncThresholdMs ?? 200);
+          const interval = Number(entry.player.settings.syncIntervalMs ?? 2000);
+          nextSyncCheckRef.current.set(
+            entry.player.id,
+            now + (Number.isFinite(interval) ? Math.max(100, interval) : 2000),
+          );
+          const correction = advanceMultiviewCorrection(
+            correctionStateRef.current.get(entry.player.id),
+            aheadBy,
+            now,
+            Number.isFinite(threshold) ? Math.max(0.025, threshold / 1000) : 0.2,
+          );
+          correctionStateRef.current.set(entry.player.id, correction.state);
+          if (correction.correct) correctingRef.current.add(entry.player.id);
+        }
+        if (correctingRef.current.has(entry.player.id)) {
+          entry.playback.correctDrift(primarySample.time);
+          if (Math.abs(aheadBy) <= 0.01) correctingRef.current.delete(entry.player.id);
         }
       }
       // Parent overlay state drives a large Svelte scene tree. Five updates per
       // second are enough for score/progress consumers while keeping that work
-      // away from the WebGL frame loop. Drift observation remains at 10 Hz.
+      // away from the WebGL frame loop. Active corrections advance at 10 Hz;
+      // drift detection uses each player's configured observation interval.
       if (now - lastStatePublishRef.current < 200) return;
       lastStatePublishRef.current = now;
       const message: MultiviewStateMessage = {
@@ -272,7 +317,9 @@ export function MultiviewShell() {
           id: player.id,
           playerId: player.playerId,
           platformIds: player.platformIds,
-          score: scoreTimelinesRef.current.get(player.id)?.at(primarySample.time)?.score ?? player.score,
+          score:
+            scoreTimelinesRef.current.get(player.id)?.at(timeline.sampleFor(player.id, now)?.time ?? 0)?.score ??
+            player.score,
           status: playbackRef.current.get(player.id)?.status ?? 'waiting',
           time: timeline.sampleFor(player.id, now)?.time ?? 0,
         })),
@@ -286,48 +333,53 @@ export function MultiviewShell() {
     return () => window.clearInterval(timer);
   }, [nativeBridge, players, timeline]);
 
-  const handlePlayback = useCallback((id: string, snapshot: MultiviewPlaybackSnapshot) => {
-    playbackRef.current.set(id, snapshot);
-    timeline.update(id, {
-      beat: snapshot.beat,
-      bpm: snapshot.bpm,
-      duration: snapshot.duration,
-      mapHash: snapshot.mapHash,
-      mapTitle: snapshot.map?.title ?? null,
-      playbackRate: snapshot.playbackRate,
-      playing: snapshot.playing,
-      syncReady: snapshot.status === 'watching',
-      time: snapshot.time,
-    });
-    const next: TilePlaybackState = {
-      duration: snapshot.duration,
-      error: snapshot.error,
-      hasMap: snapshot.map !== null,
-      playing: snapshot.playing,
-      status: snapshot.status,
-    };
-    setTilePlayback((current) => {
-      const previous = current.get(id);
-      if (
-        previous !== undefined &&
-        previous.duration === next.duration &&
-        previous.error === next.error &&
-        previous.hasMap === next.hasMap &&
-        previous.playing === next.playing &&
-        previous.status === next.status
-      )
-        return current;
-      const updated = new Map(current);
-      updated.set(id, next);
-      return updated;
-    });
-  }, [timeline]);
+  const handlePlayback = useCallback(
+    (id: string, snapshot: MultiviewPlaybackSnapshot) => {
+      playbackRef.current.set(id, snapshot);
+      timeline.update(id, {
+        beat: snapshot.beat,
+        bpm: snapshot.bpm,
+        duration: snapshot.duration,
+        mapHash: snapshot.mapHash,
+        mapTitle: snapshot.map?.title ?? null,
+        playbackRate: snapshot.playbackRate,
+        playing: snapshot.playing,
+        syncReady: snapshot.status === 'watching',
+        time: snapshot.time,
+      });
+      const next: TilePlaybackState = {
+        duration: snapshot.duration,
+        error: snapshot.error,
+        hasMap: snapshot.map !== null,
+        playing: snapshot.playing,
+        status: snapshot.status,
+      };
+      setTilePlayback((current) => {
+        const previous = current.get(id);
+        if (
+          previous !== undefined &&
+          previous.duration === next.duration &&
+          previous.error === next.error &&
+          previous.hasMap === next.hasMap &&
+          previous.playing === next.playing &&
+          previous.status === next.status
+        )
+          return current;
+        const updated = new Map(current);
+        updated.set(id, next);
+        return updated;
+      });
+    },
+    [timeline],
+  );
 
   const runtimePlayers = useMemo(() => {
     const visible = players.filter((player) => player.visible);
     const audioOwner = multiviewAudioOwner(visible);
+    const defaults = broadcastSettingsForPlayerCount(visible.length);
     return visible.map((player) => ({
       ...player,
+      settings: { ...defaults, ...player.settings },
       masterVolume: player.id === audioOwner ? player.masterVolume : 0,
     }));
   }, [players]);
@@ -357,7 +409,8 @@ export function MultiviewShell() {
         );
       })}
       <canvas ref={canvasRef} className="absolute inset-0 z-10 size-full" />
-      {host !== null && parser !== null &&
+      {host !== null &&
+        parser !== null &&
         runtimePlayers.map((player) => (
           <ViewerShell
             key={player.id}

@@ -44,8 +44,10 @@ export class MultiviewRendererHost {
   private frameHandle: number | null = null;
   private contextLost = false;
   private nextFrameAt = 0;
-  private width = 1;
-  private height = 1;
+  private width = -1;
+  private height = -1;
+  private readonly visibleEntries: Entry[] = [];
+  private entriesChanged = true;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new WebGLRenderer({
@@ -85,16 +87,18 @@ export class MultiviewRendererHost {
       sizedHeight: -1,
     };
     this.entries.set(id, entry);
+    this.entriesChanged = true;
     this.nextFrameAt = 0;
     return {
       setPerformance: (next) => {
         entry.performance = { ...next };
         view.setRenderPerformance(next);
-        entry.sizedWidth = -1;
         this.nextFrameAt = 0;
       },
       setRenderScale: (scale) => {
-        entry.renderScale = clampRenderScale(scale);
+        const next = clampRenderScale(scale);
+        if (next === entry.renderScale) return;
+        entry.renderScale = next;
         entry.sizedWidth = -1;
       },
     };
@@ -104,6 +108,7 @@ export class MultiviewRendererHost {
     const entry = this.entries.get(id);
     if (entry?.view === view) {
       this.entries.delete(id);
+      this.entriesChanged = true;
       this.nextFrameAt = 0;
     }
   }
@@ -119,7 +124,17 @@ export class MultiviewRendererHost {
     this.pendingTiles.set(id, normalized);
     const entry = this.entries.get(id);
     if (entry === undefined) return;
+    const previous = entry.tile;
+    if (
+      previous.x === normalized.x &&
+      previous.y === normalized.y &&
+      previous.width === normalized.width &&
+      previous.height === normalized.height &&
+      previous.visible === normalized.visible
+    )
+      return;
     entry.tile = normalized;
+    this.entriesChanged = true;
     this.nextFrameAt = 0;
   }
 
@@ -144,8 +159,14 @@ export class MultiviewRendererHost {
     this.frameHandle = null;
     if (this.contextLost || document.hidden) return;
     this.scheduleFrame();
-    this.resize();
-    const visibleEntries = [...this.entries.values()].filter((entry) => entry.tile.visible);
+    if (this.entriesChanged) {
+      this.visibleEntries.length = 0;
+      for (const entry of this.entries.values()) {
+        if (entry.tile.visible) this.visibleEntries.push(entry);
+      }
+      this.entriesChanged = false;
+    }
+    const visibleEntries = this.visibleEntries;
     // A shared canvas renders every visible tile as one frame. Respect the
     // strictest player cap so one override cannot silently multiply all POV work.
     const maxFps = multiviewFrameRate(visibleEntries);
@@ -167,8 +188,8 @@ export class MultiviewRendererHost {
         tile.y + tile.height <= 0
       )
         continue;
-      const renderWidth = Math.max(1, Math.round(tile.width * entry.renderScale));
-      const renderHeight = Math.max(1, Math.round(tile.height * entry.renderScale));
+      const renderWidth = Math.max(1, Math.round((entry.performance.outputWidth ?? tile.width) * entry.renderScale));
+      const renderHeight = Math.max(1, Math.round((entry.performance.outputHeight ?? tile.height) * entry.renderScale));
       if (renderWidth !== entry.sizedWidth || renderHeight !== entry.sizedHeight) {
         entry.sizedWidth = renderWidth;
         entry.sizedHeight = renderHeight;
@@ -224,6 +245,7 @@ export class MultiviewRendererHost {
     this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     this.entries.clear();
+    this.visibleEntries.length = 0;
     this.pendingTiles.clear();
     this.renderer.dispose();
   }

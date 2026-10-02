@@ -33,6 +33,28 @@ export const BROADCAST_RENDER_PERFORMANCE: RenderPerformanceOptions = {
   bloomFogSize: 256,
 };
 
+export function broadcastSettingsForPlayerCount(playerCount: number) {
+  const crowded = playerCount >= 5;
+  const medium = playerCount >= 3;
+  return {
+    ...BROADCAST_RENDER_PERFORMANCE,
+    qualityPreset: 'broadcast',
+    // Keep a cadence that divides evenly into the usual 60 Hz OBS output.
+    // Scale per-tile GPU work instead of alternating 16/33 ms frames at 45 Hz.
+    maxFps: 60,
+    renderScale: crowded ? 0.65 : medium ? 0.75 : 0.85,
+    // A positive sample count still allocates a multisample target and resolve.
+    msaaSamples: medium ? 0 : 2,
+    mirrorQuality: 'none',
+    postBloomWidth: crowded ? 384 : medium ? 512 : 640,
+    bloomFogSize: crowded ? 128 : medium ? 192 : 256,
+    screenDisplacement: false,
+    replayTrailSamples: crowded ? 8 : medium ? 10 : 12,
+    syncThresholdMs: 200,
+    syncIntervalMs: 2000,
+  };
+}
+
 export function mirrorResolutionForQuality(quality: MirrorQuality) {
   if (quality === 'none') return 0;
   if (quality === 'low') return 512;

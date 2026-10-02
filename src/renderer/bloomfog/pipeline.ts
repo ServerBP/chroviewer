@@ -490,6 +490,10 @@ export class BloomfogPipeline {
   }
 
   setFogParams(params: FogParams) {
+    const captureChanged =
+      this.captureUniforms._CaptureOffset.value !== params.offset ||
+      this.captureUniforms._CaptureFalloff.value !== params.attenuation ||
+      this.finalUpsampleUniforms._AutoExposureLimit.value !== params.autoExposureLimit;
     this.fogUniforms._CustomFogOffset.value = params.offset;
     this.fogUniforms._CustomFogAttenuation.value = params.attenuation;
     this.fogUniforms._CustomFogHeightFogStartY.value = params.startY;
@@ -497,7 +501,7 @@ export class BloomfogPipeline {
     this.captureUniforms._CaptureOffset.value = params.offset;
     this.captureUniforms._CaptureFalloff.value = params.attenuation;
     this.finalUpsampleUniforms._AutoExposureLimit.value = params.autoExposureLimit;
-    this.invalidate();
+    if (captureChanged) this.invalidate();
   }
 
   invalidate() {
@@ -541,7 +545,13 @@ export class BloomfogPipeline {
     renderer.setClearColor(0x000000, 0);
 
     renderer.setRenderTarget(this.raw);
+    // The shared compositor disables autoClear so tile output can accumulate.
+    // Fog uses additive blending and must start with an empty capture target.
+    const previousAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.clear(true, false, false);
     renderer.render(this.captureScene, this.passCamera);
+    renderer.autoClear = previousAutoClear;
 
     this.fsMesh.material = this.downsampleMaterial;
     let source = this.raw;

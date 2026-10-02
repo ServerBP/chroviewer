@@ -10,9 +10,10 @@ export const POST_BLOOM_BASE_COLOR_BOOST = 0.997;
 export const POST_BLOOM_BASE_COLOR_BOOST_THRESHOLD = 0;
 
 export function postBloomSize(viewWidth: number, viewHeight: number, textureWidth = POST_BLOOM_TEXTURE_WIDTH) {
+  const width = Math.max(1, Math.min(textureWidth, Math.floor(viewWidth)));
   return {
-    width: textureWidth,
-    height: Math.max(1, Math.floor((textureWidth * Math.max(viewHeight, 1)) / Math.max(viewWidth, 1))),
+    width,
+    height: Math.max(1, Math.floor((width * Math.max(viewHeight, 1)) / Math.max(viewWidth, 1))),
   };
 }
 

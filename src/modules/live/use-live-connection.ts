@@ -53,8 +53,7 @@ export function useLiveConnection(
     let disposed = false;
     const runtime = createLiveRuntime(activeTarget);
     const taSync =
-      optionsRef.current.externalTimeline !== true &&
-      (activeTarget.source === 'ta' || activeTarget.source === 'cocu')
+      optionsRef.current.externalTimeline !== true && (activeTarget.source === 'ta' || activeTarget.source === 'cocu')
         ? createTaLiveSync(activeTarget.playerId)
         : null;
     runtimeRef.current = runtime;
@@ -497,6 +496,7 @@ export function useLiveConnection(
           pause: pausePlayback,
           resume: resumePlayback,
           seek: seekPlayback,
+          correctDrift: (time) => clock?.correctDrift(time),
           setHolding(holding) {
             runtime.taSyncHolding = holding;
           },

@@ -20,6 +20,7 @@ export interface SongClock {
   play(): void;
   pause(): void;
   seek(songTime: number): void;
+  correctDrift(songTime: number): void;
   setRate(rate: number): void;
   setVolume(volume: number): void;
   setAudioOffset(offset: number): void;
@@ -41,6 +42,7 @@ export interface ClockDriver {
 export function createClock(duration: number, songBpm: number, driver: ClockDriver): SongClock {
   let state = createTransport();
   let audioOffset = 0;
+  let playbackRate = state.rate;
 
   const clamp = (songTime: number) => Math.min(Math.max(songTime, 0), duration);
 
@@ -76,10 +78,12 @@ export function createClock(duration: number, songBpm: number, driver: ClockDriv
     pause: () => {
       if (!state.playing) return;
       state = transportPause(state, driver.now());
+      state = transportSetRate(state, driver.now(), playbackRate);
       driver.stop?.();
     },
     seek: (songTime: number) => {
       const target = clamp(songTime);
+      state = transportSetRate(state, driver.now(), playbackRate);
       state = transportSeek(state, driver.now(), target);
       if (state.playing) {
         driver.stop?.();
@@ -87,6 +91,7 @@ export function createClock(duration: number, songBpm: number, driver: ClockDriv
       }
     },
     setRate: (rate: number) => {
+      playbackRate = rate;
       state = transportSetRate(state, driver.now(), rate);
       if (!state.playing) return;
       if (audioOffset === 0) {
@@ -95,6 +100,18 @@ export function createClock(duration: number, songBpm: number, driver: ClockDriv
         driver.stop?.();
         driver.start?.(state.anchorSongTime, rate, audioOffset);
       }
+    },
+    correctDrift: (songTime: number) => {
+      if (!Number.isFinite(songTime) || !state.playing) return;
+      const now = driver.now();
+      const error = clamp(songTime) - clamp(songTimeAt(state, now));
+      // Preserve a continuous, forward-moving clock and the existing audio
+      // source. Repeated sync observations must never become repeated seeks.
+      const correction = Math.abs(error) <= 0.01 ? 0 : Math.min(0.05, Math.max(-0.05, error / 2));
+      const rate = playbackRate * (1 + correction);
+      if (rate === state.rate) return;
+      state = transportSetRate(state, now, rate);
+      driver.setRate?.(rate);
     },
     setVolume: (volume: number) => {
       driver.setVolume?.(Math.min(Math.max(volume, 0), 1));

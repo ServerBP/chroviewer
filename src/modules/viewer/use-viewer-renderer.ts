@@ -176,7 +176,7 @@ export function useViewerRenderer({
     const viewer = viewerRef.current;
     if (viewer === null) return;
     viewer.lifecycle.setPerformance(performance);
-    viewer.view.setRenderPerformance(performance);
+    if (sharedRenderer === undefined) viewer.view.setRenderPerformance(performance);
   }, [
     performance.maxFps,
     performance.msaaSamples,

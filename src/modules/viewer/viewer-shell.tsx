@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 
-import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import type { BeatmapParser } from '../../core/beatmap/worker/client';
+import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import {
   DEFAULT_VIEWER_SETTINGS,
   defaultViewerSettings,
@@ -25,16 +25,16 @@ import {
 } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
-import type { MultiviewTimeline } from '../multiview/multiview-timeline';
 import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
-import { useMapPoolShowcase } from '../map-pool-showcase/use-map-pool-showcase';
 import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '../live/embedded-realtime-score-sync';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
-import { replayLightshowMode } from '../live/live-replay';
 import type { LiveMapCache } from '../live/live-map-cache';
+import { replayLightshowMode } from '../live/live-replay';
 import type { LiveStatus, LiveTarget } from '../live/live-types';
 import { LiveViewerPanel } from '../live/live-viewer-panel';
 import { useLiveExperience } from '../live/use-live-experience';
+import { useMapPoolShowcase } from '../map-pool-showcase/use-map-pool-showcase';
+import type { MultiviewTimeline } from '../multiview/multiview-timeline';
 import { ReplayPlayerCard } from '../replay/replay-player-card';
 import { SettingsDrawer } from '../settings/settings-drawer';
 import { useWatchPartyExperience } from '../watch-party/use-watch-party-experience';
@@ -193,6 +193,7 @@ export interface MultiviewPlaybackSnapshot {
   mapHash: string | null;
   playbackRate: number;
   seek(time: number): void;
+  correctDrift(time: number): void;
 }
 
 interface ViewerShellProps {
@@ -243,7 +244,8 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const isolatedSettings = search.isolatedSettings === true || multiview !== undefined;
   const embeddedSource =
     taLiveSource || search.previewSource !== undefined || search.showcase === true || search.poolShowcase === true;
-  const externallyConfiguredSettings = embeddedSource || multiview !== undefined || hasExternallyConfiguredSettings(search);
+  const externallyConfiguredSettings =
+    embeddedSource || multiview !== undefined || hasExternallyConfiguredSettings(search);
   const [performance, setPerformance] = useState(() => renderPerformanceForSearch(search));
   const [settings, setSettings] = useState(() => {
     // Isolated embeds must be deterministic: defaults first, then URL/message
@@ -403,7 +405,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const taLive = liveTarget?.source === 'ta' || liveTarget?.source === 'cocu';
   const remoteActive = liveActive || partyActive;
   useEffect(() => {
-    if (!embeddedSource) return;
+    if (!embeddedSource || multiview !== undefined) return;
 
     let lastSearch = '';
     function applySettingsFromLocation() {
@@ -437,9 +439,9 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
       window.clearInterval(interval);
       window.removeEventListener('popstate', applySettingsFromLocation);
     };
-  }, [embeddedSource]);
+  }, [embeddedSource, multiview !== undefined]);
   useEffect(() => {
-    if (!taLive || liveTarget === null) return;
+    if (!taLive || liveTarget === null || multiview !== undefined) return;
     const timeline = embeddedScoreTimelineRef.current;
     const livePlayerId = liveTarget.playerId;
 
@@ -482,7 +484,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     );
   }, [liveTarget?.playerId, taLive, transport.time]);
   useEffect(() => {
-    if (!embeddedSource) return;
+    if (!embeddedSource || multiview !== undefined) return;
 
     function applyEmbeddedViewerSettings(event: MessageEvent) {
       const data: unknown = event.data;
@@ -521,7 +523,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     return () => {
       window.removeEventListener('message', applyEmbeddedViewerSettings);
     };
-  }, [embeddedSource]);
+  }, [embeddedSource, multiview !== undefined]);
   useLightshowShowcase({
     enabled: configuredShowcase,
     configValue: search.showcaseConfig,
@@ -824,9 +826,9 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     if (multiview === undefined) return;
     multiview.onPlayback({
       playerId: multiview.playerId,
-      time: transport.time,
+      time: transport.clockRef.current?.currentTime() ?? transport.time,
       duration: transport.duration,
-      beat: quantizedBeatAt(transport.time, sources.songBpm, 1 / 1000),
+      beat: quantizedBeatAt(transport.clockRef.current?.currentTime() ?? transport.time, sources.songBpm, 1 / 1000),
       bpm: sources.songBpm,
       playing: transport.playing,
       status: live.status,
@@ -835,6 +837,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
       mapHash: sources.mapIdentity?.hash ?? null,
       playbackRate: transport.clockRef.current?.getRate() ?? 1,
       seek: transport.seek,
+      correctDrift: (time) => transport.clockRef.current?.correctDrift(time),
     });
   }, [
     error,
@@ -913,24 +916,32 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
           />
         )}
 
-      {hideUI && taLive && !(live.status === 'watching' && transport.playing && sources.mapMeta !== null && transport.duration > 0) && (
-        <ViewerOverlay
-          backdropBlur={false}
-          className="!bg-black"
-          icon={live.status === 'error' ? AlertCircle : LoaderCircle}
-          iconClassName={live.status === 'error' || live.status === 'paused' ? '' : 'animate-spin'}
-          label={
-            live.status === 'error' ? error || 'Replay stream unavailable'
-              : live.status === 'connecting' ? 'Connecting to TournamentAssistant'
-                : live.status === 'reconnecting' ? 'Reconnecting to TournamentAssistant'
-                  : live.status === 'loading' ? t('liveDownloadingMap')
-                    : live.status === 'buffering' ? 'Preparing replay stream'
-                      : live.status === 'paused' ? t('livePaused')
-                        : 'Waiting for replay stream'
-          }
-          progress={live.status === 'loading' ? sources.liveDownloadProgress : undefined}
-        />
-      )}
+      {hideUI &&
+        taLive &&
+        !(live.status === 'watching' && transport.playing && sources.mapMeta !== null && transport.duration > 0) && (
+          <ViewerOverlay
+            backdropBlur={false}
+            className="!bg-black"
+            icon={live.status === 'error' ? AlertCircle : LoaderCircle}
+            iconClassName={live.status === 'error' || live.status === 'paused' ? '' : 'animate-spin'}
+            label={
+              live.status === 'error'
+                ? error || 'Replay stream unavailable'
+                : live.status === 'connecting'
+                  ? 'Connecting to TournamentAssistant'
+                  : live.status === 'reconnecting'
+                    ? 'Reconnecting to TournamentAssistant'
+                    : live.status === 'loading'
+                      ? t('liveDownloadingMap')
+                      : live.status === 'buffering'
+                        ? 'Preparing replay stream'
+                        : live.status === 'paused'
+                          ? t('livePaused')
+                          : 'Waiting for replay stream'
+            }
+            progress={live.status === 'loading' ? sources.liveDownloadProgress : undefined}
+          />
+        )}
 
       {!hideUI && liveActive && liveInterruption !== null && (
         <ViewerOverlay

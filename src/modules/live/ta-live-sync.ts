@@ -20,6 +20,7 @@ export interface TaLiveSyncActions {
   pause(): void;
   resume(): boolean;
   seek(time: number): void;
+  correctDrift(time: number): void;
   setHolding(holding: boolean): void;
   updateStatus(status: 'buffering' | 'watching'): void;
 }
@@ -267,9 +268,11 @@ export function createTaLiveSync(platformId: string) {
     }
     const estimatedCoordinatorTime =
       coordinator.currentTime + ((now - coordinator.sentAt) / 1000) * coordinator.playbackRate;
-    if (Math.abs(snapshot.currentTime - estimatedCoordinatorTime) > driftToleranceSeconds) {
-      actions.seek(estimatedCoordinatorTime);
-    }
+    actions.correctDrift(
+      Math.abs(snapshot.currentTime - estimatedCoordinatorTime) > driftToleranceSeconds
+        ? estimatedCoordinatorTime
+        : snapshot.currentTime,
+    );
   }
 
   return {

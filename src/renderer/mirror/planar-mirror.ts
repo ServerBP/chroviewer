@@ -197,6 +197,9 @@ export class PlanarMirror {
         this.cScratch,
       );
       mirror.projectionMatrixInverse.copy(mirror.projectionMatrix).invert();
+      // Shared tile rendering leaves autoClear off. Reflection color/depth
+      // belong to this POV and must not survive from the previous frame.
+      renderer.clear(true, true, true);
       renderer.render(scene, mirror);
     } finally {
       renderer.setRenderTarget(prevTarget);

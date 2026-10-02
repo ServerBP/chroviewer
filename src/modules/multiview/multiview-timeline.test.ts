@@ -15,6 +15,13 @@ const base = {
 };
 
 describe('multiview timeline', () => {
+  test('supports a 200 ms drift trigger observed every two seconds', () => {
+    const first = advanceMultiviewCorrection(undefined, 0.21, 0, 0.2);
+    expect(first.correct).toBe(false);
+    expect(advanceMultiviewCorrection(first.state, 0.21, 2000, 0.2).correct).toBe(true);
+    expect(advanceMultiviewCorrection(first.state, 0.21, 4000, 0.2).correct).toBe(false);
+    expect(advanceMultiviewCorrection(undefined, 0.19, 4000, 0.2).correct).toBe(false);
+  });
   test('assigns audio to exactly one highest-volume player', () => {
     expect(
       multiviewAudioOwner([

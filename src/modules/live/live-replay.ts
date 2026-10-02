@@ -25,6 +25,16 @@ import {
   type ReplayVector3,
 } from './generated/proto/scoresaber/live/v1/replay_stream_pb';
 
+// Static cosmetic extensions are often repeated by live publishers. Cache per
+// replay, never globally: each player retains their own colors and HSV profile.
+const cosmeticExtensions = new WeakMap<Replay, Map<string, Uint8Array>>();
+const cosmeticExtensionIds = new Set([
+  'ta.hsv-profile',
+  'scoresaber.hsv-config',
+  'scoresaber.play-settings',
+  'scoresaber.controller-offsets',
+]);
+
 function vector(value?: ReplayVector3): ViewerReplayVector3 {
   return value === undefined ? { x: 0, y: 0, z: 0 } : { x: value.x, y: value.y, z: value.z };
 }
@@ -203,6 +213,14 @@ export function appendLivePause(replay: Replay, event: ReplayPauseEvent) {
 
 export function applyLiveReplayExtensions(replay: Replay, extensions: ReplayExtension[], append: boolean) {
   for (const extension of extensions) {
+    const cosmetic = extension.version === 1 && cosmeticExtensionIds.has(extension.id);
+    const cached = cosmeticExtensions.get(replay)?.get(extension.id);
+    if (
+      cosmetic &&
+      cached?.length === extension.payload.length &&
+      cached.every((byte, index) => byte === extension.payload[index])
+    )
+      continue;
     const result = Result.try(() => {
       // Quest HitScoreVisualizer does not expose ScoreSaber PC's binary codec.
       // Keep this bounded HSV-only fallback distinct instead of mislabelling JSON
@@ -216,6 +234,14 @@ export function applyLiveReplayExtensions(replay: Replay, extensions: ReplayExte
       applyScoreSaberReplayExtension(replay, extension.id, extension.version, extension.payload, append);
     });
     if (result.isErr()) console.warn(`ignoring live replay extension ${extension.id}`, result.error);
+    else if (cosmetic) {
+      let cache = cosmeticExtensions.get(replay);
+      if (cache === undefined) {
+        cache = new Map();
+        cosmeticExtensions.set(replay, cache);
+      }
+      cache.set(extension.id, extension.payload.slice());
+    }
   }
 }
 
