@@ -73,6 +73,36 @@ export function GeneralSettings({ active, settings, isMapPreview, onChange }: Ge
             <Separator />
           </>
         )}
+        <SettingSection title={t('compositorSync')} description={t('compositorSyncDescription')}>
+          <SettingRow label={t('compositorSyncType')}>
+            <Select
+              value={settings.compositorSyncType}
+              onValueChange={(value: ViewerSettings['compositorSyncType']) => update('compositorSyncType', value)}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="slow">{t('compositorSyncSlow')}</SelectItem>
+                <SelectItem value="wait-for-all">{t('compositorSyncWait')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingRow>
+          {settings.compositorSyncType === 'wait-for-all' && (
+            <SliderSetting
+              id="compositorWaitSeconds"
+              defaultValue={DEFAULT_VIEWER_SETTINGS.compositorWaitSeconds}
+              label={t('compositorWaitSeconds')}
+              value={settings.compositorWaitSeconds}
+              minimum={1}
+              maximum={60}
+              step={1}
+              display={(value) => `${value}s`}
+              onChange={(value) => update('compositorWaitSeconds', value)}
+            />
+          )}
+        </SettingSection>
+        <Separator />
         <SettingSection title={t('interface')}>
           <SettingRow label={t('timelineBookmarks')}>
             <Switch

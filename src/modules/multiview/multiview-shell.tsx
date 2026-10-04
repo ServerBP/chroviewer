@@ -7,6 +7,7 @@ import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-s
 import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
 import type { MultiviewConfigMessage, MultiviewPlayerConfig, MultiviewStateMessage } from './multiview-protocol';
+import { MultiviewStartBarrier } from './multiview-start-barrier';
 import {
   advanceMultiviewCorrection,
   MultiviewTimeline,
@@ -124,6 +125,8 @@ export function MultiviewShell() {
   const [tilePlayback, setTilePlayback] = useState<Map<string, TilePlaybackState>>(() => new Map());
   const mapCache = useMemo(() => new LiveMapCache(), []);
   const timeline = useMemo(() => new MultiviewTimeline(), []);
+  const startBarrier = useMemo(() => new MultiviewStartBarrier(), []);
+  useEffect(() => () => startBarrier.dispose(), [startBarrier]);
   const parentOriginRef = useRef<string | null>(null);
   const playbackRef = useRef(new Map<string, MultiviewPlaybackSnapshot>());
   const correctionStateRef = useRef(new Map<string, MultiviewCorrectionState>());
@@ -182,6 +185,7 @@ export function MultiviewShell() {
       const signature = configurationSignature(next);
       if (signature !== configSignatureRef.current) {
         configSignatureRef.current = signature;
+        startBarrier.configure(next);
         setPlayers(next);
       }
     }
@@ -198,7 +202,7 @@ export function MultiviewShell() {
     window.addEventListener('message', receive);
     window.parent.postMessage({ type: 'beatkhana:multiview-ready', version: 1 }, '*');
     return () => window.removeEventListener('message', receive);
-  }, [nativeBridge]);
+  }, [nativeBridge, startBarrier]);
 
   useEffect(() => {
     if (host === null) return;
@@ -424,6 +428,7 @@ export function MultiviewShell() {
               disableGameUI: player.disableGameUI,
               lights: player.lights,
               timeline,
+              startBarrier,
               settings: player.settings,
               parser,
               onPlayback: (snapshot) => handlePlayback(player.id, snapshot),

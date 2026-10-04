@@ -137,6 +137,7 @@ function tryLivePlayback(runtime: LiveRuntime, clock: SongClock, firstFrameTime:
     return;
   }
 
+  // A coordinated start deliberately plays behind the live edge. Preserve that buffer.
   let restartAt = clock.isPlaying() ? null : currentTime;
   if (!runtime.playbackStarted) {
     runtime.playbackStarted = true;
@@ -149,7 +150,10 @@ function tryLivePlayback(runtime: LiveRuntime, clock: SongClock, firstFrameTime:
     return;
   } else if (!clock.isPlaying() && currentTime > targetTime + 0.1) {
     restartAt = targetTime;
-  } else if (currentTime > runtime.latestFrameTime + 0.1 || targetTime - currentTime > 5) {
+  } else if (
+    currentTime > runtime.latestFrameTime + 0.1 ||
+    (!runtime.compositorStartAligned && targetTime - currentTime > 5)
+  ) {
     restartAt = targetTime;
   }
 

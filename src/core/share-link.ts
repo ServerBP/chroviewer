@@ -11,6 +11,8 @@ export function settingsForShareCategories(
   if (categories.includes('general')) {
     Object.assign(shared, {
       hitsounds: settings.hitsounds,
+      compositorSyncType: settings.compositorSyncType,
+      compositorWaitSeconds: settings.compositorWaitSeconds,
       previewHitNotes: settings.previewHitNotes,
       previewHitLine: settings.previewHitLine,
       previewNotesLookAtPlayer: settings.previewNotesLookAtPlayer,
@@ -27,6 +29,9 @@ export function settingsForShareCategories(
   if (categories.includes('cosmetics')) {
     Object.assign(shared, {
       preferReplayColors: settings.preferReplayColors,
+      preferReplayEnvironmentColors: settings.preferReplayEnvironmentColors,
+      customEnvironmentColors: settings.customEnvironmentColors,
+      useMapEnvironment: settings.useMapEnvironment,
       preferReplayEnvironment: settings.preferReplayEnvironment,
       overrideEnvironment: settings.overrideEnvironment,
       environmentOverrideId: settings.environmentOverrideId,

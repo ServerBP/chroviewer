@@ -85,7 +85,7 @@
     },
     "cosmetics": {
       "colors": "Colours",
-      "enableColorOverrides": "Enable colour overrides",
+      "enableColorOverrides": "Override saber colors",
       "enableEnvironmentOverride": "Override environment",
       "enableHsvOverride": "Use custom profile",
       "environment": "Environment",
@@ -103,15 +103,20 @@
       "leftColor": "Left saber / note",
       "obstacleColor": "Obstacle",
       "overrides": "General overrides",
-      "preferReplayColors": "Prefer player colours when available",
-      "preferReplayColorsDescription": "Uses each colour saved with the replay; older replays may include only some",
+      "preferReplayColors": "Use replay saber colors",
+      "preferReplayColorsDescription": "Uses the saber and note colors saved with the replay; older replays may include only some",
       "preferReplayEnvironment": "Prefer recorded environment when available",
       "preferReplayEnvironmentDescription": "Uses the environment saved with the replay instead of your stage override; older replays may not include one",
       "preferReplayHsv": "Prefer replay profile when available",
       "preferReplayHsvDescription": "Falls back to your profile when unavailable",
       "rightColor": "Right saber / note",
       "sabers": "Sabers",
-      "stage": "Stage"
+      "stage": "Stage",
+      "useMapEnvironment": "Override player environment with map default",
+      "useMapEnvironmentDescription": "Use the stage specified by the map, including maps with Chroma or Noodle extensions.",
+      "preferReplayEnvironmentColors": "Use replay environment colors",
+      "customEnvironmentColors": "Override environment colors",
+      "customEnvironmentColorsDescription": "Set light colors independently from saber colors, including white and boosted channels."
     },
     "general": {
       "advanced": "Advanced",
@@ -144,7 +149,13 @@
       "retryMapCache": "Try again",
       "startAudioCalibration": "Start",
       "stopAudioCalibration": "Stop",
-      "timelineBookmarks": "Timeline bookmarks"
+      "timelineBookmarks": "Timeline bookmarks",
+      "compositorSync": "Compositor synchronization",
+      "compositorSyncType": "Sync type",
+      "compositorSyncDescription": "All visible POVs must select the waiting mode. Mixed settings, incompatible maps or the wait timeout fall back to gradual time adjustment.",
+      "compositorSyncSlow": "Gradual time adjustment",
+      "compositorSyncWait": "Wait for all players",
+      "compositorWaitSeconds": "Maximum wait"
     },
     "graphics": {
       "high": "High",

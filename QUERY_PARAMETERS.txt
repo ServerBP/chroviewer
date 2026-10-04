@@ -120,3 +120,24 @@ EXAMPLE
 
 Full mapped lights with gameplay objects hidden and decorative walls retained:
 ?showcase=true&lights=full&map=key
+
+
+ENVIRONMENT OVERRIDES
+useMapEnvironment=true|false  Override the player's environment with the map's default stage.
+preferReplayEnvironment=true|false
+customEnvironmentColors=true|false  Override all six light channels independently of saber colors.
+preferReplayEnvironmentColors=true|false  Use recorded lights unless customEnvironmentColors is enabled.
+environmentLeftColor=%23rrggbb
+environmentRightColor=%23rrggbb
+environmentWhiteColor=%23rrggbb
+environmentLeftBoostColor=%23rrggbb
+environmentRightBoostColor=%23rrggbb
+environmentWhiteBoostColor=%23rrggbb
+Saber overrides do not replace environment colors. Existing shared customColors palettes retain their old behavior until the new controls are explicitly set.
+
+COMPOSITOR SYNCHRONIZATION
+compositorSyncType=slow|wait-for-all
+compositorWaitSeconds=1..60   Default 30 seconds, maximum 60 seconds.
+All visible players must select wait-for-all. Missing or mixed settings default to slow.
+Waiting holds stream playback until the same map hash, difficulty, characteristic and song speed are buffered for every visible player. All clocks are started in one compositor task using a common time reference. A timeout or incompatible map falls back to normal gradual playback. Waiting is only applied at stream startup, never periodically during playback. Replay memory is bounded while waiting and while playing the delayed stream.
+For multiview embeds these values belong in each player's settings object. Slow mode remains the default. Browser, OBS, windowed and Spout bridges all use the same compositor protocol and render host.

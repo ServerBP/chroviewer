@@ -3,6 +3,7 @@ import type { RefObject } from 'react';
 import type { SongClock } from '../../core/clock/song-clock';
 import type { Replay, ReplayHeightEvent, ReplayNoteEvent } from '../../core/replay/types';
 import type { ScoreSaberReplayPlayer, SourceResult } from '../../sources/source-types';
+import type { MultiviewStartBarrier } from '../multiview/multiview-start-barrier';
 import type { LiveChatMessage } from './generated/proto/scoresaber/live/v1/chat_pb';
 import type { LudusPlayState } from './generated/proto/scoresaber/live/v1/common_pb';
 
@@ -64,6 +65,7 @@ export interface LiveExperienceOptions {
   appendReplayNoteEvents: (events: ReplayNoteEvent[]) => void;
   refreshReplayDisplay: () => void;
   externalTimeline?: boolean;
+  startBarrier?: { id: string; barrier: MultiviewStartBarrier };
   hasLiveMap: (hash: string) => boolean;
   loadLiveReplay: (hash: string, replay: Replay) => Promise<SourceResult<void>>;
   selectedKey: string;

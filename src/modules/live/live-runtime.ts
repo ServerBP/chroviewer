@@ -13,6 +13,7 @@ export const maxBufferedPackets = 240;
 const retainedHistorySeconds = 30;
 const taRetainedHistorySeconds = 15;
 const maxRetainedPoseFrames = 1800;
+const maxBufferedPoseFramesPerSecond = 240;
 
 function retainLatestBefore<T>(events: T[], cutoff: number, time: (event: T) => number) {
   let remove = 0;
@@ -22,6 +23,8 @@ function retainLatestBefore<T>(events: T[], cutoff: number, time: (event: T) => 
 
 export interface LiveRuntime {
   bufferedPackets: ReplayStreamPacket[];
+  compositorBufferSeconds: number;
+  compositorStartAligned: boolean;
   connectionId: string;
   currentStreamId: string;
   followRequested: boolean;
@@ -64,6 +67,8 @@ export interface LiveRuntime {
 export function createLiveRuntime(target: LiveTarget): LiveRuntime {
   return {
     bufferedPackets: [],
+    compositorBufferSeconds: 0,
+    compositorStartAligned: false,
     connectionId: '',
     currentStreamId: '',
     followRequested: false,
@@ -120,6 +125,8 @@ export function applyLivePlaybackBuffer(runtime: LiveRuntime, buffer: LivePlayba
 
 export function resetLiveStream(runtime: LiveRuntime) {
   runtime.currentStreamId = '';
+  runtime.compositorBufferSeconds = 0;
+  runtime.compositorStartAligned = false;
   runtime.lastReplaySequence = 0n;
   runtime.latestFrameTime = 0;
   runtime.latestSongTime = 0;
@@ -172,16 +179,31 @@ export function increasePlaybackDelay(runtime: LiveRuntime) {
 
 export function pruneLiveReplay(runtime: LiveRuntime, time: number) {
   const replay = runtime.replay;
-  if (replay === null || (time - runtime.lastPruneAt < 2 && replay.poses.length <= maxRetainedPoseFrames)) return;
+  const retainedSeconds = runtime.taLive ? taRetainedHistorySeconds : retainedHistorySeconds;
+  const frameLimit =
+    runtime.compositorBufferSeconds > 0
+      ? Math.ceil(
+          (runtime.compositorBufferSeconds + (retainedSeconds + 5) / runtime.playbackRate) *
+            maxBufferedPoseFramesPerSecond,
+        )
+      : maxRetainedPoseFrames;
+  if (replay === null || (time - runtime.lastPruneAt < 2 && replay.poses.length <= frameLimit)) return;
   runtime.lastPruneAt = time;
-  const cutoff = time - (runtime.taLive ? taRetainedHistorySeconds : retainedHistorySeconds);
+  const playhead =
+    runtime.compositorBufferSeconds > 0 ? (runtime.playbackClock?.currentTime() ?? replay.poses[0]?.time ?? 0) : time;
+  const cutoff = Math.max(
+    playhead - retainedSeconds,
+    runtime.compositorBufferSeconds > 0
+      ? runtime.latestFrameTime - runtime.compositorBufferSeconds * runtime.playbackRate - retainedSeconds - 5
+      : Number.NEGATIVE_INFINITY,
+  );
   if (cutoff > 0) {
     let poseIndex = 0;
     while (poseIndex + 1 < replay.poses.length && (replay.poses[poseIndex + 1]?.time ?? 0) < cutoff) poseIndex++;
     if (poseIndex > 0) replay.poses.splice(0, poseIndex);
   }
-  if (replay.poses.length > maxRetainedPoseFrames) {
-    replay.poses.splice(0, replay.poses.length - maxRetainedPoseFrames);
+  if (replay.poses.length > frameLimit) {
+    replay.poses.splice(0, replay.poses.length - frameLimit);
   }
   if (cutoff <= 0) return;
   const base = (replay.liveHistoryBase ??= {

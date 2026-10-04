@@ -2,7 +2,7 @@ import { Result } from 'better-result';
 import * as z from 'zod/mini';
 
 import type { InfoColorScheme } from './beatmap/info';
-import type { Rgb } from './colors';
+import { DEFAULT_COLORS, type Rgb } from './colors';
 import { MAX_HSV_PROFILE_BYTES } from './replay/hit-score-visualizer-profile';
 import { replayColorScheme } from './replay/play-settings';
 import type { ReplayMetadata } from './replay/types';
@@ -16,6 +16,11 @@ export interface ViewerSettings {
   renderScale: number;
   staticLights: boolean;
   preferReplayColors: boolean;
+  preferReplayEnvironmentColors: boolean;
+  customEnvironmentColors: boolean;
+  useMapEnvironment: boolean;
+  compositorSyncType: 'slow' | 'wait-for-all';
+  compositorWaitSeconds: number;
   preferReplayEnvironment: boolean;
   overrideEnvironment: boolean;
   environmentOverrideId: string;
@@ -240,6 +245,11 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
   renderScale: 1,
   staticLights: false,
   preferReplayColors: true,
+  preferReplayEnvironmentColors: true,
+  customEnvironmentColors: false,
+  useMapEnvironment: false,
+  compositorSyncType: 'slow',
+  compositorWaitSeconds: 30,
   preferReplayEnvironment: true,
   overrideEnvironment: false,
   environmentOverrideId: 'BigMirrorEnvironment',
@@ -335,6 +345,11 @@ const viewerSettingsObjectSchema = z.object({
   renderScale: numberSetting(DEFAULT_VIEWER_SETTINGS.renderScale, 0.5, 1.5),
   staticLights: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.staticLights),
   preferReplayColors: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.preferReplayColors),
+  preferReplayEnvironmentColors: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.preferReplayEnvironmentColors),
+  customEnvironmentColors: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.customEnvironmentColors),
+  useMapEnvironment: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.useMapEnvironment),
+  compositorSyncType: z.catch(z.enum(['slow', 'wait-for-all']), DEFAULT_VIEWER_SETTINGS.compositorSyncType),
+  compositorWaitSeconds: integerSetting(DEFAULT_VIEWER_SETTINGS.compositorWaitSeconds, 1, 60),
   preferReplayEnvironment: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.preferReplayEnvironment),
   overrideEnvironment: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.overrideEnvironment),
   environmentOverrideId: z.catch(z.string(), DEFAULT_VIEWER_SETTINGS.environmentOverrideId),
@@ -436,6 +451,11 @@ export const viewerSettingsPatchSchema = z.pipe(
     if (settings.replayTrailStyle === undefined && legacyStyle !== undefined) {
       settings.replayTrailStyle = legacyStyle;
     }
+    // Older custom palettes configured notes and lights together.
+    if (settings.customColors === true && settings.customEnvironmentColors === undefined)
+      settings.customEnvironmentColors = true;
+    if (settings.preferReplayEnvironmentColors === undefined && settings.preferReplayColors !== undefined)
+      settings.preferReplayEnvironmentColors = settings.preferReplayColors;
     return settings;
   }),
 );
@@ -469,7 +489,14 @@ export function isMobileDevice(
 
 function parseStoredViewerSettings(text: string, legacy = false) {
   return Result.try(() =>
-    legacy ? sanitizeLegacyViewerSettings(JSON.parse(text)) : sanitizeViewerSettings(JSON.parse(text)),
+    (() => {
+      const value = JSON.parse(text);
+      const settings = legacy ? sanitizeLegacyViewerSettings(value) : sanitizeViewerSettings(value);
+      if (value.customEnvironmentColors === undefined) settings.customEnvironmentColors = settings.customColors;
+      if (value.preferReplayEnvironmentColors === undefined)
+        settings.preferReplayEnvironmentColors = settings.preferReplayColors;
+      return settings;
+    })(),
   );
 }
 
@@ -623,11 +650,15 @@ export function hexToRgb(hex: string): Rgb {
 }
 
 export function environmentForSettings(
-  settings: Pick<ViewerSettings, 'preferReplayEnvironment' | 'overrideEnvironment' | 'environmentOverrideId'>,
+  settings: Pick<
+    ViewerSettings,
+    'preferReplayEnvironment' | 'overrideEnvironment' | 'environmentOverrideId' | 'useMapEnvironment'
+  >,
   mapEnvironmentId: string,
   replayEnvironmentId: string | undefined,
   usesChromaOrNoodle: boolean,
 ) {
+  if (settings.useMapEnvironment) return mapEnvironmentId;
   if (!usesChromaOrNoodle && settings.preferReplayEnvironment && replayEnvironmentId !== undefined)
     return replayEnvironmentId;
   return settings.overrideEnvironment ? settings.environmentOverrideId : mapEnvironmentId;
@@ -638,27 +669,69 @@ export function colorOverride(
   mapScheme?: InfoColorScheme,
   replayMetadata?: ReplayMetadata,
 ): InfoColorScheme | undefined {
-  const base = manualColorOverride(settings, mapScheme);
-  return settings.preferReplayColors ? replayColorScheme(replayMetadata, base) : base;
-}
-
-function manualColorOverride(settings: ViewerSettings, mapScheme?: InfoColorScheme): InfoColorScheme | undefined {
-  if (!settings.customColors) return mapScheme;
-  const left = hexToRgb(settings.leftColor);
-  const right = hexToRgb(settings.rightColor);
+  const customNotes: InfoColorScheme | undefined = settings.customColors
+    ? {
+        ...DEFAULT_COLORS,
+        ...mapScheme,
+        name: 'ChroViewer saber colors',
+        overrideNotes: true,
+        overrideLights: mapScheme?.overrideLights ?? false,
+        supportsEnvironmentColorBoost: mapScheme?.supportsEnvironmentColorBoost ?? true,
+        leftNote: hexToRgb(settings.leftColor),
+        rightNote: hexToRgb(settings.rightColor),
+        obstacle: hexToRgb(settings.obstacleColor),
+        customColors: undefined,
+      }
+    : mapScheme;
+  const notes = settings.preferReplayColors ? replayColorScheme(replayMetadata, customNotes) : customNotes;
+  const lights: InfoColorScheme | undefined = settings.customEnvironmentColors
+    ? {
+        ...DEFAULT_COLORS,
+        name: 'ChroViewer environment colors',
+        overrideNotes: false,
+        overrideLights: true,
+        supportsEnvironmentColorBoost: true,
+        environmentLeft: hexToRgb(settings.environmentLeftColor),
+        environmentRight: hexToRgb(settings.environmentRightColor),
+        environmentWhite: hexToRgb(settings.environmentWhiteColor),
+        environmentLeftBoost: hexToRgb(settings.environmentLeftBoostColor),
+        environmentRightBoost: hexToRgb(settings.environmentRightBoostColor),
+        environmentWhiteBoost: hexToRgb(settings.environmentWhiteBoostColor),
+      }
+    : settings.preferReplayEnvironmentColors
+      ? replayColorScheme(replayMetadata, mapScheme)
+      : mapScheme;
+  if (notes === lights) return notes;
+  const noteCustom = notes?.customColors;
+  const lightCustom = lights?.customColors;
   return {
-    name: 'ChroViewer custom',
-    overrideNotes: true,
-    leftNote: left,
-    rightNote: right,
-    obstacle: hexToRgb(settings.obstacleColor),
-    overrideLights: true,
-    supportsEnvironmentColorBoost: true,
-    environmentLeft: hexToRgb(settings.environmentLeftColor),
-    environmentRight: hexToRgb(settings.environmentRightColor),
-    environmentWhite: hexToRgb(settings.environmentWhiteColor),
-    environmentLeftBoost: hexToRgb(settings.environmentLeftBoostColor),
-    environmentRightBoost: hexToRgb(settings.environmentRightBoostColor),
-    environmentWhiteBoost: hexToRgb(settings.environmentWhiteBoostColor),
+    ...DEFAULT_COLORS,
+    ...notes,
+    name: 'ChroViewer colors',
+    overrideNotes: notes?.overrideNotes ?? false,
+    overrideLights: lights?.overrideLights ?? false,
+    supportsEnvironmentColorBoost: lights?.supportsEnvironmentColorBoost ?? true,
+    environmentLeft: lights?.environmentLeft ?? DEFAULT_COLORS.environmentLeft,
+    environmentRight: lights?.environmentRight ?? DEFAULT_COLORS.environmentRight,
+    environmentWhite: lights?.environmentWhite,
+    environmentLeftBoost: lights?.environmentLeftBoost ?? DEFAULT_COLORS.environmentLeftBoost,
+    environmentRightBoost: lights?.environmentRightBoost ?? DEFAULT_COLORS.environmentRightBoost,
+    environmentWhiteBoost: lights?.environmentWhiteBoost,
+    customColors:
+      noteCustom === undefined && lightCustom === undefined
+        ? undefined
+        : {
+            leftNote: noteCustom?.leftNote,
+            rightNote: noteCustom?.rightNote,
+            obstacle: noteCustom?.obstacle,
+            environmentLeft: lightCustom?.environmentLeft ?? lightCustom?.leftNote,
+            environmentRight: lightCustom?.environmentRight ?? lightCustom?.rightNote,
+            environmentWhite: lightCustom?.environmentWhite,
+            environmentLeftBoost:
+              lightCustom?.environmentLeftBoost ?? lightCustom?.environmentLeft ?? lightCustom?.leftNote,
+            environmentRightBoost:
+              lightCustom?.environmentRightBoost ?? lightCustom?.environmentRight ?? lightCustom?.rightNote,
+            environmentWhiteBoost: lightCustom?.environmentWhiteBoost,
+          },
   };
 }

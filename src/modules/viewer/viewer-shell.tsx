@@ -34,6 +34,7 @@ import type { LiveStatus, LiveTarget } from '../live/live-types';
 import { LiveViewerPanel } from '../live/live-viewer-panel';
 import { useLiveExperience } from '../live/use-live-experience';
 import { useMapPoolShowcase } from '../map-pool-showcase/use-map-pool-showcase';
+import type { MultiviewStartBarrier } from '../multiview/multiview-start-barrier';
 import type { MultiviewTimeline } from '../multiview/multiview-timeline';
 import { ReplayPlayerCard } from '../replay/replay-player-card';
 import { SettingsDrawer } from '../settings/settings-drawer';
@@ -124,6 +125,12 @@ function dynamicSettingsPatch(values: Record<string, unknown>) {
     ...(values.qualityPreset === 'broadcast'
       ? { renderScale: 0.85, replayTrailSamples: 12, screenDisplacementEffects: false }
       : {}),
+    ...(typeof values.customColors === 'boolean' && values.customEnvironmentColors === undefined
+      ? { customEnvironmentColors: values.customColors }
+      : {}),
+    ...(typeof values.preferReplayColors === 'boolean' && values.preferReplayEnvironmentColors === undefined
+      ? { preferReplayEnvironmentColors: values.preferReplayColors }
+      : {}),
     ...patch,
     ...('screenDisplacement' in values ? { screenDisplacementEffects: values.screenDisplacement } : {}),
   };
@@ -206,6 +213,7 @@ interface ViewerShellProps {
     disableGameUI: boolean;
     lights: 'full' | 'static' | 'none';
     timeline: MultiviewTimeline;
+    startBarrier: MultiviewStartBarrier;
     settings?: Record<string, string | number | boolean>;
     mapCache: LiveMapCache;
     parser: BeatmapParser;
@@ -277,7 +285,11 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
       ...(search.fov === undefined ? {} : { replayCameraFov: search.fov }),
       ...(search.audioOffsetMs === undefined ? {} : { audioOffsetMs: search.audioOffsetMs }),
       ...(search.liveSource === 'ta' || search.liveSource === 'cocu'
-        ? { preferReplayColors: true, preferReplayEnvironment: true, preferReplayHsvProfile: true }
+        ? {
+            preferReplayColors: search.settings?.preferReplayColors ?? true,
+            preferReplayEnvironment: search.settings?.preferReplayEnvironment ?? true,
+            preferReplayHsvProfile: search.settings?.preferReplayHsvProfile ?? true,
+          }
         : {}),
     });
   });
@@ -549,6 +561,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     appendReplayNoteEvents: session.appendLiveReplayNoteEvents,
     refreshReplayDisplay: session.refreshLiveReplayDisplay,
     externalTimeline: multiview !== undefined,
+    startBarrier: multiview === undefined ? undefined : { id: multiview.id, barrier: multiview.startBarrier },
     hasLiveMap: (hash) => sources.hasLiveMap(hash),
     loadLiveReplay: (hash, replay) => {
       if (taLiveSource && embeddedLights === null && search.lights === undefined) {

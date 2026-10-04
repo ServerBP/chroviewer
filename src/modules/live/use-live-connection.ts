@@ -172,6 +172,15 @@ export function useLiveConnection(
       runtime.currentStreamId = packet.streamId;
       const replay = createLiveReplay(start, activeTarget.source === 'ta' || activeTarget.source === 'cocu');
       runtime.replay = replay;
+      const startBarrier = optionsRef.current.startBarrier;
+      if (startBarrier?.barrier.enabled) {
+        runtime.compositorBufferSeconds = startBarrier.barrier.waitSeconds;
+        startBarrier.barrier.begin(
+          startBarrier.id,
+          packet.streamId,
+          `${liveMapHash(start)}:${replay.metadata.difficulty}:${replay.metadata.characteristic}:${replay.metadata.songSpeed ?? 1}`,
+        );
+      }
       runtime.playbackRate = replay.metadata.songSpeed && replay.metadata.songSpeed > 0 ? replay.metadata.songSpeed : 1;
       const hash = liveMapHash(start);
       if (!/^[0-9A-F]{40}$/.test(hash)) {
@@ -472,6 +481,53 @@ export function useLiveConnection(
     function tickPlayback() {
       const transport = optionsRef.current.transport;
       const clock = transport.clockRef.current;
+      const startBarrier = optionsRef.current.startBarrier;
+      const first = runtime.replay?.poses[0]?.time;
+      if (
+        startBarrier !== undefined &&
+        runtime.replay !== null &&
+        startBarrier.barrier.isWaitingFor(startBarrier.id, runtime.currentStreamId)
+      ) {
+        const holding = startBarrier.barrier.update(startBarrier.id, runtime.currentStreamId, {
+          ready:
+            runtime.mapLoaded &&
+            optionsRef.current.selectedKey !== '' &&
+            clock !== null &&
+            clock.duration > 0 &&
+            first !== undefined &&
+            !runtime.streamPaused &&
+            (runtime.streamEnding || runtime.latestFrameTime - first >= Math.max(0.75, runtime.playbackDelay)),
+          firstFrameTime: first ?? 0,
+          latestFrameTime: runtime.latestFrameTime,
+          playbackRate: runtime.playbackRate,
+          minimumBufferSeconds: runtime.streamEnding ? 0.05 : Math.max(0.75, runtime.playbackDelay),
+          start(time, startedAt) {
+            if (
+              disposed ||
+              runtimeRef.current !== runtime ||
+              clock !== optionsRef.current.transport.clockRef.current ||
+              clock === null
+            )
+              return;
+            pausePlayback();
+            runtime.playbackClock = clock;
+            runtime.playbackStarted = true;
+            runtime.compositorStartAligned = true;
+            runtime.playbackAttemptPending = false;
+            clock.setRate(runtime.playbackRate);
+            // All tiles start in one task with a common time reference. No running clock is sought.
+            seekPlayback(time + (Math.max(0, performance.now() - startedAt) / 1000) * runtime.playbackRate);
+            resumePlayback();
+            updateConnectionState('watching');
+          },
+        });
+        if (holding) {
+          if (clock?.isPlaying()) pausePlayback();
+          updateConnectionState('buffering');
+          return;
+        }
+      }
+      if (!runtime.compositorStartAligned) runtime.compositorBufferSeconds = 0;
       tickLivePlayback(runtime, clock, optionsRef.current.selectedKey, playbackActions);
       const replay = runtime.replay;
       const firstFrameTime = replay?.poses[0]?.time;

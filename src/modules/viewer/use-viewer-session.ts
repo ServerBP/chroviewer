@@ -212,6 +212,8 @@ export function useViewerSession({
     view.refreshMapColors(colorOverride(settings, active.mapColorScheme, sources.replayRef.current?.metadata));
   }, [
     settings.preferReplayColors,
+    settings.preferReplayEnvironmentColors,
+    settings.customEnvironmentColors,
     settings.customColors,
     settings.leftColor,
     settings.rightColor,
@@ -243,6 +245,7 @@ export function useViewerSession({
     void selectEnvironment(nextEnvironmentId);
   }, [
     settings.preferReplayEnvironment,
+    settings.useMapEnvironment,
     settings.overrideEnvironment,
     settings.environmentOverrideId,
     skipInitialMenuEnvironment,

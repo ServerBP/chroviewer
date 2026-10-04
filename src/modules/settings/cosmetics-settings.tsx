@@ -120,7 +120,7 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
           <ColorPicker
             label={tc(key)}
             inputLabel={tc('hexColorInput', { setting: tc(key) })}
-            disabled={!settings.customColors}
+            disabled={key.startsWith('environment') ? !settings.customEnvironmentColors : !settings.customColors}
             value={settings[key]}
             onChange={(color) => {
               update(key, color);
@@ -183,8 +183,15 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
           <AccordionTrigger className="text-base font-semibold tracking-tight">{tc('overrides')}</AccordionTrigger>
           <AccordionContent className="flex flex-col gap-5">
             <SettingSection title={tc('environment')}>
+              <SettingRow label={tc('useMapEnvironment')} detail={tc('useMapEnvironmentDescription')}>
+                <Switch
+                  checked={settings.useMapEnvironment}
+                  onCheckedChange={(value) => update('useMapEnvironment', value)}
+                />
+              </SettingRow>
               <SettingRow label={tc('enableEnvironmentOverride')}>
                 <Switch
+                  disabled={settings.useMapEnvironment}
                   checked={settings.overrideEnvironment}
                   onCheckedChange={(overrideEnvironment) => {
                     update('overrideEnvironment', overrideEnvironment);
@@ -193,7 +200,7 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
               </SettingRow>
               <SettingRow label={tc('stage')}>
                 <Select
-                  disabled={!settings.overrideEnvironment}
+                  disabled={settings.useMapEnvironment || !settings.overrideEnvironment}
                   value={settings.environmentOverrideId}
                   onValueChange={(environmentOverrideId) => {
                     update('environmentOverrideId', environmentOverrideId);
@@ -215,6 +222,7 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
               </SettingRow>
               <SettingRow label={tc('preferReplayEnvironment')} detail={tc('preferReplayEnvironmentDescription')}>
                 <Switch
+                  disabled={settings.useMapEnvironment}
                   checked={settings.preferReplayEnvironment}
                   onCheckedChange={(preferReplayEnvironment) => {
                     update('preferReplayEnvironment', preferReplayEnvironment);
@@ -254,7 +262,22 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
                   }}
                 />
               </SettingRow>
-              {colorSettings.map(color)}
+              {colorSettings.filter((key) => !key.startsWith('environment')).map(color)}
+              <Separator />
+              <SettingRow label={tc('preferReplayEnvironmentColors')}>
+                <Switch
+                  disabled={settings.customEnvironmentColors}
+                  checked={settings.preferReplayEnvironmentColors}
+                  onCheckedChange={(value) => update('preferReplayEnvironmentColors', value)}
+                />
+              </SettingRow>
+              <SettingRow label={tc('customEnvironmentColors')} detail={tc('customEnvironmentColorsDescription')}>
+                <Switch
+                  checked={settings.customEnvironmentColors}
+                  onCheckedChange={(value) => update('customEnvironmentColors', value)}
+                />
+              </SettingRow>
+              {colorSettings.filter((key) => key.startsWith('environment')).map(color)}
             </SettingSection>
           </AccordionContent>
         </AccordionItem>
