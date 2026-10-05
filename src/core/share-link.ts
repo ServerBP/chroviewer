@@ -59,6 +59,7 @@ export function settingsForShareCategories(
       replayTrailFade: settings.replayTrailFade,
       replayTrailOpacity: settings.replayTrailOpacity,
       replayTrailMotionThreshold: settings.replayTrailMotionThreshold,
+      replayTrailSmoothing: settings.replayTrailSmoothing,
       saberGripLength: settings.saberGripLength,
       saberGripThickness: settings.saberGripThickness,
       saberGuardSize: settings.saberGuardSize,

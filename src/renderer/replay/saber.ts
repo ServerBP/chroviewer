@@ -44,7 +44,97 @@ export interface ReplaySaberTrail {
   mesh: Mesh<BufferGeometry, ShaderMaterial>;
   material: ShaderMaterial;
   samples: { base: Vector3; tip: Vector3 }[];
+  sourceSamples: { base: Vector3; tip: Vector3 }[];
+  samplePool: { base: Vector3; tip: Vector3 }[];
   settings: ReplayTrailSettings;
+}
+
+const replayTrailPredictionSpacing = 0.1;
+const maximumReplayTrailPredictions = 4;
+
+function acquireTrailSample(trail: ReplaySaberTrail) {
+  const recycled = trail.samplePool.pop();
+  return recycled ?? { base: new Vector3(), tip: new Vector3() };
+}
+
+function appendTrailSample(trail: ReplaySaberTrail, base: Vector3, tip: Vector3) {
+  const sample = acquireTrailSample(trail);
+  sample.base.copy(base);
+  sample.tip.copy(tip);
+  trail.samples.push(sample);
+}
+
+function tangentScale(before: Vector3, start: Vector3, end: Vector3) {
+  const previousLength = before.distanceTo(start);
+  return previousLength > 0 ? Math.min(start.distanceTo(end) / previousLength, 1) : 0;
+}
+
+function setHermitePoint(
+  target: Vector3,
+  before: Vector3,
+  start: Vector3,
+  end: Vector3,
+  previousScale: number,
+  t: number,
+) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const startWeight = 2 * t3 - 3 * t2 + 1;
+  const startTangentWeight = t3 - 2 * t2 + t;
+  const endWeight = -2 * t3 + 3 * t2;
+  const endTangentWeight = t3 - t2;
+  target.set(
+    startWeight * start.x +
+      startTangentWeight * (start.x - before.x) * previousScale +
+      endWeight * end.x +
+      endTangentWeight * (end.x - start.x),
+    startWeight * start.y +
+      startTangentWeight * (start.y - before.y) * previousScale +
+      endWeight * end.y +
+      endTangentWeight * (end.y - start.y),
+    startWeight * start.z +
+      startTangentWeight * (start.z - before.z) * previousScale +
+      endWeight * end.z +
+      endTangentWeight * (end.z - start.z),
+  );
+}
+
+function appendPredictedTrailSample(
+  trail: ReplaySaberTrail,
+  before: { base: Vector3; tip: Vector3 },
+  start: { base: Vector3; tip: Vector3 },
+  base: Vector3,
+  tip: Vector3,
+  baseTangentScale: number,
+  tipTangentScale: number,
+  t: number,
+) {
+  const sample = acquireTrailSample(trail);
+  setHermitePoint(sample.base, before.base, start.base, base, baseTangentScale, t);
+  setHermitePoint(sample.tip, before.tip, start.tip, tip, tipTangentScale, t);
+  trail.samples.push(sample);
+}
+
+function appendLinearTrailSample(
+  trail: ReplaySaberTrail,
+  start: { base: Vector3; tip: Vector3 },
+  base: Vector3,
+  tip: Vector3,
+  t: number,
+) {
+  const sample = acquireTrailSample(trail);
+  sample.base.lerpVectors(start.base, base, t);
+  sample.tip.lerpVectors(start.tip, tip, t);
+  trail.samples.push(sample);
+}
+
+function rememberTrailSourceSample(trail: ReplaySaberTrail, base: Vector3, tip: Vector3) {
+  const recycled =
+    trail.sourceSamples.length >= trail.settings.replayTrailSamples ? trail.sourceSamples.shift() : undefined;
+  const sample = recycled ?? { base: new Vector3(), tip: new Vector3() };
+  sample.base.copy(base);
+  sample.tip.copy(tip);
+  trail.sourceSamples.push(sample);
 }
 
 function cylinder(radius: number, length: number, segments = 12) {
@@ -168,7 +258,8 @@ export function setReplaySaberSettings(saber: ReplaySaberModel, settings: Replay
 }
 
 function configureTrailGeometry(trail: ReplaySaberTrail) {
-  const trailSamples = trail.settings.replayTrailSamples;
+  const trailSamples =
+    trail.settings.replayTrailSamples * (trail.settings.replayTrailSmoothing ? maximumReplayTrailPredictions + 1 : 1);
   const geometry = trail.mesh.geometry;
   geometry.setAttribute('position', new BufferAttribute(new Float32Array(trailSamples * 6), 3));
   geometry.setAttribute('trailAlpha', new BufferAttribute(new Float32Array(trailSamples * 2), 1));
@@ -179,6 +270,56 @@ function configureTrailGeometry(trail: ReplaySaberTrail) {
     indices.set([vertex, vertex + 1, vertex + 2, vertex + 2, vertex + 1, vertex + 3], offset);
   }
   geometry.setIndex(new BufferAttribute(indices, 1));
+}
+
+function recycleRenderedTrailSamples(trail: ReplaySaberTrail) {
+  while (trail.samples.length > 0) {
+    const sample = trail.samples.pop();
+    if (sample !== undefined) trail.samplePool.push(sample);
+  }
+}
+
+function rebuildReplaySaberTrail(trail: ReplaySaberTrail) {
+  recycleRenderedTrailSamples(trail);
+  const first = trail.sourceSamples[0];
+  if (first === undefined) {
+    trail.mesh.geometry.setDrawRange(0, 0);
+    return;
+  }
+
+  appendTrailSample(trail, first.base, first.tip);
+  for (let sourceIndex = 1; sourceIndex < trail.sourceSamples.length; sourceIndex++) {
+    const start = trail.sourceSamples[sourceIndex - 1];
+    const end = trail.sourceSamples[sourceIndex];
+    if (start === undefined || end === undefined) continue;
+    const before = trail.sourceSamples[sourceIndex - 2];
+    const predictions = trail.settings.replayTrailSmoothing
+      ? Math.min(
+          maximumReplayTrailPredictions,
+          Math.max(0, Math.ceil(start.tip.distanceTo(end.tip) / replayTrailPredictionSpacing) - 1),
+        )
+      : 0;
+    const baseTangentScale = before === undefined ? 0 : tangentScale(before.base, start.base, end.base);
+    const tipTangentScale = before === undefined ? 0 : tangentScale(before.tip, start.tip, end.tip);
+    for (let predictionIndex = 1; predictionIndex <= predictions; predictionIndex++) {
+      const t = predictionIndex / (predictions + 1);
+      if (before === undefined) appendLinearTrailSample(trail, start, end.base, end.tip, t);
+      else {
+        appendPredictedTrailSample(
+          trail,
+          before,
+          start,
+          end.base,
+          end.tip,
+          baseTangentScale,
+          tipTangentScale,
+          t,
+        );
+      }
+    }
+    appendTrailSample(trail, end.base, end.tip);
+  }
+  writeReplaySaberTrail(trail);
 }
 
 function writeReplaySaberTrail(trail: ReplaySaberTrail) {
@@ -219,32 +360,35 @@ export function createReplaySaberTrail(
   const mesh = new Mesh(geometry, material);
   mesh.frustumCulled = false;
   mesh.visible = settings.showSaberTrails;
-  const trail = { mesh, material, samples: [], settings: { ...settings } };
+  const trail = { mesh, material, samples: [], sourceSamples: [], samplePool: [], settings: { ...settings } };
   configureTrailGeometry(trail);
   return trail;
 }
 
 export function setReplaySaberTrailSettings(trail: ReplaySaberTrail, settings: ReplayTrailSettings) {
-  const samplesChanged = settings.replayTrailSamples !== trail.settings.replayTrailSamples;
+  const geometryChanged =
+    settings.replayTrailSamples !== trail.settings.replayTrailSamples ||
+    settings.replayTrailSmoothing !== trail.settings.replayTrailSmoothing;
   trail.settings = { ...settings };
   trail.mesh.visible = settings.showSaberTrails;
-  if (trail.samples.length > settings.replayTrailSamples) {
-    trail.samples.splice(0, trail.samples.length - settings.replayTrailSamples);
+  if (trail.sourceSamples.length > settings.replayTrailSamples) {
+    trail.sourceSamples.splice(0, trail.sourceSamples.length - settings.replayTrailSamples);
   }
-  if (samplesChanged) configureTrailGeometry(trail);
-  writeReplaySaberTrail(trail);
+  if (geometryChanged) configureTrailGeometry(trail);
+  rebuildReplaySaberTrail(trail);
 }
 
 export function clearReplaySaberTrail(trail: ReplaySaberTrail) {
-  trail.samples.length = 0;
+  recycleRenderedTrailSamples(trail);
+  trail.sourceSamples.length = 0;
   trail.mesh.geometry.setDrawRange(0, 0);
 }
 
 export function updateReplaySaberTrail(trail: ReplaySaberTrail, base: Vector3, tip: Vector3) {
-  const previous = trail.samples.at(-1);
+  const previous = trail.sourceSamples.at(-1);
   const threshold = trail.settings.replayTrailMotionThreshold;
   if (previous !== undefined && previous.tip.distanceToSquared(tip) < threshold * threshold) return;
-  trail.samples.push({ base: base.clone(), tip: tip.clone() });
-  if (trail.samples.length > trail.settings.replayTrailSamples) trail.samples.shift();
-  writeReplaySaberTrail(trail);
+
+  rememberTrailSourceSample(trail, base, tip);
+  rebuildReplaySaberTrail(trail);
 }

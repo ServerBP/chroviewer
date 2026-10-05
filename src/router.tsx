@@ -52,6 +52,7 @@ const replaySaberSearchKeys = [
   'replayTrailFade',
   'replayTrailOpacity',
   'replayTrailMotionThreshold',
+  'replayTrailSmoothing',
   'saberGripLength',
   'saberGripThickness',
   'saberGuardSize',

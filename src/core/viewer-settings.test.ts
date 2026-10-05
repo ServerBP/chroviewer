@@ -139,6 +139,7 @@ describe('independent player cosmetics', () => {
     );
     expect(old.customEnvironmentColors).toBe(true);
     expect(old.preferReplayEnvironmentColors).toBe(false);
+    expect(old.replayTrailSmoothing).toBe(true);
     const patch = viewerSettingsPatchSchema.parse({
       customColors: true,
       customEnvironmentColors: false,
@@ -147,6 +148,7 @@ describe('independent player cosmetics', () => {
       useMapEnvironment: true,
       compositorSyncType: 'wait-for-all',
       compositorWaitSeconds: 60,
+      replayTrailSmoothing: false,
     });
     const saved = { ...DEFAULT_VIEWER_SETTINGS, ...patch };
     const restored = loadViewerSettings({ getItem: () => JSON.stringify(saved) }, false);

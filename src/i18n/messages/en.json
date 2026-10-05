@@ -182,6 +182,7 @@
       "replayTrailFade": "Trail fade",
       "replayTrailLength": "Trail length",
       "replayTrailMotionThreshold": "Minimum movement",
+      "replayTrailSmoothing": "Trail smoothing / prediction",
       "replayTrailOpacity": "Trail opacity",
       "replayTrailSamples": "Trail samples",
       "replayTrailShape": "Trail shape",

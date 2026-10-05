@@ -51,6 +51,7 @@ export interface ViewerSettings {
   replayTrailFade: number;
   replayTrailOpacity: number;
   replayTrailMotionThreshold: number;
+  replayTrailSmoothing: boolean;
   saberGripLength: number;
   saberGripThickness: number;
   saberGuardSize: number;
@@ -138,6 +139,7 @@ export type ReplayTrailSettings = Pick<
   | 'replayTrailFade'
   | 'replayTrailOpacity'
   | 'replayTrailMotionThreshold'
+  | 'replayTrailSmoothing'
 >;
 
 export type ReplaySaberSettings = Pick<
@@ -156,6 +158,7 @@ export type ReplaySaberSettings = Pick<
   | 'replayTrailFade'
   | 'replayTrailOpacity'
   | 'replayTrailMotionThreshold'
+  | 'replayTrailSmoothing'
   | 'saberGripLength'
   | 'saberGripThickness'
   | 'saberGuardSize'
@@ -205,6 +208,7 @@ export const DEFAULT_REPLAY_TRAIL_SETTINGS: ReplayTrailSettings = {
   replayTrailFade: 1.6,
   replayTrailOpacity: 1,
   replayTrailMotionThreshold: 0.002,
+  replayTrailSmoothing: true,
 };
 
 export const DEFAULT_REPLAY_SABER_SETTINGS: ReplaySaberSettings = {
@@ -380,6 +384,7 @@ const viewerSettingsObjectSchema = z.object({
   replayTrailFade: numberSetting(DEFAULT_VIEWER_SETTINGS.replayTrailFade, 0.1, 5),
   replayTrailOpacity: numberSetting(DEFAULT_VIEWER_SETTINGS.replayTrailOpacity, 0, 2),
   replayTrailMotionThreshold: numberSetting(DEFAULT_VIEWER_SETTINGS.replayTrailMotionThreshold, 0.0001, 0.02),
+  replayTrailSmoothing: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.replayTrailSmoothing),
   saberGripLength: numberSetting(DEFAULT_VIEWER_SETTINGS.saberGripLength, 0.02, 0.3),
   saberGripThickness: numberSetting(DEFAULT_VIEWER_SETTINGS.saberGripThickness, 0.002, 0.03),
   saberGuardSize: numberSetting(DEFAULT_VIEWER_SETTINGS.saberGuardSize, 0.005, 0.08),

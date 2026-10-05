@@ -24,3 +24,10 @@ test('parses isolated settings mode case-insensitively', () => {
 
   expect(z.parse(viewerSearchSchema, parsed).isolatedSettings).toBe(true);
 });
+
+test('parses trail smoothing as a direct viewer setting', () => {
+  const parsed = parseUrlSearch('?replayTrailSmoothing=false');
+
+  expect(parsed.settings).toEqual({ replayTrailSmoothing: false });
+  expect(z.parse(viewerSearchSchema, parsed).settings).toEqual(parsed.settings);
+});

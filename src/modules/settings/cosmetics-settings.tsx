@@ -30,7 +30,10 @@ interface CosmeticsSettingsProps {
   onChange: (settings: ViewerSettings) => void;
 }
 
-type NumericSaberSetting = Exclude<keyof ReplaySaberSettings, 'showSabers' | 'showSaberTrails' | 'replayTrailStyle'>;
+type NumericSaberSetting = Exclude<
+  keyof ReplaySaberSettings,
+  'showSabers' | 'showSaberTrails' | 'replayTrailStyle' | 'replayTrailSmoothing'
+>;
 
 interface SaberSliderOptions {
   minimum: number;
@@ -388,6 +391,14 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
                   checked={settings.showSaberTrails}
                   onCheckedChange={(showSaberTrails) => {
                     update('showSaberTrails', showSaberTrails);
+                  }}
+                />
+              </SettingRow>
+              <SettingRow label={t('replayTrailSmoothing')}>
+                <Switch
+                  checked={settings.replayTrailSmoothing}
+                  onCheckedChange={(replayTrailSmoothing) => {
+                    update('replayTrailSmoothing', replayTrailSmoothing);
                   }}
                 />
               </SettingRow>

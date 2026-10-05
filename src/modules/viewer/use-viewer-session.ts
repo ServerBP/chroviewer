@@ -180,6 +180,7 @@ export function useViewerSession({
     settings.replayTrailFade,
     settings.replayTrailOpacity,
     settings.replayTrailMotionThreshold,
+    settings.replayTrailSmoothing,
     settings.saberGripLength,
     settings.saberGripThickness,
     settings.saberGuardSize,

@@ -79,6 +79,7 @@ replayTrailSamples=2..128
 replayTrailFade=0.1..5
 replayTrailOpacity=0..2
 replayTrailMotionThreshold=0.0001..0.02
+replayTrailSmoothing=true|false (default true; predicts curved trail points across large replay-frame gaps)
 saberGripLength=0.02..0.3
 saberGripThickness=0.002..0.03
 saberGuardSize=0.005..0.08
