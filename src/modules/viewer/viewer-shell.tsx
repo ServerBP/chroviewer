@@ -211,6 +211,7 @@ interface ViewerShellProps {
     masterVolume: number;
     hitsoundVolume: number;
     disableGameUI: boolean;
+    hidePlatform: boolean;
     lights: 'full' | 'static' | 'none';
     timeline: MultiviewTimeline;
     startBarrier: MultiviewStartBarrier;
@@ -236,6 +237,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
           masterVolume: multiview.masterVolume,
           hitsoundVolume: multiview.hitsoundVolume,
           disableGameUI: multiview.disableGameUI,
+          hidePlatform: multiview.hidePlatform,
           lights: multiview.lights,
           qualityPreset: 'broadcast' as const,
           maxFps: typeof multiview.settings?.maxFps === 'number' ? multiview.settings.maxFps : 60,
@@ -361,6 +363,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   });
   const session = useViewerSession({
     disableGameUI: search.disableGameUI === true,
+    hidePlatform: search.hidePlatform === true,
     hideGameplayNotes: search.showcase === true,
     lightshowMode,
     lightshowModeRef,

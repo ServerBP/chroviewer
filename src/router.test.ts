@@ -76,6 +76,7 @@ test('preserves a serialized multi-map showcase configuration from a long browse
     showcase: 'true',
     hideUI: 'true',
     isolatedSettings: 'true',
+    hidePlatform: 'true',
     qualityPreset: 'broadcast',
     showcaseConfig,
   });
@@ -85,5 +86,6 @@ test('preserves a serialized multi-map showcase configuration from a long browse
 
   expect(validated.showcase).toBe(true);
   expect(validated.showcaseConfig).toBe(showcaseConfig);
+  expect(validated.hidePlatform).toBe(true);
   expect(JSON.parse(validated.showcaseConfig ?? '{}').maps).toHaveLength(8);
 });

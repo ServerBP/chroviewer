@@ -69,6 +69,7 @@ function validPlayer(value: unknown): value is MultiviewPlayerConfig {
     typeof value.masterVolume === 'number' &&
     typeof value.hitsoundVolume === 'number' &&
     typeof value.disableGameUI === 'boolean' &&
+    (value.hidePlatform === undefined || typeof value.hidePlatform === 'boolean') &&
     (value.lights === 'full' || value.lights === 'static' || value.lights === 'none') &&
     (value.backgroundColor === undefined || typeof value.backgroundColor === 'string') &&
     (value.waitingColor === undefined || typeof value.waitingColor === 'string') &&
@@ -426,6 +427,7 @@ export function MultiviewShell() {
               masterVolume: player.masterVolume,
               hitsoundVolume: player.hitsoundVolume,
               disableGameUI: player.disableGameUI,
+              hidePlatform: player.hidePlatform ?? false,
               lights: player.lights,
               timeline,
               startBarrier,

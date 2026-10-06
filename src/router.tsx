@@ -95,6 +95,7 @@ const searchKeyAliases = new Map(
     poolshowcase: 'poolShowcase',
     poolshowcaseconfig: 'poolShowcaseConfig',
     disablegameui: 'disableGameUI',
+    hideplatform: 'hidePlatform',
     lightshow: 'lightshow',
     lights: 'lights',
     mastervolume: 'masterVolume',

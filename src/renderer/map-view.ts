@@ -77,6 +77,7 @@ export class MapView implements RenderView {
   private readonly environmentLights = new EnvironmentLightRuntime();
   private environment: LoadedEnvironment | null = null;
   private environmentMirrorConsumers: Mesh[] = [];
+  private playerPlatformNodes: Array<{ node: Group; visible: boolean }> = [];
   private environmentRequest: {
     id: string;
     chromaEnvironment?: ChromaEnvironmentData;
@@ -91,6 +92,7 @@ export class MapView implements RenderView {
   private menuLightshowSeed: number | null = null;
   private orthoCameraEnabled = DEFAULT_REPLAY_CAMERA_SETTINGS.orthoCameraEnabled;
   private screenDisplacementEffects = true;
+  private playerPlatformVisible = true;
 
   private data: MapRenderData | null = null;
   private beatSource: () => number = () => 0;
@@ -219,6 +221,13 @@ export class MapView implements RenderView {
     }
     this.environment = environment;
     this.environmentRequest = null;
+    this.playerPlatformNodes = [];
+    environment.root.traverse((node) => {
+      if (node instanceof Group && /^PlayersPlace(?:\(Clone\))*$/.test(node.name)) {
+        this.playerPlatformNodes.push({ node, visible: node.visible });
+      }
+    });
+    this.applyPlayerPlatformVisibility();
     this.environmentMirrorConsumers = collectMirrorConsumers(environment.root);
     this.scene.add(environment.root);
     this.environmentLights.setEnvironment(environment);
@@ -275,6 +284,18 @@ export class MapView implements RenderView {
 
   setGameUIEnabled(enabled: boolean) {
     this.replayView.setGameUIEnabled(enabled);
+  }
+
+  setPlayerPlatformVisible(visible: boolean) {
+    this.playerPlatformVisible = visible;
+    this.applyPlayerPlatformVisibility();
+  }
+
+  private applyPlayerPlatformVisibility() {
+    for (const platform of this.playerPlatformNodes) {
+      platform.node.visible = this.playerPlatformVisible ? platform.visible : false;
+    }
+    if (this.playerPlatformVisible) this.environment?.enforceChromaRemoval();
   }
 
   setGameplayNotesVisible(visible: boolean) {
@@ -434,6 +455,7 @@ export class MapView implements RenderView {
     if (this.environment !== null) {
       const fog = this.environmentLights.update(now, this.baseProviders);
       if (fog !== undefined) this.pipeline.setFogParams(fog);
+      if (!this.playerPlatformVisible) this.applyPlayerPlatformVisibility();
     }
     if (data === null) return;
     if (!shouldShowMapObjects(this.lightshowMode, this.gameplayObjectsVisible)) return;

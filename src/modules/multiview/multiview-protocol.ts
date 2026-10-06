@@ -10,6 +10,7 @@ export interface MultiviewPlayerConfig {
   masterVolume: number;
   hitsoundVolume: number;
   disableGameUI: boolean;
+  hidePlatform?: boolean;
   lights: 'full' | 'static' | 'none';
   backgroundColor?: string;
   waitingColor?: string;
