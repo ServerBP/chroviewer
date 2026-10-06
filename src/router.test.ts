@@ -31,3 +31,20 @@ test('parses trail smoothing as a direct viewer setting', () => {
   expect(parsed.settings).toEqual({ replayTrailSmoothing: false });
   expect(z.parse(viewerSearchSchema, parsed).settings).toEqual(parsed.settings);
 });
+
+test('parses custom saber model aliases and canonical keys', () => {
+  const alias = parseUrlSearch('?saber=euc');
+  const canonical = parseUrlSearch('?saberModel=beatkhana');
+
+  expect(alias.settings).toEqual({ saberModel: 'euc' });
+  expect(canonical.settings).toEqual({ saberModel: 'beatkhana' });
+  expect(z.parse(viewerSearchSchema, alias).settings).toEqual(alias.settings);
+  expect(z.parse(viewerSearchSchema, canonical).settings).toEqual(canonical.settings);
+});
+
+test('parses saber width as a per-viewer setting', () => {
+  const parsed = parseUrlSearch('?saberWidth=0.72');
+
+  expect(parsed.settings).toEqual({ saberWidth: 0.72 });
+  expect(z.parse(viewerSearchSchema, parsed).settings).toEqual(parsed.settings);
+});

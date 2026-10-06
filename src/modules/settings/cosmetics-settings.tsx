@@ -7,6 +7,7 @@ import { MAX_HSV_PROFILE_BYTES, parseHitScoreVisualizerProfile } from '../../cor
 import {
   DEFAULT_REPLAY_SABER_SETTINGS,
   DEFAULT_VIEWER_SETTINGS,
+  replaySaberModelIds,
   type ReplaySaberSettings,
   type ViewerSettings,
 } from '../../core/viewer-settings';
@@ -32,7 +33,7 @@ interface CosmeticsSettingsProps {
 
 type NumericSaberSetting = Exclude<
   keyof ReplaySaberSettings,
-  'showSabers' | 'showSaberTrails' | 'replayTrailStyle' | 'replayTrailSmoothing'
+  'showSabers' | 'saberModel' | 'showSaberTrails' | 'replayTrailStyle' | 'replayTrailSmoothing'
 >;
 
 interface SaberSliderOptions {
@@ -345,6 +346,28 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
               {ts('resetAll')}
             </Button>
             <SettingSection title={t('blade')}>
+              <SettingRow label={t('saberModel')}>
+                <Select
+                  value={settings.saberModel}
+                  onValueChange={(saberModel) => {
+                    const selected = replaySaberModelIds.find((model) => model === saberModel);
+                    if (selected !== undefined) update('saberModel', selected);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {replaySaberModelIds.map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {t(`saberModels.${model}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </SettingRow>
               <SettingRow label={t('showSabers')}>
                 <Switch
                   checked={settings.showSabers}
@@ -353,36 +376,46 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
                   }}
                 />
               </SettingRow>
-              {slider('saberScale', {
+              {slider('saberWidth', {
                 minimum: 0.25,
                 maximum: 3,
                 step: 0.01,
                 display: percent,
               })}
-              {slider('saberBladeLength', {
-                minimum: 0.1,
-                maximum: 2,
-                step: 0.001,
-                display: centimeters,
-              })}
-              {slider('saberBladeThickness', {
-                minimum: 0.001,
-                maximum: 0.03,
-                step: 0.0001,
-                display: millimeters,
-              })}
-              {slider('saberCoreThickness', {
-                minimum: 0.0005,
-                maximum: 0.02,
-                step: 0.0001,
-                display: millimeters,
-              })}
-              {slider('saberCoreInset', {
-                minimum: 0,
-                maximum: 0.2,
-                step: 0.001,
-                display: millimeters,
-              })}
+              {settings.saberModel === 'default' && (
+                <>
+                  {slider('saberScale', {
+                    minimum: 0.25,
+                    maximum: 3,
+                    step: 0.01,
+                    display: percent,
+                  })}
+                  {slider('saberBladeLength', {
+                    minimum: 0.1,
+                    maximum: 2,
+                    step: 0.001,
+                    display: centimeters,
+                  })}
+                  {slider('saberBladeThickness', {
+                    minimum: 0.001,
+                    maximum: 0.03,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                  {slider('saberCoreThickness', {
+                    minimum: 0.0005,
+                    maximum: 0.02,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                  {slider('saberCoreInset', {
+                    minimum: 0,
+                    maximum: 0.2,
+                    step: 0.001,
+                    display: millimeters,
+                  })}
+                </>
+              )}
             </SettingSection>
             <Separator />
             <SettingSection title={t('trail')}>
@@ -454,6 +487,8 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
                 display: millimeters,
               })}
             </SettingSection>
+            {settings.saberModel === 'default' && (
+              <>
             <Separator />
             <SettingSection title={t('hilt')}>
               {slider('saberGripLength', {
@@ -574,6 +609,8 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
                 display: degrees,
               })}
             </SettingSection>
+              </>
+            )}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

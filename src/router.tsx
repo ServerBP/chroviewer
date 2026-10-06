@@ -39,7 +39,9 @@ const replaySaberSearchKeys = [
   'leftColor',
   'rightColor',
   'showSabers',
+  'saberModel',
   'saberScale',
+  'saberWidth',
   'saberBladeLength',
   'saberBladeThickness',
   'saberCoreThickness',
@@ -77,6 +79,7 @@ const replaySaberSearchKeys = [
 const searchKeyAliases = new Map(
   Object.entries({
     ...Object.fromEntries(replaySaberSearchKeys.map((key) => [key.toLowerCase(), key])),
+    saber: 'saberModel',
     map: 'map',
     replayurl: 'replayUrl',
     scoreid: 'scoreId',

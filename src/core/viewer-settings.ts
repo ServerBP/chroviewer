@@ -38,7 +38,9 @@ export interface ViewerSettings {
   preferReplayHsvProfile: boolean;
   hsvProfile: string;
   showSabers: boolean;
+  saberModel: ReplaySaberModelId;
   saberScale: number;
+  saberWidth: number;
   saberBladeLength: number;
   saberBladeThickness: number;
   saberCoreThickness: number;
@@ -104,6 +106,16 @@ export interface ViewerSettings {
   keepMapInfoVisible: boolean;
 }
 
+export const replaySaberModelIds = [
+  'default',
+  'beatkhana',
+  'cube-community-new',
+  'cube-community-v1',
+  'euc',
+] as const;
+
+export type ReplaySaberModelId = (typeof replaySaberModelIds)[number];
+
 export type HitsoundPreset = z.infer<typeof hitsoundPresetSchema>;
 
 export const MIN_AUDIO_OFFSET_MS = -1000;
@@ -145,7 +157,9 @@ export type ReplayTrailSettings = Pick<
 export type ReplaySaberSettings = Pick<
   ViewerSettings,
   | 'showSabers'
+  | 'saberModel'
   | 'saberScale'
+  | 'saberWidth'
   | 'saberBladeLength'
   | 'saberBladeThickness'
   | 'saberCoreThickness'
@@ -213,7 +227,9 @@ export const DEFAULT_REPLAY_TRAIL_SETTINGS: ReplayTrailSettings = {
 
 export const DEFAULT_REPLAY_SABER_SETTINGS: ReplaySaberSettings = {
   showSabers: true,
+  saberModel: 'default',
   saberScale: 1,
+  saberWidth: 1,
   saberBladeLength: 1,
   saberBladeThickness: 0.0075,
   saberCoreThickness: 0.003,
@@ -289,8 +305,9 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
   keepMapInfoVisible: false,
 };
 
-const storageKey = 'chroviewer.settings.v9';
-const previousStorageKey = 'chroviewer.settings.v8';
+const storageKey = 'chroviewer.settings.v10';
+const previousStorageKey = 'chroviewer.settings.v9';
+const v8StorageKey = 'chroviewer.settings.v8';
 const v7StorageKey = 'chroviewer.settings.v7';
 const v6StorageKey = 'chroviewer.settings.v6';
 const incorrectColorStorageKey = 'chroviewer.settings.v5';
@@ -371,7 +388,9 @@ const viewerSettingsObjectSchema = z.object({
   preferReplayHsvProfile: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.preferReplayHsvProfile),
   hsvProfile: z.catch(z.string().check(z.maxLength(MAX_HSV_PROFILE_BYTES)), DEFAULT_VIEWER_SETTINGS.hsvProfile),
   showSabers: z.catch(z.boolean(), DEFAULT_VIEWER_SETTINGS.showSabers),
+  saberModel: z.catch(z.enum(replaySaberModelIds), DEFAULT_VIEWER_SETTINGS.saberModel),
   saberScale: numberSetting(DEFAULT_VIEWER_SETTINGS.saberScale, 0.25, 3),
+  saberWidth: numberSetting(DEFAULT_VIEWER_SETTINGS.saberWidth, 0.25, 3),
   saberBladeLength: numberSetting(DEFAULT_VIEWER_SETTINGS.saberBladeLength, 0.1, 2),
   saberBladeThickness: numberSetting(DEFAULT_VIEWER_SETTINGS.saberBladeThickness, 0.001, 0.03),
   saberCoreThickness: numberSetting(DEFAULT_VIEWER_SETTINGS.saberCoreThickness, 0.0005, 0.02),
@@ -519,6 +538,13 @@ export function loadViewerSettings(
   const previousText = storage.getItem(previousStorageKey);
   if (previousText !== null) {
     const parsed = parseStoredViewerSettings(previousText, true);
+    if (parsed.isErr()) return defaults;
+    return parsed.value;
+  }
+
+  const v8Text = storage.getItem(v8StorageKey);
+  if (v8Text !== null) {
+    const parsed = parseStoredViewerSettings(v8Text, true);
     if (parsed.isErr()) return defaults;
     return parsed.value;
   }

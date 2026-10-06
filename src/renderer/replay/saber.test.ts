@@ -14,6 +14,21 @@ function updateAt(trail: ReturnType<typeof createReplaySaberTrail>, x: number, y
 }
 
 describe('replay saber trail smoothing', () => {
+  test('orients custom trail textures from the live saber edge without mirroring the blade span', () => {
+    const trail = createReplaySaberTrail(new ShaderMaterial(), {
+      ...DEFAULT_REPLAY_TRAIL_SETTINGS,
+      replayTrailSamples: 4,
+      replayTrailSmoothing: false,
+    });
+
+    updateReplaySaberTrail(trail, point(0, 0), point(0, 1));
+    updateReplaySaberTrail(trail, point(1, 0), point(1, 1));
+
+    const uv = trail.mesh.geometry.getAttribute('trailUv');
+    expect([uv.getX(0), uv.getY(0), uv.getX(1), uv.getY(1)]).toEqual([1, 1, 1, 0]);
+    expect([uv.getX(2), uv.getY(2), uv.getX(3), uv.getY(3)]).toEqual([0, 1, 0, 0]);
+  });
+
   test('is enabled by default and predicts curved points across large frame gaps', () => {
     const trail = createReplaySaberTrail(new ShaderMaterial(), {
       ...DEFAULT_REPLAY_TRAIL_SETTINGS,

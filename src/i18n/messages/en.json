@@ -187,6 +187,14 @@
       "replayTrailSamples": "Trail samples",
       "replayTrailShape": "Trail shape",
       "replayTrailThinness": "Trail thinness",
+      "saberModel": "Saber",
+      "saberModels": {
+        "beatkhana": "BeatKhana",
+        "cube-community-new": "Cube Community",
+        "cube-community-v1": "Cube Community V1",
+        "default": "Default",
+        "euc": "European Championship"
+      },
       "saberBladeLength": "Blade length",
       "saberBladeThickness": "Blade thickness",
       "saberCollarSize": "Collar size",
@@ -205,6 +213,7 @@
       "saberRingSpacing": "Decorative ring spacing",
       "saberRingThickness": "Decorative ring thickness",
       "saberScale": "Overall scale",
+      "saberWidth": "Saber width",
       "saberXOffset": "Left / right offset",
       "saberXRotation": "Pitch",
       "saberYOffset": "Up / down offset",

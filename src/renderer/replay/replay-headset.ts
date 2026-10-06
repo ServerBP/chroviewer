@@ -6,13 +6,19 @@ import { z } from 'zod';
 import type { Rgb } from '../../core/colors';
 import type { FogUniforms } from '../bloomfog/pipeline';
 import { createEnvironmentLitMaterial } from '../materials/environment-surface-materials';
+import type { MaterialTexture } from '../materials/shared';
 
-interface HeadsetSurface {
+export interface ReplaySurface {
   color: Rgb;
   metallic: number;
   smoothness: number;
   specularIntensity: number;
   ambientMinimalValue?: number;
+  diffuse?: MaterialTexture;
+  emission?: MaterialTexture;
+  emissionColor?: Rgb;
+  emissionBrightness?: number;
+  emissionBloomIntensity?: number;
 }
 
 export interface ReplayDirectionalLights {
@@ -22,7 +28,7 @@ export interface ReplayDirectionalLights {
   radii: number[];
 }
 
-const DEFAULT_HEADSET_SURFACE: HeadsetSurface = {
+const DEFAULT_HEADSET_SURFACE: ReplaySurface = {
   color: [0.18, 0.22, 0.28],
   metallic: 0.05,
   smoothness: 0.55,
@@ -31,7 +37,7 @@ const DEFAULT_HEADSET_SURFACE: HeadsetSurface = {
 
 const meshSchema = z.custom<Mesh>((value) => value instanceof Mesh);
 
-const HEADSET_SURFACES = new Map<string, HeadsetSurface>(
+const HEADSET_SURFACES = new Map<string, ReplaySurface>(
   Object.entries({
     Headset_M: DEFAULT_HEADSET_SURFACE,
     Foam: {
@@ -67,7 +73,7 @@ const HEADSET_SURFACES = new Map<string, HeadsetSurface>(
   }),
 );
 
-export const SABER_METAL_SURFACE: HeadsetSurface = {
+export const SABER_METAL_SURFACE: ReplaySurface = {
   color: [0.05, 0.055, 0.065],
   metallic: 0.65,
   smoothness: 0.45,
@@ -75,7 +81,7 @@ export const SABER_METAL_SURFACE: HeadsetSurface = {
   ambientMinimalValue: 0.01,
 };
 
-export const SABER_GRIP_SURFACE: HeadsetSurface = {
+export const SABER_GRIP_SURFACE: ReplaySurface = {
   color: [0.025, 0.03, 0.04],
   metallic: 0.05,
   smoothness: 0.2,
@@ -86,7 +92,7 @@ export const SABER_GRIP_SURFACE: HeadsetSurface = {
 export function createReplaySurfaceMaterial(
   fog: FogUniforms,
   directionalLights: ReplayDirectionalLights,
-  surface: HeadsetSurface,
+  surface: ReplaySurface,
 ) {
   return createEnvironmentLitMaterial(
     fog,
@@ -137,6 +143,7 @@ export function createReplaySurfaceMaterial(
       displacementAxisMultiplier: [0, 0, 0],
       meshPackingEnabled: false,
       meshPackingId: 0,
+      diffuse: surface.diffuse,
       albedoMultiplier: 1,
       metallicTextureEnabled: false,
       smoothnessTextureSource: 'none',
@@ -147,14 +154,15 @@ export function createReplaySurfaceMaterial(
       occlusionDetailOffset: [0, 0],
       occlusionDetailIntensity: 0,
       normalScale: 1,
-      emissionColor: [0, 0, 0],
-      emissionColorAlpha: 0,
-      emissionBrightness: 0,
+      emission: surface.emission,
+      emissionColor: surface.emissionColor ?? surface.color,
+      emissionColorAlpha: surface.emission === undefined ? 0 : 1,
+      emissionBrightness: surface.emissionBrightness ?? 0,
       emissionAlphaSource: 'textureAlpha',
       emissionWhiteBoost: false,
       emissionWhiteBoostMultiplier: 1,
-      emissionMainEffect: false,
-      emissionBloomIntensity: 1,
+      emissionMainEffect: surface.emission !== undefined,
+      emissionBloomIntensity: surface.emissionBloomIntensity ?? 1,
       toneMapBeforeEmission: false,
       emissionMaskSpeed: [0, 0, 0],
       secondaryEmissionMaskSpeed: [0, 0, 0],

@@ -255,19 +255,31 @@ void main() {
 
 export const SABER_TRAIL_VERT = /* glsl */ `
 attribute float trailAlpha;
+attribute vec2 trailUv;
 varying float vTrailAlpha;
+varying vec2 vTrailUv;
 void main() {
   vTrailAlpha = trailAlpha;
+  vTrailUv = trailUv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;
 
 export const SABER_TRAIL_FRAG = /* glsl */ `
 uniform vec3 _Color;
+#ifdef CUSTOM_TRAIL_TEXTURE
+uniform sampler2D _TrailTexture;
+#endif
 varying float vTrailAlpha;
+varying vec2 vTrailUv;
 void main() {
-  float alpha = vTrailAlpha * 0.3;
-  gl_FragColor = vec4(_Color * (0.45 + vTrailAlpha * 0.55), alpha);
+  float textureSignal = 1.0;
+  #ifdef CUSTOM_TRAIL_TEXTURE
+  vec4 trailTexture = texture2D(_TrailTexture, vTrailUv);
+  textureSignal = max(trailTexture.r, max(trailTexture.g, trailTexture.b));
+  #endif
+  float alpha = vTrailAlpha * textureSignal * 0.72;
+  gl_FragColor = vec4(_Color * textureSignal * (0.55 + vTrailAlpha * 0.8), alpha);
   #include <colorspace_fragment>
 }
 `;

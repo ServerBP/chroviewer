@@ -140,6 +140,8 @@ describe('independent player cosmetics', () => {
     expect(old.customEnvironmentColors).toBe(true);
     expect(old.preferReplayEnvironmentColors).toBe(false);
     expect(old.replayTrailSmoothing).toBe(true);
+    expect(old.saberModel).toBe('default');
+    expect(old.saberWidth).toBe(1);
     const patch = viewerSettingsPatchSchema.parse({
       customColors: true,
       customEnvironmentColors: false,
@@ -149,6 +151,8 @@ describe('independent player cosmetics', () => {
       compositorSyncType: 'wait-for-all',
       compositorWaitSeconds: 60,
       replayTrailSmoothing: false,
+      saberModel: 'euc',
+      saberWidth: 0.72,
     });
     const saved = { ...DEFAULT_VIEWER_SETTINGS, ...patch };
     const restored = loadViewerSettings({ getItem: () => JSON.stringify(saved) }, false);

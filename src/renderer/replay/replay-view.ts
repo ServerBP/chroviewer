@@ -11,6 +11,7 @@ import {
   DEFAULT_REPLAY_CAMERA_SETTINGS,
   DEFAULT_REPLAY_SABER_SETTINGS,
   type ReplayCameraSettings,
+  type ReplaySaberModelId,
   type ReplaySaberSettings,
 } from '../../core/viewer-settings';
 import type { FogUniforms } from '../bloomfog/pipeline';
@@ -31,10 +32,19 @@ import {
   type ReplayDirectionalLights,
 } from './replay-headset';
 import {
+  createCustomSaberInstance,
+  customSaberTrailPoints,
+  isCustomSaberModel,
+  loadCustomSaberTrailTexture,
+  type CustomSaberColorBinding,
+  type CustomSaberInstance,
+} from './custom-saber';
+import {
   clearReplaySaberTrail,
   createReplaySaber,
   createReplaySaberTrail,
   setReplaySaberSettings,
+  setReplaySaberTrailMaterial,
   setReplaySaberTrailSettings,
   updateReplaySaberTrail,
   type ReplaySaberModel,
@@ -43,6 +53,15 @@ import {
 
 function saberCoreColor([red, green, blue]: Rgb): Rgb {
   return [0.55 + red * 0.45, 0.55 + green * 0.45, 0.55 + blue * 0.45];
+}
+
+function setCustomSaberMaterialColor(material: ShaderMaterial, color: Rgb) {
+  const customColor = shaderUniformValue(material, '_Color');
+  customColor?.setRGB(...color).convertSRGBToLinear();
+  const customCoreColor = shaderUniformValue(material, '_CoreColor');
+  customCoreColor?.setRGB(...saberCoreColor(color)).convertSRGBToLinear();
+  const emissionColor = shaderUniformValue(material, '_EmissionTexColor');
+  emissionColor?.setRGB(...color).convertSRGBToLinear();
 }
 
 export class ReplayView {
@@ -75,8 +94,16 @@ export class ReplayView {
   private readonly replayGeometries: BufferGeometry[] = [];
   private readonly replayMaterials: ShaderMaterial[] = [];
   private readonly replaySabers: ReplaySaberModel[] = [];
+  private readonly customSaberRoots = [new Group(), new Group()];
+  private readonly customSaberMaterials: ShaderMaterial[] = [];
+  private readonly customSaberColorBindings: CustomSaberColorBinding[][] = [[], []];
   private readonly replayTrails: ReplaySaberTrail[] = [];
+  private readonly defaultReplayTrailMaterials: ShaderMaterial[] = [];
   private readonly replaySaberColorMaterials: { blade: ShaderMaterial; core: ShaderMaterial }[] = [];
+  private saberColors: [Rgb, Rgb] = [[...DEFAULT_COLORS.leftNote], [...DEFAULT_COLORS.rightNote]];
+  private customSaberLoadGeneration = 0;
+  private loadedCustomSaberModel: ReplaySaberModelId = 'default';
+  private disposed = false;
   private replayTrailTime = Number.NEGATIVE_INFINITY;
   private localSpaceSaberTrail = false;
   private showHeadset = DEFAULT_REPLAY_CAMERA_SETTINGS.showHeadset;
@@ -89,9 +116,9 @@ export class ReplayView {
 
   constructor(
     camera: PerspectiveCamera,
-    fog: FogUniforms,
-    directionalLights: ReplayDirectionalLights,
-    refreshMirrorMaterials: () => void,
+    private readonly fog: FogUniforms,
+    private readonly directionalLights: ReplayDirectionalLights,
+    private readonly refreshMirrorMaterials: () => void,
   ) {
     this.cameraController = new ReplayCameraController(camera);
     this.replayHeadset = new ReplayHeadset(fog, directionalLights, refreshMirrorMaterials);
@@ -111,7 +138,7 @@ export class ReplayView {
         trailBase: this.replayRightTrailBase,
       },
     ];
-    for (const { color, offset, tip, trailBase } of sabers) {
+    for (const [index, { color, offset, tip, trailBase }] of sabers.entries()) {
       const bladeMaterial = createSaberGlowMaterial(fog, color, saberCoreColor(color));
       const coreMaterial = createSaberCoreMaterial(fog, saberCoreColor(color));
       const saber = createReplaySaber({
@@ -125,14 +152,14 @@ export class ReplayView {
       saber.root.remove(saber.trailBase, saber.tip);
       saber.trailBase = trailBase;
       saber.tip = tip;
-      saber.root.add(trailBase, tip);
       setReplaySaberSettings(saber, this.saberSettings);
-      offset.add(saber.root);
+      offset.add(saber.root, this.customSaberRoots[index] ?? new Group(), trailBase, tip);
       this.replaySabers.push(saber);
       this.replayGeometries.push(...saber.geometries);
       this.replayMaterials.push(bladeMaterial, coreMaterial);
       this.replaySaberColorMaterials.push({ blade: bladeMaterial, core: coreMaterial });
       const trailMaterial = createSaberTrailMaterial(color);
+      this.defaultReplayTrailMaterials.push(trailMaterial);
       const trail = createReplaySaberTrail(trailMaterial);
       this.root.add(trail.mesh);
       this.replayGeometries.push(trail.mesh.geometry);
@@ -150,6 +177,7 @@ export class ReplayView {
     this.poseHeadTrack.add(this.poseHead);
     this.posePlayerRoot.add(this.poseHeadTrack);
     this.root.visible = false;
+    this.applySaberModel();
   }
 
   get hudRoot() {
@@ -287,10 +315,19 @@ export class ReplayView {
 
   setSaberSettings(settings: ReplaySaberSettings) {
     this.clearTrails();
+    const previousModel = this.saberSettings.saberModel;
+    if (settings.saberModel !== previousModel) {
+      this.customSaberLoadGeneration++;
+      this.clearCustomSabers();
+    }
     this.saberSettings = { ...settings };
     for (const saber of this.replaySabers) setReplaySaberSettings(saber, settings);
     for (const trail of this.replayTrails) setReplaySaberTrailSettings(trail, settings);
     this.applySaberOffsets();
+    this.applySaberModel();
+    if (isCustomSaberModel(settings.saberModel) && settings.saberModel !== previousModel) {
+      void this.loadCustomSaberModel(settings.saberModel);
+    }
   }
 
   setNoodleTrailLocalSpace(enabled: boolean) {
@@ -307,6 +344,7 @@ export class ReplayView {
   }
 
   setColors(colors: ColorScheme) {
+    this.saberColors = [[...colors.leftNote], [...colors.rightNote]];
     [colors.leftNote, colors.rightNote].forEach((color, index) => {
       const materials = this.replaySaberColorMaterials[index];
       const bladeColor = shaderUniformValue(materials?.blade, '_Color');
@@ -318,6 +356,10 @@ export class ReplayView {
       const trail = this.replayTrails[index];
       const trailColor = shaderUniformValue(trail?.material, '_Color');
       trailColor?.setRGB(...color).convertSRGBToLinear();
+      for (const binding of this.customSaberColorBindings[index] ?? []) {
+        const bindingColor = this.saberColors[binding.colorIndex];
+        setCustomSaberMaterialColor(binding.material, bindingColor);
+      }
     });
   }
 
@@ -455,13 +497,100 @@ export class ReplayView {
 
   private applySaberOffsets() {
     const settings = this.saberSettings;
+    const custom = isCustomSaberModel(settings.saberModel);
     for (const offset of [this.replayLeftOffset, this.replayRightOffset]) {
-      offset.position.set(settings.saberXOffset, settings.saberYOffset, settings.saberZOffset);
-      offset.rotation.set(
-        (settings.saberXRotation * Math.PI) / 180,
-        (settings.saberYRotation * Math.PI) / 180,
-        (settings.saberZRotation * Math.PI) / 180,
+      offset.position.set(
+        custom ? 0 : settings.saberXOffset,
+        custom ? 0 : settings.saberYOffset,
+        custom ? 0 : settings.saberZOffset,
       );
+      offset.rotation.set(
+        custom ? 0 : (settings.saberXRotation * Math.PI) / 180,
+        custom ? 0 : (settings.saberYRotation * Math.PI) / 180,
+        custom ? 0 : (settings.saberZRotation * Math.PI) / 180,
+      );
+    }
+  }
+
+  private applySaberModel() {
+    const settings = this.saberSettings;
+    const custom = isCustomSaberModel(settings.saberModel);
+    for (const saber of this.replaySabers) saber.root.visible = settings.showSabers && !custom;
+    for (const root of this.customSaberRoots) {
+      root.visible = settings.showSabers && custom && this.loadedCustomSaberModel === settings.saberModel;
+      root.scale.set(settings.saberWidth, settings.saberWidth, 1);
+    }
+
+    const customTrail = isCustomSaberModel(settings.saberModel)
+      ? customSaberTrailPoints(settings.saberModel)
+      : null;
+    const tipDistance = customTrail?.tip ?? settings.saberBladeLength;
+    const nativeCustomTrailLength = customTrail === null ? 0 : customTrail.tip - customTrail.base;
+    const trailLength =
+      customTrail === null
+        ? settings.replayTrailLength
+        : nativeCustomTrailLength * (settings.replayTrailLength / DEFAULT_REPLAY_SABER_SETTINGS.replayTrailLength);
+    const baseDistance = tipDistance - trailLength;
+    const scale = custom ? 1 : settings.saberScale;
+    for (const [tip, trailBase] of [
+      [this.replayLeftTip, this.replayLeftTrailBase],
+      [this.replayRightTip, this.replayRightTrailBase],
+    ] as const) {
+      tip.position.set(0, 0, -tipDistance * scale);
+      trailBase.position.set(0, 0, -baseDistance * scale);
+    }
+  }
+
+  private clearCustomSabers() {
+    for (const root of this.customSaberRoots) root.clear();
+    for (const material of this.customSaberMaterials) material.dispose();
+    this.customSaberMaterials.length = 0;
+    this.customSaberColorBindings[0] = [];
+    this.customSaberColorBindings[1] = [];
+    for (const [index, trail] of this.replayTrails.entries()) {
+      const material = this.defaultReplayTrailMaterials[index];
+      if (material !== undefined) setReplaySaberTrailMaterial(trail, material);
+    }
+    this.loadedCustomSaberModel = 'default';
+  }
+
+  private async loadCustomSaberModel(model: Exclude<ReplaySaberModelId, 'default'>) {
+    const generation = ++this.customSaberLoadGeneration;
+    try {
+      const [instances, trailTexture] = await Promise.all([
+        Promise.all([
+          createCustomSaberInstance(model, 0, this.saberColors, this.fog, this.directionalLights),
+          createCustomSaberInstance(model, 1, this.saberColors, this.fog, this.directionalLights),
+        ] satisfies Promise<CustomSaberInstance>[]),
+        loadCustomSaberTrailTexture(model),
+      ]);
+      if (this.disposed || generation !== this.customSaberLoadGeneration || this.saberSettings.saberModel !== model) {
+        for (const instance of instances) for (const material of instance.materials) material.dispose();
+        return;
+      }
+      this.clearCustomSabers();
+      for (const [index, instance] of instances.entries()) {
+        this.customSaberRoots[index]?.add(instance.root);
+        this.customSaberMaterials.push(...instance.materials);
+        this.customSaberColorBindings[index] = instance.colorBindings;
+        for (const binding of instance.colorBindings) {
+          setCustomSaberMaterialColor(binding.material, this.saberColors[binding.colorIndex]);
+        }
+        const trail = this.replayTrails[index];
+        const color = this.saberColors[index] ?? DEFAULT_COLORS.leftNote;
+        if (trail === undefined) continue;
+        const trailMaterial = createSaberTrailMaterial(color, trailTexture);
+        setReplaySaberTrailMaterial(trail, trailMaterial);
+        this.customSaberMaterials.push(trailMaterial);
+      }
+      this.loadedCustomSaberModel = model;
+      this.applySaberModel();
+      this.refreshMirrorMaterials();
+    } catch (error) {
+      if (generation !== this.customSaberLoadGeneration) return;
+      console.error(`Unable to load custom saber model ${model}`, error);
+      this.loadedCustomSaberModel = 'default';
+      for (const saber of this.replaySabers) saber.root.visible = this.saberSettings.showSabers;
     }
   }
 
@@ -486,6 +615,9 @@ export class ReplayView {
   }
 
   dispose() {
+    this.disposed = true;
+    this.customSaberLoadGeneration++;
+    this.clearCustomSabers();
     this.replayHeadset.dispose();
     this.gameplayHud.dispose();
     for (const geometry of this.replayGeometries) geometry.dispose();

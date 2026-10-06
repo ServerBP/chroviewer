@@ -199,7 +199,11 @@ export function setReplaySaberSettings(saber: ReplaySaberModel, settings: Replay
   const gripStart = 0.0032;
   const hiltEnd = gripStart + settings.saberGripLength + settings.saberPommelLength;
   saber.root.visible = settings.showSabers;
-  saber.root.scale.setScalar(settings.saberScale);
+  saber.root.scale.set(
+    settings.saberScale * settings.saberWidth,
+    settings.saberScale * settings.saberWidth,
+    settings.saberScale,
+  );
 
   saber.blade.position.z = bladeCenter;
   saber.blade.scale.set(
@@ -263,6 +267,7 @@ function configureTrailGeometry(trail: ReplaySaberTrail) {
   const geometry = trail.mesh.geometry;
   geometry.setAttribute('position', new BufferAttribute(new Float32Array(trailSamples * 6), 3));
   geometry.setAttribute('trailAlpha', new BufferAttribute(new Float32Array(trailSamples * 2), 1));
+  geometry.setAttribute('trailUv', new BufferAttribute(new Float32Array(trailSamples * 4), 2));
   const indices = new Uint16Array((trailSamples - 1) * 6);
   for (let index = 0; index < trailSamples - 1; index++) {
     const offset = index * 6;
@@ -325,6 +330,7 @@ function rebuildReplaySaberTrail(trail: ReplaySaberTrail) {
 function writeReplaySaberTrail(trail: ReplaySaberTrail) {
   const position = trail.mesh.geometry.getAttribute('position');
   const alpha = trail.mesh.geometry.getAttribute('trailAlpha');
+  const uv = trail.mesh.geometry.getAttribute('trailUv');
   const denominator = Math.max(trail.samples.length - 1, 1);
   trail.samples.forEach((sample, index) => {
     const span = index / denominator;
@@ -345,9 +351,12 @@ function writeReplaySaberTrail(trail: ReplaySaberTrail) {
     const opacity = span ** trail.settings.replayTrailFade * trail.settings.replayTrailOpacity;
     alpha.setX(index * 2, opacity);
     alpha.setX(index * 2 + 1, opacity);
+    uv.setXY(index * 2, 1 - span, 1);
+    uv.setXY(index * 2 + 1, 1 - span, 0);
   });
   position.needsUpdate = true;
   alpha.needsUpdate = true;
+  uv.needsUpdate = true;
   trail.mesh.geometry.setDrawRange(0, Math.max(trail.samples.length - 1, 0) * 6);
 }
 
@@ -376,6 +385,11 @@ export function setReplaySaberTrailSettings(trail: ReplaySaberTrail, settings: R
   }
   if (geometryChanged) configureTrailGeometry(trail);
   rebuildReplaySaberTrail(trail);
+}
+
+export function setReplaySaberTrailMaterial(trail: ReplaySaberTrail, material: ShaderMaterial) {
+  trail.material = material;
+  trail.mesh.material = material;
 }
 
 export function clearReplaySaberTrail(trail: ReplaySaberTrail) {

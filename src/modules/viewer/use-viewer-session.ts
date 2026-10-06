@@ -167,7 +167,9 @@ export function useViewerSession({
     viewerRef.current?.view.setReplaySaberSettings(settings);
   }, [
     settings.showSabers,
+    settings.saberModel,
     settings.saberScale,
+    settings.saberWidth,
     settings.saberBladeLength,
     settings.saberBladeThickness,
     settings.saberCoreThickness,
