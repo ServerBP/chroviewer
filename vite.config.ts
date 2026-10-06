@@ -28,6 +28,7 @@ const beatKhanaFrameAncestors = [
   'https://*.shyyluna.dev',
   'https://*.compcube.net',
   'https://compcube.net',
+  'https://bseuc.eu'
 ];
 
 export default defineConfig(({ mode }) => {
