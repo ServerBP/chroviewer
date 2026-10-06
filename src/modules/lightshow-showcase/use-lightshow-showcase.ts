@@ -118,6 +118,7 @@ export function useLightshowShowcase({
   const timerRef = useRef<number | null>(null);
   const timelineStartAtRef = useRef(0);
   const lastPublishRef = useRef({ identity: '', at: 0 });
+  const failedEntriesRef = useRef(new Set<string>());
 
   function publish(song: Record<string, unknown> | null) {
     if (window.parent === window) return;
@@ -136,9 +137,10 @@ export function useLightshowShowcase({
     return promise;
   }
 
-  function maintainWindow(index: number, generation: number) {
+  function maintainWindow(index: number, generation: number, prefetchNext: boolean) {
     const keep = new Set<string>();
-    for (let offset = 0; offset <= 2; offset++) {
+    const ahead = prefetchNext ? 1 : 0;
+    for (let offset = 0; offset <= ahead; offset++) {
       const entry = entriesRef.current[index + offset];
       if (entry === undefined) continue;
       const identity = entry.map.hash.toLowerCase() || entry.map.key.toLowerCase();
@@ -164,6 +166,15 @@ export function useLightshowShowcase({
     const entry = entriesRef.current[resolvedIndex];
     if (entry === undefined) {
       const config = configRef.current;
+      // A failed map must not turn a looping showcase into an immediate,
+      // unbounded retry cycle. This is especially costly in browser sources,
+      // where every retry downloads and extracts the archive again.
+      if (failedEntriesRef.current.size > 0) {
+        setActive(null);
+        publish(null);
+        sources.clearSource();
+        return;
+      }
       if (config?.loop && config.lastMap === null && config.maps.length > 0 && config.targetAtMs === null) {
         entriesRef.current = orderedCycle(config).map((map) => ({ map, startSeconds: 0 }));
         activeIndexRef.current = -1;
@@ -177,13 +188,17 @@ export function useLightshowShowcase({
     }
     transitioningRef.current = true;
     activeIndexRef.current = resolvedIndex;
-    maintainWindow(resolvedIndex, generation);
+    // Prepare only the active map during startup. Large lightshow archives can
+    // otherwise compete with two speculative downloads and leave OBS browser
+    // sources looking permanently blank while all three are extracted.
+    maintainWindow(resolvedIndex, generation, false);
     const source = await ensurePrepared(entry, generation);
     if (generation !== generationRef.current) {
       transitioningRef.current = false;
       return;
     }
     if (source === null) {
+      failedEntriesRef.current.add(entry.map.hash.toLowerCase() || entry.map.key.toLowerCase());
       transitioningRef.current = false;
       await activate(resolvedIndex + 1, generation);
       return;
@@ -213,9 +228,13 @@ export function useLightshowShowcase({
     });
     transitioningRef.current = false;
     if (generation !== generationRef.current || result.isErr()) {
-      if (generation === generationRef.current) await activate(resolvedIndex + 1, generation);
+      if (generation === generationRef.current) {
+        failedEntriesRef.current.add(entry.map.hash.toLowerCase() || entry.map.key.toLowerCase());
+        await activate(resolvedIndex + 1, generation);
+      }
       return;
     }
+    failedEntriesRef.current.clear();
     const timedAfterLoad = timedMode ? resolveTimedLightshow(entriesRef.current, timelineStartAtRef.current) : null;
     if (timedMode && timedAfterLoad === null) {
       setActive(null);
@@ -230,7 +249,10 @@ export function useLightshowShowcase({
     }
     if (Math.abs(transport.time - afterLoad.startSeconds) > 0.25) transport.seek(afterLoad.startSeconds);
     setActive({ ...entry, startSeconds: afterLoad.startSeconds });
-    maintainWindow(resolvedIndex, generation);
+    // Once the current map is visible, prepare just the next transition. The
+    // two-entry window keeps playback smooth without retaining three complete
+    // extracted maps in memory.
+    maintainWindow(resolvedIndex, generation, true);
   }
 
   useEffect(() => {
@@ -239,6 +261,7 @@ export function useLightshowShowcase({
     const generation = ++generationRef.current;
     configRef.current = config;
     preparedRef.current.clear();
+    failedEntriesRef.current.clear();
     transitioningRef.current = false;
     setActive(null);
     publish(null);
@@ -252,7 +275,7 @@ export function useLightshowShowcase({
     entriesRef.current = plan.entries;
     timelineStartAtRef.current = plan.startAtMs;
     activeIndexRef.current = -1;
-    maintainWindow(0, generation);
+    maintainWindow(0, generation, false);
     const delay = Math.max(0, plan.startAtMs - Date.now());
     timerRef.current = window.setTimeout(() => void activate(0, generation), delay);
   }, [configValue, enabled]);
