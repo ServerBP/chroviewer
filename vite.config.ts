@@ -5,6 +5,7 @@ import rsc from '@vitejs/plugin-rsc';
 import { nitro } from 'nitro/vite';
 import { defineConfig, loadEnv, lazyPlugins } from 'vite-plus';
 
+import { beatKhanaFrameAncestors } from './src/embed-origins';
 import { enabledViewerSourcesSchema } from './src/sources/source-options';
 
 const sourceFrameAncestors = {
@@ -12,24 +13,6 @@ const sourceFrameAncestors = {
   scoresaber: ['https://scoresaber.com'],
   beatleader: ['https://beatleader.com', 'https://beatleader.xyz'],
 };
-
-const beatKhanaFrameAncestors = [
-  'http://localhost:*',
-  'http://localhost:1420',
-  'https://beatkhana.com',
-  'https://*.beatkhana.com',
-  // CSP wildcard host sources do not reliably cover nested subdomains such as
-  // view.replay.beatkhana.com, and every ancestor in a nested iframe chain
-  // must be allowed explicitly.
-  'https://view.beatkhana.com',
-  'https://view.replay.beatkhana.com',
-  'https://replay.beatkhana.com',
-  'https://*.replay.beatkhana.com',
-  'https://*.shyyluna.dev',
-  'https://*.compcube.net',
-  'https://compcube.net',
-  'https://bseuc.eu'
-];
 
 export default defineConfig(({ mode }) => {
   const enabledSources = enabledViewerSourcesSchema.parse(loadEnv(mode, process.cwd(), 'VITE_').VITE_ENABLED_SOURCES);

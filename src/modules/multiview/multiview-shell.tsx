@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BeatmapParser } from '../../core/beatmap/worker/client';
+import { isBeatKhanaFrameAncestor } from '../../embed-origins';
 import { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { broadcastSettingsForPlayerCount } from '../../renderer/render-performance';
 import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-sync';
@@ -44,14 +45,10 @@ function sameBaseSite(origin: string) {
 }
 
 function trustedParentOrigin(origin: string) {
-  if (sameBaseSite(origin)) return true;
+  if (sameBaseSite(origin) || isBeatKhanaFrameAncestor(origin)) return true;
   try {
     const { hostname, protocol } = new URL(origin);
-    return (
-      (protocol === 'http:' &&
-        (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]')) ||
-      (protocol === 'https:' && (hostname === 'beatkhana.com' || hostname.endsWith('.beatkhana.com')))
-    );
+    return protocol === 'http:' && (hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]');
   } catch {
     return false;
   }
