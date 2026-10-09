@@ -55,8 +55,8 @@ export function applyLiveReplayChunk(
   );
   replay.energies.push(...events.energyEvents.map((event) => ({ energy: event.energy, time: event.timeSeconds })));
   runtime.latestFrameTime = Math.max(runtime.latestFrameTime, replay.poses.at(-1)?.time ?? 0);
-  // Keep pose memory bounded even when the audio clock cannot advance yet
-  // (autoplay blocked, map loading, tab hidden, or stream buffering).
+  // Retire consumed history on receipt too. TA retains unread data while its
+  // clock is delayed or held; other sources retain their existing memory caps.
   pruneLiveReplay(runtime, runtime.latestFrameTime);
   if (
     notes.length > 0 ||

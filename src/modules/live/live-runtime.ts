@@ -179,7 +179,15 @@ export function increasePlaybackDelay(runtime: LiveRuntime) {
 
 export function pruneLiveReplay(runtime: LiveRuntime, time: number) {
   const replay = runtime.replay;
+  if (replay === null) return;
   const retainedSeconds = runtime.taLive ? taRetainedHistorySeconds : retainedHistorySeconds;
+  // TA can play far behind incoming data, including after a compositor timeout.
+  // Keep every unread pose; only the consumer's clock can retire its history.
+  const playhead =
+    runtime.taLive || runtime.compositorBufferSeconds > 0
+      ? (runtime.playbackClock?.currentTime() ?? replay.poses[0]?.time ?? 0)
+      : time;
+  const pruneTime = runtime.taLive ? playhead : time;
   const frameLimit =
     runtime.compositorBufferSeconds > 0
       ? Math.ceil(
@@ -187,22 +195,22 @@ export function pruneLiveReplay(runtime: LiveRuntime, time: number) {
             maxBufferedPoseFramesPerSecond,
         )
       : maxRetainedPoseFrames;
-  if (replay === null || (time - runtime.lastPruneAt < 2 && replay.poses.length <= frameLimit)) return;
-  runtime.lastPruneAt = time;
-  const playhead =
-    runtime.compositorBufferSeconds > 0 ? (runtime.playbackClock?.currentTime() ?? replay.poses[0]?.time ?? 0) : time;
-  const cutoff = Math.max(
-    playhead - retainedSeconds,
-    runtime.compositorBufferSeconds > 0
-      ? runtime.latestFrameTime - runtime.compositorBufferSeconds * runtime.playbackRate - retainedSeconds - 5
-      : Number.NEGATIVE_INFINITY,
-  );
+  if (pruneTime - runtime.lastPruneAt < 2 && (runtime.taLive || replay.poses.length <= frameLimit)) return;
+  runtime.lastPruneAt = pruneTime;
+  const cutoff = runtime.taLive
+    ? playhead - retainedSeconds
+    : Math.max(
+        playhead - retainedSeconds,
+        runtime.compositorBufferSeconds > 0
+          ? runtime.latestFrameTime - runtime.compositorBufferSeconds * runtime.playbackRate - retainedSeconds - 5
+          : Number.NEGATIVE_INFINITY,
+      );
   if (cutoff > 0) {
     let poseIndex = 0;
     while (poseIndex + 1 < replay.poses.length && (replay.poses[poseIndex + 1]?.time ?? 0) < cutoff) poseIndex++;
     if (poseIndex > 0) replay.poses.splice(0, poseIndex);
   }
-  if (replay.poses.length > frameLimit) {
+  if (!runtime.taLive && replay.poses.length > frameLimit) {
     replay.poses.splice(0, replay.poses.length - frameLimit);
   }
   if (cutoff <= 0) return;
