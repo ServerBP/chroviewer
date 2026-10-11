@@ -189,6 +189,9 @@ export function buildEnvironmentParticleSystems(
 ) {
   const viewport = new Vector2();
   for (const [index, system] of systems.entries()) {
+    // Lattice's large ambient smoke sprites sit at the player origin and obscure
+    // the camera. Skip the shared system for every map using this environment.
+    if (system.name === 'BigSmokePS') continue;
     const texture = context.textures?.get(system.texture);
     if (texture === undefined || system.maxParticles === 0 || system.rate <= 0) continue;
     const geometry = particleGeometry(system);
