@@ -17,6 +17,7 @@ export const beatKhanaFrameAncestors = [
   'https://*.compcube.net',
   'https://compcube.net',
   'https://bseuc.eu',
+  'https://fishnation.xyz',
 ];
 
 /** Matches an origin against a CSP host source (`scheme://[*.]host[:port|:*]`). */
