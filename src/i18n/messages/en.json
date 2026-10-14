@@ -190,6 +190,7 @@
       "saberModel": "Saber",
       "saberModels": {
         "beatkhana": "BeatKhana",
+        "cg5": "CG5",
         "cube-community-new": "Cube Community",
         "cube-community-v1": "Cube Community V1",
         "default": "Default",

@@ -2,6 +2,8 @@ import {
   Color,
   Group,
   Mesh,
+  NoColorSpace,
+  RepeatWrapping,
   SRGBColorSpace,
   TextureLoader,
   type BufferGeometry,
@@ -16,15 +18,11 @@ import type { ReplaySaberModelId } from '../../core/viewer-settings';
 import type { FogUniforms } from '../bloomfog/pipeline';
 import { createSaberGlowMaterial } from '../materials/map-object-materials';
 import type { MaterialTexture } from '../materials/shared';
-import {
-  createReplaySurfaceMaterial,
-  type ReplayDirectionalLights,
-  type ReplaySurface,
-} from './replay-headset';
+import { createCg5SaberGlowMaterial } from './cg5-saber-materials';
+import { createReplaySurfaceMaterial, type ReplayDirectionalLights, type ReplaySurface } from './replay-headset';
 
 type CustomSaberModelId = Exclude<ReplaySaberModelId, 'default'>;
-type CustomSaberMaterialRole =
-  'surface' | 'custom-surface' | 'static-glow' | 'custom-glow';
+type CustomSaberMaterialRole = 'surface' | 'custom-surface' | 'static-glow' | 'custom-glow';
 type CustomSaberColorIndex = 0 | 1 | null;
 
 interface CustomSaberPart {
@@ -59,6 +57,7 @@ interface CustomSaberTrailDefinition {
 
 const MODEL_PATHS: Record<CustomSaberModelId, string> = {
   beatkhana: 'beatkhana.glb',
+  cg5: 'cg5.glb',
   'cube-community-new': 'cube-community-new.glb',
   'cube-community-v1': 'cube-community-v1.glb',
   euc: 'euc.glb',
@@ -69,6 +68,11 @@ const MODEL_TRAILS: Record<CustomSaberModelId, CustomSaberTrailDefinition> = {
     base: 0.504500031,
     tip: 1.004500031,
     texture: 'beatkhana-trail.png',
+  },
+  cg5: {
+    base: 0.9045000076293945,
+    tip: 1.0045000314712524,
+    texture: 'cg5-trail.png',
   },
   'cube-community-new': {
     base: 0.8,
@@ -87,10 +91,7 @@ const MODEL_TRAILS: Record<CustomSaberModelId, CustomSaberTrailDefinition> = {
   },
 };
 
-const templateCache = new Map<
-  CustomSaberModelId,
-  Promise<CustomSaberTemplate>
->();
+const templateCache = new Map<CustomSaberModelId, Promise<CustomSaberTemplate>>();
 const textureCache = new Map<string, Promise<Texture>>();
 const textureLoader = new TextureLoader();
 
@@ -104,12 +105,7 @@ function materialRole(model: CustomSaberModelId, name: string): CustomSaberMater
     return 'custom-glow';
   }
   const role = name.split('::').at(-1);
-  if (
-    role === 'custom-surface' ||
-    role === 'static-glow' ||
-    role === 'custom-glow'
-  )
-    return role;
+  if (role === 'custom-surface' || role === 'static-glow' || role === 'custom-glow') return role;
   return 'surface';
 }
 
@@ -118,8 +114,7 @@ function materialColor(model: CustomSaberModelId, material: Material): Rgb {
     return [0.018, 0.006, 0.028];
   }
   const candidate = material as Material & { color?: Color };
-  const color =
-    candidate.color?.clone().convertLinearToSRGB() ?? new Color(0.8, 0.8, 0.8);
+  const color = candidate.color?.clone().convertLinearToSRGB() ?? new Color(0.8, 0.8, 0.8);
   return [color.r, color.g, color.b];
 }
 
@@ -145,7 +140,12 @@ function loadTexture(fileName: string) {
   const loading = textureLoader
     .loadAsync(`${import.meta.env.BASE_URL}sabers/textures/${fileName}`)
     .then((texture) => {
-      texture.colorSpace = SRGBColorSpace;
+      // CG5's fire shader reads masks and displacement, not sRGB colors.
+      texture.colorSpace = fileName.startsWith('cg5-') ? NoColorSpace : SRGBColorSpace;
+      if (fileName === 'cg5-trail-displacement.png') {
+        texture.wrapS = RepeatWrapping;
+        texture.wrapT = RepeatWrapping;
+      }
       texture.name = fileName;
       return texture;
     })
@@ -157,9 +157,7 @@ function loadTexture(fileName: string) {
   return loading;
 }
 
-async function loadTemplate(
-  model: CustomSaberModelId,
-): Promise<CustomSaberTemplate> {
+async function loadTemplate(model: CustomSaberModelId): Promise<CustomSaberTemplate> {
   const existing = templateCache.get(model);
   if (existing !== undefined) return existing;
   const loading = Promise.all([
@@ -171,11 +169,7 @@ async function loadTemplate(
       const sourceMaterials = new Set<Material>();
       gltf.scene.traverse((object) => {
         if (!(object instanceof Mesh)) return;
-        const side: 0 | 1 | null = object.name.startsWith('Left__')
-          ? 0
-          : object.name.startsWith('Right__')
-            ? 1
-            : null;
+        const side: 0 | 1 | null = object.name.startsWith('Left__') ? 0 : object.name.startsWith('Right__') ? 1 : null;
         if (side === null) return;
         const source = readMaterial(object.material);
         if (source === undefined) return;
@@ -214,11 +208,7 @@ function saberCoreColor([red, green, blue]: Rgb): Rgb {
   return [0.55 + red * 0.45, 0.55 + green * 0.45, 0.55 + blue * 0.45];
 }
 
-function saberSurface(
-  color: Rgb,
-  luminous: boolean,
-  texture?: MaterialTexture,
-): ReplaySurface {
+function saberSurface(color: Rgb, luminous: boolean, texture?: MaterialTexture): ReplaySurface {
   return {
     color,
     metallic: luminous ? 0.12 : 0.42,
@@ -250,21 +240,16 @@ export async function createCustomSaberInstance(
 
   function createMaterial(part: CustomSaberPart) {
     const materialColor = part.colorIndex === null ? part.color : colors[part.colorIndex];
+    if (model === 'cg5' && (part.role === 'custom-glow' || materialBaseName(part.name) === 'Hilt')) {
+      return createCg5SaberGlowMaterial(fog, materialColor, part.role === 'custom-glow' ? 0.8 : 0);
+    }
     if ((part.role === 'custom-glow' || part.role === 'static-glow') && part.texture === undefined) {
-      return createSaberGlowMaterial(
-        fog,
-        materialColor,
-        saberCoreColor(materialColor),
-      );
+      return createSaberGlowMaterial(fog, materialColor, saberCoreColor(materialColor));
     }
     return createReplaySurfaceMaterial(
       fog,
       directionalLights,
-      saberSurface(
-        materialColor,
-        part.role === 'custom-glow' || part.role === 'static-glow',
-        part.texture,
-      ),
+      saberSurface(materialColor, part.role === 'custom-glow' || part.role === 'static-glow', part.texture),
     );
   }
 
@@ -294,8 +279,10 @@ export function loadCustomSaberTrailTexture(model: CustomSaberModelId) {
   return loadTexture(MODEL_TRAILS[model].texture);
 }
 
-export function isCustomSaberModel(
-  model: ReplaySaberModelId,
-): model is CustomSaberModelId {
+export function loadCustomSaberTrailDisplacementTexture(model: CustomSaberModelId) {
+  return model === 'cg5' ? loadTexture('cg5-trail-displacement.png') : Promise.resolve(undefined);
+}
+
+export function isCustomSaberModel(model: ReplaySaberModelId): model is CustomSaberModelId {
   return model !== 'default';
 }

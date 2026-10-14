@@ -42,6 +42,19 @@ test('parses custom saber model aliases and canonical keys', () => {
   expect(z.parse(viewerSearchSchema, canonical).settings).toEqual(canonical.settings);
 });
 
+test('selects CG5 through either per-player URL key and keeps other players independent', () => {
+  const cg5 = z.parse(viewerSearchSchema, parseUrlSearch('?saber=cg5&leftColor=%2300ff00'));
+  const canonical = z.parse(viewerSearchSchema, parseUrlSearch('?saberModel=cg5'));
+  const euc = z.parse(viewerSearchSchema, parseUrlSearch('?saber=euc'));
+  const compositorSettings = encodeURIComponent(JSON.stringify({ saberModel: 'cg5', rightColor: '#ffaa00' }));
+  const nested = z.parse(viewerSearchSchema, parseUrlSearch(`?settings=${compositorSettings}`));
+
+  expect(cg5.settings).toMatchObject({ saberModel: 'cg5', leftColor: '#00ff00' });
+  expect(canonical.settings?.saberModel).toBe('cg5');
+  expect(euc.settings?.saberModel).toBe('euc');
+  expect(nested.settings).toMatchObject({ saberModel: 'cg5', rightColor: '#ffaa00' });
+});
+
 test('parses saber width as a per-viewer setting', () => {
   const parsed = parseUrlSearch('?saberWidth=0.72');
 

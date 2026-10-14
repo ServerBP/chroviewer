@@ -109,6 +109,7 @@ export interface ViewerSettings {
 export const replaySaberModelIds = [
   'default',
   'beatkhana',
+  'cg5',
   'cube-community-new',
   'cube-community-v1',
   'euc',

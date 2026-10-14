@@ -1,4 +1,13 @@
-import { Group, Object3D, PerspectiveCamera, Quaternion, ShaderMaterial, Vector3, type BufferGeometry } from 'three';
+import {
+  Group,
+  Object3D,
+  PerspectiveCamera,
+  Quaternion,
+  ShaderMaterial,
+  Vector3,
+  type BufferGeometry,
+  type IUniform,
+} from 'three';
 
 import { eulerFromQuaternion } from '../../core/animation/point-definition';
 import { DEFAULT_COLORS, type ColorScheme, type Rgb } from '../../core/colors';
@@ -22,6 +31,16 @@ import {
   createSaberTrailMaterial,
 } from '../materials/map-object-materials';
 import { shaderUniformValue } from '../materials/shared';
+import { createCg5SaberTrailMaterial } from './cg5-saber-materials';
+import {
+  createCustomSaberInstance,
+  customSaberTrailPoints,
+  isCustomSaberModel,
+  loadCustomSaberTrailDisplacementTexture,
+  loadCustomSaberTrailTexture,
+  type CustomSaberColorBinding,
+  type CustomSaberInstance,
+} from './custom-saber';
 import { ReplayGameplayHud } from './hud/gameplay-hud';
 import { ReplayCameraController, type ReplayCameraMode } from './replay-camera';
 import {
@@ -31,14 +50,6 @@ import {
   SABER_METAL_SURFACE,
   type ReplayDirectionalLights,
 } from './replay-headset';
-import {
-  createCustomSaberInstance,
-  customSaberTrailPoints,
-  isCustomSaberModel,
-  loadCustomSaberTrailTexture,
-  type CustomSaberColorBinding,
-  type CustomSaberInstance,
-} from './custom-saber';
 import {
   clearReplaySaberTrail,
   createReplaySaber,
@@ -521,9 +532,7 @@ export class ReplayView {
       root.scale.set(settings.saberWidth, settings.saberWidth, 1);
     }
 
-    const customTrail = isCustomSaberModel(settings.saberModel)
-      ? customSaberTrailPoints(settings.saberModel)
-      : null;
+    const customTrail = isCustomSaberModel(settings.saberModel) ? customSaberTrailPoints(settings.saberModel) : null;
     const tipDistance = customTrail?.tip ?? settings.saberBladeLength;
     const nativeCustomTrailLength = customTrail === null ? 0 : customTrail.tip - customTrail.base;
     const trailLength =
@@ -557,12 +566,13 @@ export class ReplayView {
   private async loadCustomSaberModel(model: Exclude<ReplaySaberModelId, 'default'>) {
     const generation = ++this.customSaberLoadGeneration;
     try {
-      const [instances, trailTexture] = await Promise.all([
+      const [instances, trailTexture, displacementTexture] = await Promise.all([
         Promise.all([
           createCustomSaberInstance(model, 0, this.saberColors, this.fog, this.directionalLights),
           createCustomSaberInstance(model, 1, this.saberColors, this.fog, this.directionalLights),
         ] satisfies Promise<CustomSaberInstance>[]),
         loadCustomSaberTrailTexture(model),
+        loadCustomSaberTrailDisplacementTexture(model),
       ]);
       if (this.disposed || generation !== this.customSaberLoadGeneration || this.saberSettings.saberModel !== model) {
         for (const instance of instances) for (const material of instance.materials) material.dispose();
@@ -579,7 +589,10 @@ export class ReplayView {
         const trail = this.replayTrails[index];
         const color = this.saberColors[index] ?? DEFAULT_COLORS.leftNote;
         if (trail === undefined) continue;
-        const trailMaterial = createSaberTrailMaterial(color, trailTexture);
+        const trailMaterial =
+          displacementTexture === undefined
+            ? createSaberTrailMaterial(color, trailTexture)
+            : createCg5SaberTrailMaterial(color, trailTexture, displacementTexture);
         setReplaySaberTrailMaterial(trail, trailMaterial);
         this.customSaberMaterials.push(trailMaterial);
       }
@@ -595,6 +608,10 @@ export class ReplayView {
   }
 
   private updateTrails(time: number) {
+    for (const trail of this.replayTrails) {
+      const timeUniform: IUniform<number> | undefined = trail.material.uniforms._Time;
+      if (timeUniform !== undefined) timeUniform.value = time;
+    }
     if (time < this.replayTrailTime || time - this.replayTrailTime > 0.25) this.clearTrails();
     if (time === this.replayTrailTime) return;
     this.root.updateMatrixWorld(true);
