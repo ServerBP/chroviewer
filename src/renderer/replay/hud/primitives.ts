@@ -18,7 +18,7 @@ import { getBrowserLocale } from '../../../i18n/config';
 import { formatDuration, getFormatter } from '../../../i18n/formats';
 import { MAIN_ONLY_LAYER } from '../../mirror/planar-mirror';
 
-const tekoFontUrl = `${import.meta.env.BASE_URL}fonts/teko-medium.ttf`;
+export const tekoFontUrl = `${import.meta.env.BASE_URL}fonts/teko-medium.ttf`;
 const hudTextMaterials = new WeakMap<Text, MeshBasicMaterial>();
 export const flyingScoreBloomAlpha = 0.55;
 

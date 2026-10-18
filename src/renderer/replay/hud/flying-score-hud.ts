@@ -1,16 +1,21 @@
 import { Group, Mesh, PlaneGeometry, Quaternion, Vector3, type MeshBasicMaterial } from 'three';
-import type { Text } from 'troika-three-text';
 
-import type { HitScoreTextRun } from '../../../core/replay/hit-score-visualizer';
-import { flyingScoresAt, type ReplayTimeline } from '../../../core/replay/replay-display';
+import { flyingScoresAt, type FlyingScore, type ReplayTimeline } from '../../../core/replay/replay-display';
 import type { ReplayNoteEvent } from '../../../core/replay/types';
 import { MAIN_ONLY_LAYER } from '../../mirror/planar-mirror';
-import { disposeHudText, flyingScoreBloomAlpha, flyingScoreMaterial, hudText } from './primitives';
+import { flyingScoreBloomAlpha, flyingScoreMaterial } from './primitives';
+import { acquireRichTextTexture, releaseRichTextTexture, type RichTextTexture } from './rich-text-texture';
+
+/** A textured quad, reused between flying scores with the same bloom setting. */
+interface TextQuad {
+  mesh: Mesh<PlaneGeometry, MeshBasicMaterial>;
+  bloomAlpha: number;
+}
 
 interface FlyingText {
   root: Group;
-  texts: Text[];
-  decorations: Mesh<PlaneGeometry, MeshBasicMaterial>[];
+  quad?: TextQuad;
+  texture?: RichTextTexture;
   indicator?: Mesh<PlaneGeometry, MeshBasicMaterial>;
   start: Vector3;
   target: Vector3;
@@ -20,95 +25,8 @@ interface FlyingText {
 
 const flyingScoreFontSize = 0.26;
 const flyingFailureFontSize = 0.46;
-
-function flyingScoreText(runs: HitScoreTextRun[], color: string, bloomAlpha: number, failure: boolean) {
-  const root = new Group();
-  const decorations: Mesh<PlaneGeometry, MeshBasicMaterial>[] = [];
-  const baseFontSize = failure ? flyingFailureFontSize : flyingScoreFontSize;
-  const firstRun = runs[0];
-  const onlyRun =
-    runs.length === 1 && firstRun?.baselineOffset === undefined && firstRun?.underline !== true ? firstRun : undefined;
-  if (onlyRun !== undefined && !onlyRun.text.includes('\n')) {
-    const text = hudText(
-      onlyRun.text,
-      baseFontSize * onlyRun.scale,
-      [0, 0, 0],
-      'middle',
-      'center',
-      true,
-      bloomAlpha,
-      false,
-    );
-    text.color = onlyRun.color ?? color;
-    text.maxWidth = 2.5;
-    text.sync();
-    root.add(text);
-    return { root, texts: [text], decorations };
-  }
-  const lines: { run: HitScoreTextRun; text: Text; underline?: Mesh<PlaneGeometry, MeshBasicMaterial> }[][] = [[]];
-  for (const run of runs) {
-    const parts = run.text.split('\n');
-    for (const [index, part] of parts.entries()) {
-      if (part !== '') {
-        const text = hudText(
-          part,
-          baseFontSize * run.scale,
-          [0, 0, 0],
-          'bottom-baseline',
-          'left',
-          true,
-          bloomAlpha,
-          false,
-        );
-        text.color = run.color ?? color;
-        text.maxWidth = 2.5;
-        const underline =
-          run.underline === true
-            ? new Mesh(new PlaneGeometry(1, 1), flyingScoreMaterial(run.color ?? color, bloomAlpha))
-            : undefined;
-        if (underline !== undefined) {
-          underline.renderOrder = 1001;
-          underline.layers.set(MAIN_ONLY_LAYER);
-          decorations.push(underline);
-          root.add(underline);
-        }
-        lines.at(-1)?.push({ run, text, underline });
-        root.add(text);
-      }
-      if (index < parts.length - 1) lines.push([]);
-    }
-  }
-  const texts = lines.flat().map((part) => part.text);
-  const lineHeights = lines.map((line) => Math.max(baseFontSize, ...line.map((part) => part.text.fontSize)));
-  const totalHeight = lineHeights.reduce((sum, height) => sum + height, 0);
-  let top = totalHeight / 2;
-  for (const [lineIndex, line] of lines.entries()) {
-    const height = lineHeights[lineIndex] ?? baseFontSize;
-    const baseline = top - height * 0.8;
-    let pending = line.length;
-    function layout() {
-      if (--pending > 0) return;
-      const widths = line.map((part) => {
-        const bounds = part.text.textRenderInfo?.blockBounds;
-        return bounds === undefined ? 0 : bounds[2] - bounds[0];
-      });
-      let x = -widths.reduce((sum, width) => sum + width, 0) / 2;
-      for (const [index, part] of line.entries()) {
-        const width = widths[index] ?? 0;
-        const y = baseline + (part.run.baselineOffset ?? 0) * baseFontSize;
-        part.text.position.set(x, y, 0);
-        if (part.underline !== undefined) {
-          part.underline.position.set(x + width / 2, y - part.text.fontSize * 0.12, 0.001);
-          part.underline.scale.set(width, part.text.fontSize * 0.055, 1);
-        }
-        x += width;
-      }
-    }
-    for (const part of line) part.text.sync(layout);
-    top -= height;
-  }
-  return { root, texts, decorations };
-}
+const quadGeometry = new PlaneGeometry(1, 1);
+const indicatorGeometry = new PlaneGeometry(0.32, 0.04);
 
 function hermite(from: number, to: number, fromSlope: number, toSlope: number, amount: number) {
   const squared = amount * amount;
@@ -154,6 +72,7 @@ export class FlyingScoreHud {
 
   private readonly flying = new Map<number, FlyingText>();
   private readonly activeIds = new Set<number>();
+  private readonly quads: TextQuad[] = [];
   private readonly start = new Vector3();
   private readonly target = new Vector3();
   private readonly rotation = new Quaternion();
@@ -173,14 +92,9 @@ export class FlyingScoreHud {
       if (note === undefined) continue;
       let flying = this.flying.get(score.id);
       if (flying === undefined) {
-        flying = this.createFlyingText(
-          score.runs,
-          score.color,
-          score.showCenterIndicator,
-          score.kind !== 'score',
-          note,
-          timeline,
-        );
+        flying = this.createFlyingText(score, note, timeline);
+        // Text drawing is over budget this frame; it appears on a following one.
+        if (flying === undefined) continue;
         this.flying.set(score.id, flying);
         this.root.add(flying.root);
       }
@@ -191,8 +105,7 @@ export class FlyingScoreHud {
       );
       flying.root.quaternion.copy(flying.rotation);
       const opacity = (flying.failure ? failureFade(score.age) : flyingFade(score.age)) * score.opacity;
-      for (const text of flying.texts) text.fillOpacity = opacity;
-      for (const decoration of flying.decorations) decoration.material.opacity = opacity;
+      if (flying.quad !== undefined) flying.quad.mesh.material.opacity = opacity;
       if (flying.indicator !== undefined) flying.indicator.material.opacity = opacity;
     }
   }
@@ -202,18 +115,42 @@ export class FlyingScoreHud {
     this.flying.clear();
   }
 
+  private takeQuad(bloomAlpha: number) {
+    const index = this.quads.findIndex((quad) => quad.bloomAlpha === bloomAlpha);
+    if (index !== -1) return this.quads.splice(index, 1)[0];
+    const mesh = new Mesh(quadGeometry, flyingScoreMaterial(0xffffff, bloomAlpha));
+    mesh.renderOrder = 1000;
+    mesh.frustumCulled = false;
+    mesh.layers.set(MAIN_ONLY_LAYER);
+    return { mesh, bloomAlpha };
+  }
+
   private createFlyingText(
-    runs: HitScoreTextRun[],
-    color: string,
-    showCenterIndicator: boolean,
-    failure: boolean,
+    score: FlyingScore,
     note: ReplayNoteEvent,
     timeline: ReplayTimeline,
-  ): FlyingText {
-    const bloomAlpha = failure || timeline.hitScoreVisualizer === null ? flyingScoreBloomAlpha : 0;
-    const { root, texts, decorations } = flyingScoreText(runs, color, bloomAlpha, failure);
-    const indicator = showCenterIndicator
-      ? new Mesh(new PlaneGeometry(0.32, 0.04), flyingScoreMaterial(color))
+  ): FlyingText | undefined {
+    const failure = score.kind !== 'score';
+    const acquired = acquireRichTextTexture(
+      score.display.text,
+      score.display.color,
+      failure ? flyingFailureFontSize : flyingScoreFontSize,
+    );
+    if (acquired === 'deferred') return undefined;
+    const texture = acquired ?? undefined;
+    const root = new Group();
+    const bloomAlpha = failure || score.display.vanilla ? flyingScoreBloomAlpha : 0;
+    let quad: TextQuad | undefined;
+    if (texture !== undefined) {
+      quad = this.takeQuad(bloomAlpha);
+      if (quad !== undefined) {
+        quad.mesh.material.map = texture.texture;
+        quad.mesh.scale.set(texture.width, texture.height, 1);
+        root.add(quad.mesh);
+      }
+    }
+    const indicator = score.showCenterIndicator
+      ? new Mesh(indicatorGeometry, flyingScoreMaterial(score.display.color))
       : undefined;
     if (indicator !== undefined) {
       indicator.position.set(0, -0.15, 0.01);
@@ -221,6 +158,7 @@ export class FlyingScoreHud {
       indicator.layers.set(MAIN_ONLY_LAYER);
       root.add(indicator);
     }
+    const parts = { root, quad, texture, indicator };
 
     const fixedPosition = timeline.hitScoreVisualizer?.fixedPosition;
     const start =
@@ -257,10 +195,9 @@ export class FlyingScoreHud {
         .set(local.x < 0 ? -2 : 2, 1.3, -15)
         .applyQuaternion(rotation)
         .clone();
-      return { root, texts, decorations, indicator, start: failureStart, target, rotation, failure };
+      return { ...parts, start: failureStart, target, rotation, failure };
     }
-    if (fixedPosition !== undefined)
-      return { root, texts, decorations, indicator, start, target: start.clone(), rotation, failure };
+    if (fixedPosition !== undefined) return { ...parts, start, target: start.clone(), rotation, failure };
     this.inverseRotation.copy(rotation).invert();
     const local = this.target.copy(start).applyQuaternion(this.inverseRotation);
     local.z = 0;
@@ -269,17 +206,17 @@ export class FlyingScoreHud {
     const target = local.applyQuaternion(rotation).clone();
     const offset = timeline.hitScoreVisualizer?.targetPositionOffset;
     if (offset !== undefined) target.add(this.start.set(offset[0], offset[1], -offset[2]));
-    return { root, texts, decorations, indicator, start, target, rotation, failure };
+    return { ...parts, start, target, rotation, failure };
   }
 
   private disposeFlyingText(flying: FlyingText) {
     this.root.remove(flying.root);
-    flying.indicator?.geometry.dispose();
-    flying.indicator?.material.dispose();
-    for (const decoration of flying.decorations) {
-      decoration.geometry.dispose();
-      decoration.material.dispose();
+    if (flying.quad !== undefined) {
+      flying.root.remove(flying.quad.mesh);
+      flying.quad.mesh.material.map = null;
+      this.quads.push(flying.quad);
     }
-    for (const text of flying.texts) disposeHudText(text);
+    if (flying.texture !== undefined) releaseRichTextTexture(flying.texture);
+    flying.indicator?.material.dispose();
   }
 }

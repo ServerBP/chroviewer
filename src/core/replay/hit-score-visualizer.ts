@@ -1,18 +1,17 @@
 import type { CutScore } from './scoring';
+import { parseRichText } from './tmp-rich-text';
 import type { ReplayNoteEvent } from './types';
 
+/**
+ * A flying score's TMP rich text and base colour. `vanilla` marks text Beat Saber draws
+ * itself (no HSV, or HSV leaving that note type alone), which keeps the game's own styling.
+ */
 export interface HitScoreDisplay {
   text: string;
   color: string;
-  runs: HitScoreTextRun[];
-}
-
-export interface HitScoreTextRun {
-  text: string;
-  scale: number;
-  color?: string;
-  baselineOffset?: number;
-  underline?: boolean;
+  vanilla: boolean;
+  /** False when the text has no visible characters, so nothing needs to be drawn. */
+  visible: boolean;
 }
 
 interface ColoredText {
@@ -30,116 +29,56 @@ interface Segment {
   text: string;
 }
 
-interface TimeSegment extends Segment {
-  threshold: number;
-}
-
 interface BadCutDisplay extends ColoredText {
   type: number;
 }
 
+/**
+ * Which HitScoreVisualizer interpreted the profile. PC (ErisApps) and Quest (Metalit)
+ * differ in a few visible details: Quest ignores displayMode, leaves notes it has no chain
+ * judgments for to the game, and does not format %t inside %T segments.
+ */
+export type HitScoreVisualizerPlatform = 'pc' | 'quest';
+
 export interface HitScoreVisualizerConfig {
+  platform: HitScoreVisualizerPlatform;
   fixedPosition?: readonly [number, number, number];
   targetPositionOffset?: readonly [number, number, number];
   displayMode: number;
+  /** Highest threshold first. */
   judgments: Judgment[];
+  /** Highest threshold first; empty means the game's own text (Quest only). */
   chainHeadJudgments: Judgment[];
-  chainLinkDisplay: ColoredText;
+  /** Undefined means the game's own text on Quest and HSV's default on PC. */
+  chainLinkDisplay?: ColoredText;
   beforeSegments: Segment[];
   accuracySegments: Segment[];
   afterSegments: Segment[];
-  timeSegments: TimeSegment[];
+  timeSegments: Segment[];
   badCuts: BadCutDisplay[];
   misses: ColoredText[];
   timePrecision: number;
   timeOffset: number;
 }
 
-const richTextTag = /<([^>]*)>/g;
+export const DISPLAY_MODE = { none: 0, format: 1, textOnly: 2, numeric: 3, scoreOnTop: 4, directions: 5 } as const;
+export const BAD_CUT_TYPE = { all: 0, wrongDirection: 1, wrongColor: 2, bomb: 3 } as const;
 
-export function hitScoreTextRuns(value: string) {
-  const runs: HitScoreTextRun[] = [];
-  const sizes = [1];
-  const colors: (string | undefined)[] = [undefined];
-  const scripts = [{ scale: 1, baselineOffset: 0 }];
-  let underlineDepth = 0;
-  let offset = 0;
-  function append(text: string) {
-    if (text === '') return;
-    const script = scripts.at(-1) ?? scripts[0];
-    if (script === undefined) return;
-    const scale = (sizes.at(-1) ?? 1) * script.scale;
-    if (scale === 0) return;
-    const color = colors.at(-1);
-    const baselineOffset = script.baselineOffset === 0 ? undefined : script.baselineOffset;
-    const underline = underlineDepth === 0 ? undefined : true;
-    const previous = runs.at(-1);
-    if (
-      previous?.scale === scale &&
-      previous.color === color &&
-      previous.baselineOffset === baselineOffset &&
-      previous.underline === underline
-    ) {
-      previous.text += text;
-    } else {
-      const run: HitScoreTextRun = { text, scale };
-      if (color !== undefined) run.color = color;
-      if (baselineOffset !== undefined) run.baselineOffset = baselineOffset;
-      if (underline !== undefined) run.underline = underline;
-      runs.push(run);
-    }
-  }
-  for (const match of value.matchAll(richTextTag)) {
-    const index = match.index;
-    append(value.slice(offset, index));
-    const tag = match[1]?.trim() ?? '';
-    if (/^\/size$/i.test(tag)) {
-      if (sizes.length > 1) sizes.pop();
-    } else {
-      const size = /^size\s*=\s*["']?([\d.]+)(%)?["']?$/i.exec(tag);
-      const color = /^(?:color\s*=\s*["']?(#[\da-f]{3,8}|[a-z]+)["']?|(#[\da-f]{3,8}))$/i.exec(tag);
-      if (size !== null) {
-        const value = Number(size[1]);
-        sizes.push(size[2] === '%' ? ((sizes.at(-1) ?? 1) * value) / 100 : value === 0 ? 0 : (sizes.at(-1) ?? 1));
-      } else if (/^\/color$/i.test(tag)) {
-        if (colors.length > 1) colors.pop();
-      } else if (color !== null) {
-        colors.push(color[1] ?? color[2]);
-      } else if (/^sup$/i.test(tag)) {
-        const current = scripts.at(-1) ?? scripts[0];
-        if (current !== undefined)
-          scripts.push({ scale: current.scale * 0.5, baselineOffset: current.baselineOffset + 0.25 });
-      } else if (/^\/sup$/i.test(tag)) {
-        if (scripts.length > 1) scripts.pop();
-      } else if (/^sub$/i.test(tag)) {
-        const current = scripts.at(-1) ?? scripts[0];
-        if (current !== undefined)
-          scripts.push({ scale: current.scale * 0.5, baselineOffset: current.baselineOffset - 0.25 });
-      } else if (/^\/sub$/i.test(tag)) {
-        if (scripts.length > 1) scripts.pop();
-      } else if (/^u$/i.test(tag)) {
-        underlineDepth++;
-      } else if (/^\/u$/i.test(tag)) {
-        underlineDepth = Math.max(underlineDepth - 1, 0);
-      }
-    }
-    offset = index + match[0].length;
-  }
-  append(value.slice(offset));
-  return runs;
+/** HSV PC's `ChainHeadJudgment.Default`, added by its 3.4 migration when a profile has none. */
+export const DEFAULT_CHAIN_HEAD_JUDGMENT: Judgment = { threshold: 0, text: '%s', color: '#ffffff', fade: false };
+/** HSV PC's `ChainLinkDisplay.Default`. */
+const defaultChainLinkDisplay: ColoredText = { text: '<u>20</u>', color: '#ffffff' };
+/** HSV PC's `NormalJudgment.Default`, used when no threshold matches. */
+const defaultJudgment: Judgment = { threshold: 0, text: '%s', color: '#ffffff', fade: false };
+
+function display(text: string, color: string, vanilla = false): HitScoreDisplay {
+  return { text, color, vanilla, visible: parseRichText(text, 1).plain.trim() !== '' };
 }
 
-function styledDisplay(text: string, color: string): HitScoreDisplay {
-  const runs = hitScoreTextRuns(text);
-  return { text: runs.map((run) => run.text).join(''), color, runs };
-}
-
-const defaultDisplay = styledDisplay('', '#cccccc');
-
-function nativeFailureDisplay(note: ReplayNoteEvent) {
-  if (note.eventType === 3) return styledDisplay('MISS', '#ff0000');
-  if (note.eventType === 2 || note.eventType === 4) return styledDisplay('X', '#ff0000');
-  return defaultDisplay;
+function vanillaFailureDisplay(note: ReplayNoteEvent) {
+  if (note.eventType === 3) return display('MISS', '#ff0000', true);
+  if (note.eventType === 2 || note.eventType === 4) return display('X', '#ff0000', true);
+  return display('', '#cccccc', true);
 }
 
 class PayloadReader {
@@ -175,7 +114,6 @@ class PayloadReader {
 
   string() {
     const length = this.ushort();
-    if (length > 512) throw new Error('HSV string is too large');
     this.require(length);
     const value = new TextDecoder().decode(this.payload.subarray(this.offset, this.offset + length));
     this.offset += length;
@@ -189,9 +127,7 @@ class PayloadReader {
   }
 
   list<T>(read: () => T) {
-    const count = this.byte();
-    if (count > 32) throw new Error('HSV list is too large');
-    return Array.from({ length: count }, read);
+    return Array.from({ length: this.byte() }, read);
   }
 
   finished() {
@@ -203,14 +139,20 @@ class PayloadReader {
   }
 }
 
+export function byThresholdDescending<T extends { threshold: number }>(values: T[]) {
+  // Stable, so the first of several equal thresholds keeps winning as in both HSVs.
+  return [...values].sort((left, right) => right.threshold - left.threshold);
+}
+
+/** ScoreSaber PC's `scoresaber.hsv-config` replay extension. */
 export function decodeHitScoreVisualizer(payload: Uint8Array | undefined): HitScoreVisualizerConfig | null {
-  if (payload === undefined || payload.length === 0 || payload.length > 128 * 1024) return null;
+  if (payload === undefined || payload.length === 0 || payload.length > 1024 * 1024) return null;
   try {
     const reader = new PayloadReader(payload);
     const major = reader.byte();
-    const minor = reader.byte();
     reader.byte();
-    if (major !== 3 || minor > 7) return null;
+    reader.byte();
+    if (major !== 3) return null;
     const displayMode = reader.byte();
     if (displayMode > 5) return null;
     const flags = reader.byte();
@@ -218,20 +160,15 @@ export function decodeHitScoreVisualizer(payload: Uint8Array | undefined): HitSc
     const targetPositionOffset = (flags & 2) !== 0 ? reader.vector() : undefined;
     const timePrecision = reader.byte();
     const timeOffset = reader.byte();
-    const judgments = reader.list(() => ({
+    const judgment = () => ({
       threshold: reader.ushort(),
       text: reader.string(),
       color: reader.color(),
       fade: reader.byte() !== 0,
-    }));
-    const chainHeadJudgments = reader.list(() => ({
-      threshold: reader.ushort(),
-      text: reader.string(),
-      color: reader.color(),
-      fade: reader.byte() !== 0,
-    }));
-    const chainLinkDisplay =
-      (flags & 16) !== 0 ? { text: reader.string(), color: reader.color() } : { text: '<u>%s', color: '#ffffff' };
+    });
+    const judgments = reader.list(judgment);
+    const chainHeadJudgments = reader.list(judgment);
+    const chainLinkDisplay = (flags & 16) !== 0 ? { text: reader.string(), color: reader.color() } : undefined;
     const segments = () => reader.list(() => ({ threshold: reader.ushort(), text: reader.string() }));
     const beforeSegments = segments();
     const accuracySegments = segments();
@@ -239,18 +176,20 @@ export function decodeHitScoreVisualizer(payload: Uint8Array | undefined): HitSc
     const timeSegments = reader.list(() => ({ threshold: reader.float(), text: reader.string() }));
     const badCuts = reader.list(() => ({ text: reader.string(), color: reader.color(), type: reader.byte() }));
     const misses = reader.list(() => ({ text: reader.string(), color: reader.color() }));
-    if (!reader.finished() || judgments.length === 0 || chainHeadJudgments.length === 0) return null;
+    if (!reader.finished() || judgments.length === 0) return null;
     return {
+      platform: 'pc',
       displayMode,
       fixedPosition,
       targetPositionOffset,
-      judgments,
-      chainHeadJudgments,
+      judgments: byThresholdDescending(judgments),
+      chainHeadJudgments:
+        chainHeadJudgments.length === 0 ? [DEFAULT_CHAIN_HEAD_JUDGMENT] : byThresholdDescending(chainHeadJudgments),
       chainLinkDisplay,
-      beforeSegments,
-      accuracySegments,
-      afterSegments,
-      timeSegments,
+      beforeSegments: byThresholdDescending(beforeSegments),
+      accuracySegments: byThresholdDescending(accuracySegments),
+      afterSegments: byThresholdDescending(afterSegments),
+      timeSegments: byThresholdDescending(timeSegments),
       badCuts,
       misses,
       timePrecision,
@@ -296,66 +235,150 @@ function directionArrow(note: ReplayNoteEvent) {
 }
 
 function fadeColor(from: string, to: string, amount: number) {
+  const t = Math.min(Math.max(Number.isFinite(amount) ? amount : 0, 0), 1);
   const channel = (color: string, offset: number) => Number.parseInt(color.slice(offset, offset + 2), 16);
   const result = [1, 3, 5].map((offset) =>
-    Math.round(channel(from, offset) + (channel(to, offset) - channel(from, offset)) * amount),
+    Math.round(channel(from, offset) + (channel(to, offset) - channel(from, offset)) * t),
   );
   return `#${result.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
 }
 
-function formatTemplate(template: string, config: HitScoreVisualizerConfig, cut: CutScore, note: ReplayNoteEvent) {
+/**
+ * HSV's left-to-right `%` substitution. Inserted values are not scanned again, unknown
+ * specifiers stay as written, and a trailing `%` is kept by PC (with a space) but dropped by Quest.
+ */
+function substitute(
+  template: string,
+  platform: HitScoreVisualizerPlatform,
+  value: (specifier: string) => string | undefined,
+) {
+  let output = '';
+  let offset = 0;
+  while (offset < template.length) {
+    const percent = template.indexOf('%', offset);
+    if (percent === -1) break;
+    output += template.slice(offset, percent);
+    if (percent === template.length - 1) {
+      if (platform === 'pc') output += '% ';
+      offset = template.length;
+      break;
+    }
+    const specifier = template.charAt(percent + 1);
+    output += specifier === '%' ? '%' : specifier === 'n' ? '\n' : (value(specifier) ?? `%${specifier}`);
+    offset = percent + 2;
+  }
+  return output + template.slice(offset);
+}
+
+function timeDependenceText(config: HitScoreVisualizerConfig, timeDependence: number) {
+  const value = timeDependence * 10 ** config.timeOffset;
+  const digits = Math.min(config.timePrecision, 100);
+  if (config.platform === 'quest') return value.toFixed(digits);
+  // .NET's "n" format groups thousands.
+  try {
+    return value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  } catch {
+    return value.toFixed(digits);
+  }
+}
+
+function formatJudgmentText(template: string, config: HitScoreVisualizerConfig, cut: CutScore, note: ReplayNoteEvent) {
   const timeDependence = Math.abs(note.cutNormal.z);
-  const timeText = (timeDependence * 10 ** config.timeOffset).toFixed(config.timePrecision);
-  return template.replace(/%([bcatBCATdsp%n])/g, (_match, specifier: string) => {
-    if (specifier === 'b') return String(cut.before);
-    if (specifier === 'c') return String(cut.accuracy);
-    if (specifier === 'a') return String(cut.after);
-    if (specifier === 't') return timeText;
-    if (specifier === 'B') return segmentText(config.beforeSegments, cut.before);
-    if (specifier === 'C') return segmentText(config.accuracySegments, cut.accuracy);
-    if (specifier === 'A') return segmentText(config.afterSegments, cut.after);
-    if (specifier === 'T')
-      return (
-        config.timeSegments.find((segment) => timeDependence >= segment.threshold)?.text.replace('%t', timeText) ?? ''
-      );
-    if (specifier === 'd') return directionArrow(note);
-    if (specifier === 's') return String(cut.total);
-    if (specifier === 'p') return String(Math.round((cut.total / cut.maximum) * 100));
-    if (specifier === 'n') return '\n';
-    return '%';
+  return substitute(template, config.platform, (specifier) => {
+    switch (specifier) {
+      case 'b':
+        return String(cut.before);
+      case 'c':
+        return String(cut.accuracy);
+      case 'a':
+        return String(cut.after);
+      case 't':
+        return timeDependenceText(config, timeDependence);
+      case 'B':
+        return segmentText(config.beforeSegments, cut.before);
+      case 'C':
+        return segmentText(config.accuracySegments, cut.accuracy);
+      case 'A':
+        return segmentText(config.afterSegments, cut.after);
+      case 'T': {
+        const text = segmentText(config.timeSegments, timeDependence);
+        return config.platform === 'quest'
+          ? text
+          : substitute(text, 'pc', (inner) => (inner === 't' ? timeDependenceText(config, timeDependence) : undefined));
+      }
+      case 'd':
+        return directionArrow(note);
+      case 's':
+        return String(cut.total);
+      case 'p': {
+        const percent = Math.round((cut.total / cut.maximum) * 100);
+        // Quest HSV prints the rounded float with std::to_string.
+        return config.platform === 'quest' ? percent.toFixed(6) : String(percent);
+      }
+      default:
+        return undefined;
+    }
   });
+}
+
+function textForMode(template: string, config: HitScoreVisualizerConfig, cut: CutScore, note: ReplayNoteEvent) {
+  if (config.platform === 'quest') return formatJudgmentText(template, config, cut, note);
+  switch (config.displayMode) {
+    case DISPLAY_MODE.format:
+      return formatJudgmentText(template, config, cut, note);
+    case DISPLAY_MODE.textOnly:
+      return template;
+    case DISPLAY_MODE.numeric:
+      return String(cut.total);
+    case DISPLAY_MODE.scoreOnTop:
+      return `${String(cut.total)}\n${template}\n`;
+    case DISPLAY_MODE.directions:
+      return `${template}\n${directionArrow(note)}\n`;
+    default:
+      return `${template}\n${String(cut.total)}\n`;
+  }
+}
+
+function judgedDisplay(judgments: Judgment[], config: HitScoreVisualizerConfig, cut: CutScore, note: ReplayNoteEvent) {
+  let index = judgments.findIndex((judgment) => cut.total >= judgment.threshold);
+  // No match: PC falls back to a plain white score, Quest to its last judgment.
+  if (index === -1 && config.platform === 'quest') index = judgments.length - 1;
+  const judgment = judgments[index] ?? defaultJudgment;
+  const higher = index > 0 ? judgments[index - 1] : undefined;
+  const color =
+    judgment.fade && higher !== undefined
+      ? fadeColor(
+          judgment.color,
+          higher.color,
+          (cut.total - judgment.threshold) / (higher.threshold - judgment.threshold),
+        )
+      : judgment.color;
+  return display(textForMode(judgment.text, config, cut, note), color);
+}
+
+function vanillaScoreDisplay(cut: CutScore) {
+  return display(String(cut.total), '#cccccc', true);
 }
 
 function judgmentDisplay(config: HitScoreVisualizerConfig, cut: CutScore, note: ReplayNoteEvent) {
   if (note.noteId.gameplayType === 3) {
-    return styledDisplay(
-      formatTemplate(config.chainLinkDisplay.text, config, cut, note),
-      config.chainLinkDisplay.color,
-    );
+    const link = config.chainLinkDisplay ?? (config.platform === 'quest' ? undefined : defaultChainLinkDisplay);
+    return link === undefined
+      ? vanillaScoreDisplay(cut)
+      : display(textForMode(link.text, config, cut, note), link.color);
   }
-  const judgments = note.noteId.gameplayType === 2 ? config.chainHeadJudgments : config.judgments;
-  const index = Math.max(
-    judgments.findIndex((judgment) => cut.total >= judgment.threshold),
-    0,
-  );
-  const judgment = judgments[index] ?? judgments[0];
-  if (judgment === undefined) return defaultDisplay;
-  let text = formatTemplate(judgment.text, config, cut, note);
-  if (config.displayMode === 2) text = judgment.text;
-  else if (config.displayMode === 3) text = String(cut.total);
-  else if (config.displayMode === 4) text = `${String(cut.total)}\n${judgment.text}`;
-  else if (config.displayMode === 5) text = `${judgment.text}\n${directionArrow(note)}`;
-  else if (config.displayMode === 0) text = `${judgment.text}\n${String(cut.total)}`;
-  const previous = judgments[index - 1];
-  const color =
-    judgment.fade && previous !== undefined
-      ? fadeColor(
-          judgment.color,
-          previous.color,
-          (cut.total - judgment.threshold) / (previous.threshold - judgment.threshold),
-        )
-      : judgment.color;
-  return styledDisplay(text, color);
+  if (note.noteId.gameplayType === 2) {
+    return config.chainHeadJudgments.length === 0
+      ? vanillaScoreDisplay(cut)
+      : judgedDisplay(config.chainHeadJudgments, config, cut, note);
+  }
+  return judgedDisplay(config.judgments, config, cut, note);
+}
+
+function badCutType(note: ReplayNoteEvent) {
+  if (note.eventType === 4) return BAD_CUT_TYPE.bomb;
+  // Both HSVs treat a cut with the wrong saber as a colour error, whatever the direction.
+  return note.saberType === note.noteId.colorType ? BAD_CUT_TYPE.wrongDirection : BAD_CUT_TYPE.wrongColor;
 }
 
 export function hitScoreDisplay(
@@ -364,17 +387,15 @@ export function hitScoreDisplay(
   cut: CutScore | undefined,
   eventIndex: number,
 ): HitScoreDisplay {
-  if (cut !== undefined)
-    return config === null ? styledDisplay(String(cut.total), '#cccccc') : judgmentDisplay(config, cut, note);
-  if (config === null) {
-    return nativeFailureDisplay(note);
+  if (cut !== undefined) return config === null ? vanillaScoreDisplay(cut) : judgmentDisplay(config, cut, note);
+  if (config === null) return vanillaFailureDisplay(note);
+  let candidates: ColoredText[];
+  if (note.eventType === 3) candidates = config.misses;
+  else {
+    const type = badCutType(note);
+    candidates = config.badCuts.filter((badCut) => badCut.type === BAD_CUT_TYPE.all || badCut.type === type);
   }
-  const candidates =
-    note.eventType === 3
-      ? config.misses
-      : config.badCuts.filter(
-          (display) => display.type === 0 || display.type === (note.eventType === 4 ? 3 : note.directionOk ? 2 : 1),
-        );
+  // HSV picks these randomly by default; a stable pick keeps scrubbing deterministic.
   const candidate = candidates[eventIndex % Math.max(candidates.length, 1)];
-  return candidate === undefined ? nativeFailureDisplay(note) : styledDisplay(candidate.text, candidate.color);
+  return candidate === undefined ? vanillaFailureDisplay(note) : display(candidate.text, candidate.color);
 }

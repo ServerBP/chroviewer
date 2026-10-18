@@ -227,7 +227,7 @@ export function applyLiveReplayExtensions(replay: Replay, extensions: ReplayExte
       // as a scoresaber.hsv-config payload.
       if (extension.id === 'ta.hsv-profile' && extension.version === 1) {
         const profile = new TextDecoder('utf-8', { fatal: true }).decode(extension.payload);
-        if (parseHitScoreVisualizerProfile(profile).isErr()) throw new Error('invalid TA HSV profile');
+        if (parseHitScoreVisualizerProfile(profile, 'quest').isErr()) throw new Error('invalid TA HSV profile');
         replay.hsvProfile = profile;
         return;
       }
