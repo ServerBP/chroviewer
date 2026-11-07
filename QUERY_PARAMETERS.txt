@@ -121,6 +121,9 @@ PLAYBACK AND SOURCES
 autoplay=true|false           Attempt playback without waiting for the play button.
 map=<BeatSaver key or URL>    Load a map preview.
 replayUrl=<HTTPS URL>         Load a replay file.
+tarfPath=<path or HTTPS URL>  Load a TournamentAssistant (.tarf) replay from a path on this site,
+                              like /replays/match.tarf, or from another site. A map baked into
+                              the replay is used instead of downloading it from BeatSaver.
 scoreId=<ScoreSaber score>    Load a ScoreSaber replay.
 beat=<number>                 Initial beat for non-live playback.
 difficulty=<zero-based index> Difficulty index for a map preview.
