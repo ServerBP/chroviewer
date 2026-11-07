@@ -9,8 +9,8 @@
     "api:generate": "node scripts/codegen/generate-api.ts",
     "api:regen": "node scripts/codegen/generate-api.ts --refresh",
     "api:check": "node scripts/codegen/generate-api.ts --check",
-    "proto:generate": "node scripts/codegen/generate-live-protocol.ts",
-    "proto:check": "node scripts/codegen/generate-live-protocol.ts --check && buf lint src/modules/live/proto",
+    "proto:generate": "node scripts/codegen/generate-live-protocol.ts && node scripts/codegen/generate-tarf-protocol.ts",
+    "proto:check": "node scripts/codegen/generate-live-protocol.ts --check && node scripts/codegen/generate-tarf-protocol.ts --check && buf lint src/modules/live/proto && buf lint src/core/replay/proto",
     "verify": "vp check && vp run api:check && vp run proto:check && vp test && vp build"
   },
   "dependencies": {

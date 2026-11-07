@@ -33,7 +33,8 @@ export function hitScoreVisualizerForSettings(settings: HitScoreVisualizerSettin
   if (settings.preferReplayHsvProfile && replayConfig !== null) return replayConfig;
   if (settings.preferReplayHsvProfile && replay?.hsvProfile !== undefined) {
     // TA Standalone sends the Quest player's selected profile file as-is.
-    const profile = parseHitScoreVisualizerProfile(replay.hsvProfile, 'quest');
+    // TARF replays say which platform their profile was written for.
+    const profile = parseHitScoreVisualizerProfile(replay.hsvProfile, replay.hsvProfilePlatform ?? 'quest');
     if (profile.isOk()) return profile.value;
   }
   if (settings.overrideHsvProfile) {

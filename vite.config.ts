@@ -68,6 +68,7 @@ export default defineConfig(({ mode }) => {
         'node_modules/**',
         'public/environments/**',
         'src/routeTree.gen.ts',
+        'src/core/replay/generated/**',
         'src/modules/live/generated/**',
         'src/sources/beatsaver/generated/**',
         'src/sources/scoresaber/generated/**',
@@ -87,6 +88,7 @@ export default defineConfig(({ mode }) => {
       },
       ignorePatterns: [
         'src/routeTree.gen.ts',
+        'src/core/replay/generated/**',
         'src/modules/live/generated/**',
         'src/sources/beatsaver/generated/**',
         'src/sources/scoresaber/generated/**',
