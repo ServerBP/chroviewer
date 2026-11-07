@@ -378,6 +378,25 @@ export function parseBeatLeaderReplay(data: Uint8Array): Replay {
 
   if (!metadata) throw new Error('BeatLeader replay is missing info section');
 
+  const { scores, combos, multipliers, energies } = simulateReplayScoring(notes, walls);
+
+  return {
+    metadata,
+    poses,
+    heights,
+    notes,
+    scores,
+    combos,
+    multipliers,
+    energies,
+    pauses,
+    walls,
+  };
+}
+
+// BSOR doesn't record score, combo, multiplier or energy events, so they are
+// worked out from the note and wall events the same way the game does.
+export function simulateReplayScoring(notes: ReplayNoteEvent[], walls: ReplayWallEvent[]) {
   const scores: ReplayScoreEvent[] = [];
   const combos: ReplayComboEvent[] = [];
   const multipliers: ReplayMultiplierEvent[] = [];
@@ -471,16 +490,5 @@ export function parseBeatLeaderReplay(data: Uint8Array): Replay {
     });
   }
 
-  return {
-    metadata,
-    poses,
-    heights,
-    notes,
-    scores,
-    combos,
-    multipliers,
-    energies,
-    pauses,
-    walls,
-  };
+  return { scores, combos, multipliers, energies };
 }

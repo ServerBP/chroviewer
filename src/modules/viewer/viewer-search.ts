@@ -41,6 +41,8 @@ const remoteSourceUrlSchema = z.pipe(
   ),
 );
 const mapSourceSchema = z.union([mapKeySchema, remoteSourceUrlSchema]);
+// A path on this site, like /replays/match.tarf, or an https URL
+const tarfPathSchema = z.union([z.string().check(z.maxLength(4096), z.regex(/^\/(?!\/)/)), remoteSourceUrlSchema]);
 const nonnegativeNumberSchema = z.number().check(z.nonnegative());
 const unitNumberSchema = z.number().check(z.minimum(0), z.maximum(1));
 const renderScaleSchema = z.number().check(z.minimum(0.5), z.maximum(1.5));
@@ -62,6 +64,7 @@ export const viewerSearchSchema = z.pipe(
     party: z.catch(z.optional(livePlayerIdSchema), undefined),
     map: z.catch(z.optional(mapSourceSchema), undefined),
     replayUrl: z.catch(z.optional(remoteSourceUrlSchema), undefined),
+    tarfPath: z.catch(z.optional(tarfPathSchema), undefined),
     scoreId: z.catch(z.optional(scoreIdSchema), undefined),
     scoreIdBL: z.catch(z.optional(scoreIdSchema), undefined),
     difficulty: z.catch(z.optional(difficultyIndexSchema), undefined),
@@ -117,6 +120,7 @@ export const viewerSearchSchema = z.pipe(
         ...search,
         map: undefined,
         replayUrl: undefined,
+        tarfPath: undefined,
         scoreId: undefined,
         scoreIdBL: undefined,
         difficulty: undefined,
@@ -139,6 +143,7 @@ export const viewerSearchSchema = z.pipe(
         ...search,
         map: undefined,
         replayUrl: undefined,
+        tarfPath: undefined,
         scoreId: undefined,
         scoreIdBL: undefined,
         difficulty: undefined,
@@ -149,7 +154,7 @@ export const viewerSearchSchema = z.pipe(
         previewStartSeconds: undefined,
       };
     }
-    if (search.replayUrl !== undefined)
+    if (search.replayUrl !== undefined || search.tarfPath !== undefined)
       return { ...search, map: undefined, scoreId: undefined, scoreIdBL: undefined, difficulty: undefined };
     if (search.scoreId !== undefined) return { ...search, map: undefined, scoreIdBL: undefined, difficulty: undefined };
     if (search.scoreIdBL !== undefined) return { ...search, map: undefined, scoreId: undefined, difficulty: undefined };

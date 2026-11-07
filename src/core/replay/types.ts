@@ -1,3 +1,5 @@
+import type { HitScoreVisualizerPlatform } from './hit-score-visualizer';
+
 export interface ReplayVector3 {
   x: number;
   y: number;
@@ -187,6 +189,10 @@ export interface Replay {
   walls: ReplayWallEvent[];
   hsvConfig?: Uint8Array;
   hsvProfile?: string;
+  // Which HitScoreVisualizer the profile JSON was written for. Quest when unset.
+  hsvProfilePlatform?: HitScoreVisualizerPlatform;
+  // A zip of the map, for replays which carry their own map.
+  mapArchive?: Uint8Array;
   legacyScoreSaber?: LegacyScoreSaberData;
   liveHistoryBase?: {
     scoringNotes: number;

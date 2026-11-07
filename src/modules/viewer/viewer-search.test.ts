@@ -20,3 +20,14 @@ test('recognizes query-driven viewer settings as external configuration', () => 
     hasExternallyConfiguredSettings(z.parse(viewerSearchSchema, { settings: { replayCameraFov: 90 } })),
   ).toBe(true);
 });
+
+test('tarfPath accepts paths on this site and https URLs', () => {
+  expect(z.parse(viewerSearchSchema, { tarfPath: '/replays/match.tarf' }).tarfPath).toBe('/replays/match.tarf');
+  expect(z.parse(viewerSearchSchema, { tarfPath: 'https://cdn.example.com/a.tarf' }).tarfPath).toBe(
+    'https://cdn.example.com/a.tarf',
+  );
+  // Protocol relative paths would point at another site without going through the source proxy
+  expect(z.parse(viewerSearchSchema, { tarfPath: '//cdn.example.com/a.tarf' }).tarfPath).toBeUndefined();
+  expect(z.parse(viewerSearchSchema, { tarfPath: 'http://cdn.example.com/a.tarf' }).tarfPath).toBeUndefined();
+  expect(z.parse(viewerSearchSchema, { tarfPath: '/replays/match.tarf', map: 'abc' }).map).toBeUndefined();
+});

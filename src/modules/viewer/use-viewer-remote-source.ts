@@ -7,6 +7,7 @@ import { useTranslations } from 'use-intl';
 
 import { isBeatLeaderReplay } from '../../core/replay/parse-beatleader';
 import { applyLegacyScoreSaberMetadata, isScoreSaberReplay } from '../../core/replay/parse-scoresaber';
+import { isTarfReplay } from '../../core/replay/parse-tarf';
 import type { Replay } from '../../core/replay/types';
 import { replayMapHash } from '../../core/replay/types';
 import { applySharedViewerSettings } from '../../core/share-link';
@@ -58,6 +59,7 @@ type RemoteSourceCommand = { requestId: number } & (
       autoplay?: boolean;
     }
   | { type: 'shared-replay'; replayUrl: string; beat?: number; autoplay?: boolean }
+  | { type: 'shared-tarf'; tarfPath: string; beat?: number; autoplay?: boolean }
   | { type: 'shared-score'; scoreId: string; beat?: number; autoplay?: boolean }
   | { type: 'shared-beatleader'; scoreId: string; beat?: number; autoplay?: boolean }
 );
@@ -254,6 +256,16 @@ export function useViewerRemoteSource({
     return Result.gen(async function* () {
       const replay = yield* Result.await(parseReplay(data));
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
+
+      // TARF replays can carry their own map, which also works for maps that aren't on BeatSaver
+      if (replay.mapArchive !== undefined) {
+        const files = yield* Result.await(extractMapArchive(replay.mapArchive));
+        if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
+        pendingSharedViewRef.current = pending;
+        yield* Result.await(loadSourceFiles(requestId, files, replay, { sourceLink }));
+        return Result.ok(undefined);
+      }
+
       const hash = replayMapHash(replay);
       if (hash === null) {
         return Result.err(
@@ -293,6 +305,29 @@ export function useViewerRemoteSource({
       );
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
       yield* Result.await(loadReplayData(requestId, data, pending, { type: 'replay', url: replayUrl }));
+      return Result.ok(undefined);
+    });
+  }
+
+  // Paths on this site are fetched directly, other sites go through the source proxy like replayUrl does
+  async function loadTarfPath(
+    requestId: number,
+    tarfPath: string,
+    pending: { beat?: number; autoplay?: boolean } = {},
+  ) {
+    const url = new URL(tarfPath, window.location.origin);
+    const sameOrigin = url.origin === window.location.origin;
+    return Result.gen(async function* () {
+      const data = yield* Result.await(
+        requestArrayBuffer(sameOrigin ? url.href : sourceDownloadUrl(url.href), {
+          source: 'local',
+          label: 'Replay',
+          operation: 'download-replay',
+          ...downloadOptions('replay', requestId),
+        }),
+      );
+      if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
+      yield* Result.await(loadReplayData(requestId, data, pending, { type: 'replay', url: url.href }));
       return Result.ok(undefined);
     });
   }
@@ -402,7 +437,7 @@ export function useViewerRemoteSource({
     }
     return Result.gen(async function* () {
       const pathname = new URL(linkUrl).pathname.toLowerCase();
-      const replayByName = pathname.endsWith('.dat') || pathname.endsWith('.bsor');
+      const replayByName = pathname.endsWith('.dat') || pathname.endsWith('.bsor') || pathname.endsWith('.tarf');
       const data = yield* Result.await(
         requestArrayBuffer(sourceDownloadUrl(linkUrl), {
           source: 'local',
@@ -413,7 +448,7 @@ export function useViewerRemoteSource({
       );
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
       const bytes = new Uint8Array(data);
-      if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes)) {
+      if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes) || isTarfReplay(bytes)) {
         yield* Result.await(loadReplayData(requestId, data, {}, { type: 'replay', url: linkUrl }));
         if (isSourceRequestCurrent(requestId)) {
           await navigate({ to: '/', search: { replayUrl: linkUrl }, replace: true });
@@ -511,6 +546,11 @@ export function useViewerRemoteSource({
           beat: command.beat,
           autoplay: command.autoplay,
         });
+      case 'shared-tarf':
+        return loadTarfPath(command.requestId, command.tarfPath, {
+          beat: command.beat,
+          autoplay: command.autoplay,
+        });
       case 'shared-score':
         return loadScoreSaberScore(command.requestId, command.scoreId, {
           beat: command.beat,
@@ -583,6 +623,22 @@ export function useViewerRemoteSource({
 
   useEffect(() => {
     if (!enabled) return;
+    if (search.tarfPath !== undefined) {
+      const requestId = beginSourceRequest();
+      const sharedSettings = search.settings;
+      if (sharedSettings !== undefined) {
+        setSettings((current) => applySharedViewerSettings(current, sharedSettings));
+      }
+      setSourceInput(search.tarfPath);
+      sourceMutation.mutate({
+        type: 'shared-tarf',
+        tarfPath: search.tarfPath,
+        beat: search.beat,
+        autoplay: search.autoplay,
+        requestId,
+      });
+      return;
+    }
     if (search.replayUrl !== undefined) {
       const requestId = beginSourceRequest();
       const sharedSettings = search.settings;
