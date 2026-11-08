@@ -707,7 +707,8 @@ export function useViewerRemoteSource({
     } else {
       pendingSharedViewRef.current = {
         autoplay: search.autoplay,
-        difficultyIndex: search.difficulty,
+        difficultyRank: search.difficulty,
+        characteristic: search.characteristic,
         beat: search.beat,
       };
       sourceMutation.mutate({ type: 'shared-map', mapSource: search.map, requestId });

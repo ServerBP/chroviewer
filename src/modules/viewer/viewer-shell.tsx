@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 
+import { difficultyRank } from '../../core/beatmap/info';
 import type { BeatmapParser } from '../../core/beatmap/worker/client';
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import {
@@ -361,6 +362,17 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     liveMapCache: multiview?.mapCache,
     sharedParser: multiview?.parser,
   });
+  const mapSelectionRow =
+    search.map === undefined || search.previewSource !== undefined
+      ? undefined
+      : (sources.rows.find((row) => {
+          if (row.difficulty === undefined || row.infoDifficulty === undefined) return false;
+          return (
+            (search.difficulty === undefined || difficultyRank(row.infoDifficulty.difficulty) === search.difficulty) &&
+            (search.characteristic === undefined ||
+              row.infoDifficulty.characteristic.toLowerCase() === search.characteristic.toLowerCase())
+          );
+        }) ?? sources.rows.find((row) => row.difficulty !== undefined && row.infoDifficulty !== undefined));
   const session = useViewerSession({
     disableGameUI: search.disableGameUI === true,
     hidePlatform: search.hidePlatform === true,
@@ -368,6 +380,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     lightshowMode,
     lightshowModeRef,
     authoritativeLightshowMode: authoritativeLights,
+    requestedMapRow: mapSelectionRow,
     skipInitialMenuEnvironment:
       search.map !== undefined || search.scoreId !== undefined || search.scoreIdBL !== undefined,
     setActivePanel,
@@ -404,6 +417,22 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     setPerformance(replaceRenderPerformance(values));
     setSettings((current) => sanitizeViewerSettings({ ...current, ...dynamicSettingsPatch(values) }));
   }, [multiviewSettingsSignature]);
+  useEffect(() => {
+    const infoDifficulty = mapSelectionRow?.infoDifficulty;
+    if (search.map === undefined || infoDifficulty === undefined) return;
+    const difficulty = difficultyRank(infoDifficulty.difficulty);
+    if (
+      difficulty === -1 ||
+      (search.difficulty === difficulty && search.characteristic === infoDifficulty.characteristic)
+    )
+      return;
+    void router.navigate({
+      to: '/',
+      search: { ...search, difficulty, characteristic: infoDifficulty.characteristic },
+      replace: true,
+      resetScroll: false,
+    });
+  }, [mapSelectionRow, router, search]);
   const liveTarget: LiveTarget | null =
     search.playerId === undefined
       ? null
@@ -692,6 +721,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     };
   }, [liveActive, taLive]);
   function toggleHitsounds() {
+    if (!settingsRef.current.hitsounds) transport.unlockHitsounds();
     setSettings((current) => ({ ...current, hitsounds: !current.hitsounds }));
   }
 
@@ -756,7 +786,8 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     mapIdentity: sources.mapIdentity,
     scoreId: sources.shareScoreId,
     scoreIdBL: sources.shareScoreIdBL,
-    selectedDifficultyIndex: session.selectedDifficultyIndex,
+    selectedDifficulty:
+      mapSelectionRow?.infoDifficulty ?? sources.rows.find((row) => row.key === session.selectedKey)?.infoDifficulty,
     settings,
     sourceLink: sources.sourceLink,
     setError,
@@ -1085,11 +1116,18 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
                   leaderboardUrl={session.leaderboardUrl}
                   leaderboardPlatform={session.leaderboardPlatform}
                   options={session.difficultyOptions}
-                  selectedKey={session.selectedKey}
+                  selectedKey={mapSelectionRow?.key ?? session.selectedKey}
                   settingsOpen={settingsOpen}
                   onSelectDifficulty={(key) => {
                     const row = sources.rows.find((candidate) => candidate.key === key);
-                    if (row !== undefined) void session.selectDifficulty(row);
+                    if (row?.infoDifficulty === undefined) return;
+                    const difficulty = difficultyRank(row.infoDifficulty.difficulty);
+                    if (difficulty === -1) return;
+                    void router.navigate({
+                      to: '/',
+                      search: { ...search, difficulty, characteristic: row.infoDifficulty.characteristic },
+                      resetScroll: false,
+                    });
                   }}
                   onBack={() => {
                     void router.navigate({ to: '/', search: {}, replace: true, reloadDocument: true });

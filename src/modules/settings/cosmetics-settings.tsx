@@ -396,6 +396,10 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
                     step: 0.001,
                     display: centimeters,
                   })}
+                  {slider('saberBladeWidth', { minimum: 0.25, maximum: 4, step: 0.01, display: percent })}
+                  {slider('saberTipWidth', { minimum: 0, maximum: 1, step: 0.01, display: percent })}
+                  {slider('saberHiltLength', { minimum: 0.04, maximum: 0.4, step: 0.01, display: centimeters })}
+                  {slider('saberHiltWidth', { minimum: 0.25, maximum: 3, step: 0.01, display: percent })}
                   {slider('saberBladeThickness', {
                     minimum: 0.001,
                     maximum: 0.03,
@@ -427,6 +431,14 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
                   }}
                 />
               </SettingRow>
+              {slider('saberTrailDuration', {
+                minimum: 0.05,
+                maximum: 1,
+                step: 0.01,
+                display: (value) => t('milliseconds', { value: format.number(value * 1000, 'integer') }),
+              })}
+              {slider('saberTrailWidth', { minimum: 0.05, maximum: 1, step: 0.01, display: percent })}
+              {slider('saberTrailBrightness', { minimum: 0, maximum: 2, step: 0.01, display: percent })}
               <SettingRow label={t('replayTrailSmoothing')}>
                 <Switch
                   checked={settings.replayTrailSmoothing}
@@ -489,126 +501,126 @@ export function CosmeticsSettings({ settings, environments, onChange }: Cosmetic
             </SettingSection>
             {settings.saberModel === 'default' && (
               <>
-            <Separator />
-            <SettingSection title={t('hilt')}>
-              {slider('saberGripLength', {
-                minimum: 0.02,
-                maximum: 0.3,
-                step: 0.001,
-                display: centimeters,
-              })}
-              {slider('saberGripThickness', {
-                minimum: 0.002,
-                maximum: 0.03,
-                step: 0.0001,
-                display: millimeters,
-              })}
-              {slider('saberGuardSize', {
-                minimum: 0.005,
-                maximum: 0.08,
-                step: 0.0005,
-                display: millimeters,
-              })}
-              {slider('saberGuardThickness', {
-                minimum: 0.0005,
-                maximum: 0.01,
-                step: 0.0001,
-                display: millimeters,
-              })}
-              {slider('saberCollarSize', {
-                minimum: 0.002,
-                maximum: 0.04,
-                step: 0.0005,
-                display: millimeters,
-              })}
-              {slider('saberCollarThickness', {
-                minimum: 0.0005,
-                maximum: 0.01,
-                step: 0.0001,
-                display: millimeters,
-              })}
-              {slider('saberCollarSpacing', {
-                minimum: 0,
-                maximum: 0.2,
-                step: 0.001,
-                display: millimeters,
-              })}
-              {slider('saberRingCount', {
-                minimum: 0,
-                maximum: 5,
-                step: 1,
-                display: integer,
-              })}
-              {slider('saberRingSize', {
-                minimum: 0.002,
-                maximum: 0.03,
-                step: 0.0001,
-                display: millimeters,
-              })}
-              {slider('saberRingThickness', {
-                minimum: 0.001,
-                maximum: 0.02,
-                step: 0.0001,
-                display: millimeters,
-              })}
-              {slider('saberRingSpacing', {
-                minimum: 0,
-                maximum: 0.04,
-                step: 0.0005,
-                display: millimeters,
-              })}
-              {slider('saberPommelLength', {
-                minimum: 0.002,
-                maximum: 0.05,
-                step: 0.0005,
-                display: millimeters,
-              })}
-              {slider('saberPommelThickness', {
-                minimum: 0.002,
-                maximum: 0.03,
-                step: 0.0001,
-                display: millimeters,
-              })}
-            </SettingSection>
-            <Separator />
-            <SettingSection title={t('alignment')}>
-              {slider('saberXOffset', {
-                minimum: -0.25,
-                maximum: 0.25,
-                step: 0.001,
-                display: centimeters,
-              })}
-              {slider('saberYOffset', {
-                minimum: -0.25,
-                maximum: 0.25,
-                step: 0.001,
-                display: centimeters,
-              })}
-              {slider('saberZOffset', {
-                minimum: -0.25,
-                maximum: 0.25,
-                step: 0.001,
-                display: centimeters,
-              })}
-              {slider('saberXRotation', {
-                minimum: -45,
-                maximum: 45,
-                step: 0.1,
-                display: degrees,
-              })}
-              {slider('saberYRotation', {
-                minimum: -45,
-                maximum: 45,
-                step: 0.1,
-                display: degrees,
-              })}
-              {slider('saberZRotation', {
-                minimum: -45,
-                maximum: 45,
-                step: 0.1,
-                display: degrees,
-              })}
-            </SettingSection>
+                <Separator />
+                <SettingSection title={t('hilt')}>
+                  {slider('saberGripLength', {
+                    minimum: 0.02,
+                    maximum: 0.3,
+                    step: 0.001,
+                    display: centimeters,
+                  })}
+                  {slider('saberGripThickness', {
+                    minimum: 0.002,
+                    maximum: 0.03,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                  {slider('saberGuardSize', {
+                    minimum: 0.005,
+                    maximum: 0.08,
+                    step: 0.0005,
+                    display: millimeters,
+                  })}
+                  {slider('saberGuardThickness', {
+                    minimum: 0.0005,
+                    maximum: 0.01,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                  {slider('saberCollarSize', {
+                    minimum: 0.002,
+                    maximum: 0.04,
+                    step: 0.0005,
+                    display: millimeters,
+                  })}
+                  {slider('saberCollarThickness', {
+                    minimum: 0.0005,
+                    maximum: 0.01,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                  {slider('saberCollarSpacing', {
+                    minimum: 0,
+                    maximum: 0.2,
+                    step: 0.001,
+                    display: millimeters,
+                  })}
+                  {slider('saberRingCount', {
+                    minimum: 0,
+                    maximum: 5,
+                    step: 1,
+                    display: integer,
+                  })}
+                  {slider('saberRingSize', {
+                    minimum: 0.002,
+                    maximum: 0.03,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                  {slider('saberRingThickness', {
+                    minimum: 0.001,
+                    maximum: 0.02,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                  {slider('saberRingSpacing', {
+                    minimum: 0,
+                    maximum: 0.04,
+                    step: 0.0005,
+                    display: millimeters,
+                  })}
+                  {slider('saberPommelLength', {
+                    minimum: 0.002,
+                    maximum: 0.05,
+                    step: 0.0005,
+                    display: millimeters,
+                  })}
+                  {slider('saberPommelThickness', {
+                    minimum: 0.002,
+                    maximum: 0.03,
+                    step: 0.0001,
+                    display: millimeters,
+                  })}
+                </SettingSection>
+                <Separator />
+                <SettingSection title={t('alignment')}>
+                  {slider('saberXOffset', {
+                    minimum: -0.25,
+                    maximum: 0.25,
+                    step: 0.001,
+                    display: centimeters,
+                  })}
+                  {slider('saberYOffset', {
+                    minimum: -0.25,
+                    maximum: 0.25,
+                    step: 0.001,
+                    display: centimeters,
+                  })}
+                  {slider('saberZOffset', {
+                    minimum: -0.25,
+                    maximum: 0.25,
+                    step: 0.001,
+                    display: centimeters,
+                  })}
+                  {slider('saberXRotation', {
+                    minimum: -45,
+                    maximum: 45,
+                    step: 0.1,
+                    display: degrees,
+                  })}
+                  {slider('saberYRotation', {
+                    minimum: -45,
+                    maximum: 45,
+                    step: 0.1,
+                    display: degrees,
+                  })}
+                  {slider('saberZRotation', {
+                    minimum: -45,
+                    maximum: 45,
+                    step: 0.1,
+                    display: degrees,
+                  })}
+                </SettingSection>
               </>
             )}
           </AccordionContent>

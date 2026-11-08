@@ -258,7 +258,9 @@ attribute float trailAlpha;
 attribute vec2 trailUv;
 varying float vTrailAlpha;
 varying vec2 vTrailUv;
+varying vec2 vUv;
 void main() {
+  vUv = uv;
   vTrailAlpha = trailAlpha;
   vTrailUv = trailUv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -267,6 +269,10 @@ void main() {
 
 export const SABER_TRAIL_FRAG = /* glsl */ `
 uniform vec3 _Color;
+uniform float _Brightness;
+uniform float _Duration;
+uniform float _TrailFade;
+varying vec2 vUv;
 #ifdef CUSTOM_TRAIL_TEXTURE
 uniform sampler2D _TrailTexture;
 #endif
@@ -277,9 +283,15 @@ void main() {
   #ifdef CUSTOM_TRAIL_TEXTURE
   vec4 trailTexture = texture2D(_TrailTexture, vTrailUv);
   textureSignal = max(trailTexture.r, max(trailTexture.g, trailTexture.b));
-  #endif
   float alpha = vTrailAlpha * textureSignal * 0.72;
   gl_FragColor = vec4(_Color * textureSignal * (0.55 + vTrailAlpha * 0.8), alpha);
+  #else
+  float along = vUv.x;
+  float fresh = 1.0 - vUv.y;
+  float intensity = pow(fresh, _TrailFade + 0.4) * pow(smoothstep(0.0, 0.35, along), 2.2) * pow(smoothstep(0.0, 0.05, 1.0 - along), 2.2) * _Brightness;
+  float hot = (1.0 - smoothstep(0.0, 0.04, vUv.y * _Duration)) * along * along;
+  gl_FragColor = vec4(mix(_Color, vec3(1.0), hot * 0.6) * intensity, intensity * 0.3);
+  #endif
   #include <colorspace_fragment>
 }
 `;

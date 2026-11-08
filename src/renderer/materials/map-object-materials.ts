@@ -247,8 +247,11 @@ export function createSaberTrailMaterial(color: Rgb, texture?: Texture) {
     uniforms: {
       _Color: { value: linearColor(color) },
       _TrailTexture: { value: texture ?? null },
+      _Brightness: { value: 1 },
+      _Duration: { value: 1 },
+      _TrailFade: { value: 1.6 },
     },
-    transparent: true,
+    ...(texture === undefined ? additive : { transparent: true }),
     depthWrite: false,
     side: DoubleSide,
   });

@@ -42,6 +42,13 @@ export interface ViewerSettings {
   saberScale: number;
   saberWidth: number;
   saberBladeLength: number;
+  saberBladeWidth: number;
+  saberTipWidth: number;
+  saberHiltLength: number;
+  saberHiltWidth: number;
+  saberTrailDuration: number;
+  saberTrailWidth: number;
+  saberTrailBrightness: number;
   saberBladeThickness: number;
   saberCoreThickness: number;
   saberCoreInset: number;
@@ -153,6 +160,9 @@ export type ReplayTrailSettings = Pick<
   | 'replayTrailOpacity'
   | 'replayTrailMotionThreshold'
   | 'replayTrailSmoothing'
+  | 'saberTrailDuration'
+  | 'saberTrailWidth'
+  | 'saberTrailBrightness'
 >;
 
 export type ReplaySaberSettings = Pick<
@@ -162,6 +172,13 @@ export type ReplaySaberSettings = Pick<
   | 'saberScale'
   | 'saberWidth'
   | 'saberBladeLength'
+  | 'saberBladeWidth'
+  | 'saberTipWidth'
+  | 'saberHiltLength'
+  | 'saberHiltWidth'
+  | 'saberTrailDuration'
+  | 'saberTrailWidth'
+  | 'saberTrailBrightness'
   | 'saberBladeThickness'
   | 'saberCoreThickness'
   | 'saberCoreInset'
@@ -224,6 +241,9 @@ export const DEFAULT_REPLAY_TRAIL_SETTINGS: ReplayTrailSettings = {
   replayTrailOpacity: 1,
   replayTrailMotionThreshold: 0.002,
   replayTrailSmoothing: true,
+  saberTrailDuration: 0.29,
+  saberTrailWidth: 0.25,
+  saberTrailBrightness: 1,
 };
 
 export const DEFAULT_REPLAY_SABER_SETTINGS: ReplaySaberSettings = {
@@ -232,6 +252,10 @@ export const DEFAULT_REPLAY_SABER_SETTINGS: ReplaySaberSettings = {
   saberScale: 1,
   saberWidth: 1,
   saberBladeLength: 1,
+  saberBladeWidth: 1,
+  saberTipWidth: 0.2,
+  saberHiltLength: 0.16,
+  saberHiltWidth: 1,
   saberBladeThickness: 0.0075,
   saberCoreThickness: 0.003,
   saberCoreInset: 0.004,
@@ -393,6 +417,13 @@ const viewerSettingsObjectSchema = z.object({
   saberScale: numberSetting(DEFAULT_VIEWER_SETTINGS.saberScale, 0.25, 3),
   saberWidth: numberSetting(DEFAULT_VIEWER_SETTINGS.saberWidth, 0.25, 3),
   saberBladeLength: numberSetting(DEFAULT_VIEWER_SETTINGS.saberBladeLength, 0.1, 2),
+  saberBladeWidth: numberSetting(DEFAULT_VIEWER_SETTINGS.saberBladeWidth, 0.25, 4),
+  saberTipWidth: numberSetting(DEFAULT_VIEWER_SETTINGS.saberTipWidth, 0, 1),
+  saberHiltLength: numberSetting(DEFAULT_VIEWER_SETTINGS.saberHiltLength, 0.04, 0.4),
+  saberHiltWidth: numberSetting(DEFAULT_VIEWER_SETTINGS.saberHiltWidth, 0.25, 3),
+  saberTrailDuration: numberSetting(DEFAULT_VIEWER_SETTINGS.saberTrailDuration, 0.05, 1),
+  saberTrailWidth: numberSetting(DEFAULT_VIEWER_SETTINGS.saberTrailWidth, 0.05, 1),
+  saberTrailBrightness: numberSetting(DEFAULT_VIEWER_SETTINGS.saberTrailBrightness, 0, 2),
   saberBladeThickness: numberSetting(DEFAULT_VIEWER_SETTINGS.saberBladeThickness, 0.001, 0.03),
   saberCoreThickness: numberSetting(DEFAULT_VIEWER_SETTINGS.saberCoreThickness, 0.0005, 0.02),
   saberCoreInset: numberSetting(DEFAULT_VIEWER_SETTINGS.saberCoreInset, 0, 0.2),

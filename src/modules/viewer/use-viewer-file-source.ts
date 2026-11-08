@@ -23,7 +23,6 @@ import type { DifficultyRow, MapIdentity, MapMeta, ViewerSourceLink } from './vi
 
 export interface PendingSharedView {
   autoplay?: boolean;
-  difficultyIndex?: number;
   beat?: number;
   startSeconds?: number;
   difficultyRank?: number;

@@ -1,7 +1,6 @@
 import {
   BufferAttribute,
   BufferGeometry,
-  ConeGeometry,
   CylinderGeometry,
   Group,
   Mesh,
@@ -33,109 +32,46 @@ export interface ReplaySaberModel {
   geometries: BufferGeometry[];
   blade: Mesh;
   core: Mesh;
+  tipWidth: number;
+  hilt: Group;
   guard: Mesh;
   grip: Mesh;
   collars: Mesh[];
-  rings: Mesh[];
   pommel: Mesh;
+  rings: Mesh[];
+}
+
+interface TrailNode {
+  time: number;
+  base: Vector3;
+  axis: Vector3;
 }
 
 export interface ReplaySaberTrail {
   mesh: Mesh<BufferGeometry, ShaderMaterial>;
-  material: ShaderMaterial;
-  samples: { base: Vector3; tip: Vector3 }[];
-  sourceSamples: { base: Vector3; tip: Vector3 }[];
-  samplePool: { base: Vector3; tip: Vector3 }[];
+  nodes: TrailNode[];
+  head: TrailNode;
   settings: ReplayTrailSettings;
 }
 
-const replayTrailPredictionSpacing = 0.1;
-const maximumReplayTrailPredictions = 4;
-
-function acquireTrailSample(trail: ReplaySaberTrail) {
-  const recycled = trail.samplePool.pop();
-  return recycled ?? { base: new Vector3(), tip: new Vector3() };
-}
-
-function appendTrailSample(trail: ReplaySaberTrail, base: Vector3, tip: Vector3) {
-  const sample = acquireTrailSample(trail);
-  sample.base.copy(base);
-  sample.tip.copy(tip);
-  trail.samples.push(sample);
-}
-
-function tangentScale(before: Vector3, start: Vector3, end: Vector3) {
-  const previousLength = before.distanceTo(start);
-  return previousLength > 0 ? Math.min(start.distanceTo(end) / previousLength, 1) : 0;
-}
-
-function setHermitePoint(
-  target: Vector3,
-  before: Vector3,
-  start: Vector3,
-  end: Vector3,
-  previousScale: number,
-  t: number,
-) {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  const startWeight = 2 * t3 - 3 * t2 + 1;
-  const startTangentWeight = t3 - 2 * t2 + t;
-  const endWeight = -2 * t3 + 3 * t2;
-  const endTangentWeight = t3 - t2;
-  target.set(
-    startWeight * start.x +
-      startTangentWeight * (start.x - before.x) * previousScale +
-      endWeight * end.x +
-      endTangentWeight * (end.x - start.x),
-    startWeight * start.y +
-      startTangentWeight * (start.y - before.y) * previousScale +
-      endWeight * end.y +
-      endTangentWeight * (end.y - start.y),
-    startWeight * start.z +
-      startTangentWeight * (start.z - before.z) * previousScale +
-      endWeight * end.z +
-      endTangentWeight * (end.z - start.z),
-  );
-}
-
-function appendPredictedTrailSample(
-  trail: ReplaySaberTrail,
-  before: { base: Vector3; tip: Vector3 },
-  start: { base: Vector3; tip: Vector3 },
-  base: Vector3,
-  tip: Vector3,
-  baseTangentScale: number,
-  tipTangentScale: number,
-  t: number,
-) {
-  const sample = acquireTrailSample(trail);
-  setHermitePoint(sample.base, before.base, start.base, base, baseTangentScale, t);
-  setHermitePoint(sample.tip, before.tip, start.tip, tip, tipTangentScale, t);
-  trail.samples.push(sample);
-}
-
-function appendLinearTrailSample(
-  trail: ReplaySaberTrail,
-  start: { base: Vector3; tip: Vector3 },
-  base: Vector3,
-  tip: Vector3,
-  t: number,
-) {
-  const sample = acquireTrailSample(trail);
-  sample.base.lerpVectors(start.base, base, t);
-  sample.tip.lerpVectors(start.tip, tip, t);
-  trail.samples.push(sample);
-}
-
-function rememberTrailSourceSample(trail: ReplaySaberTrail, base: Vector3, tip: Vector3) {
-  const recycled =
-    trail.sourceSamples.length >= trail.settings.replayTrailSamples ? trail.sourceSamples.shift() : undefined;
-  const sample = recycled ?? { base: new Vector3(), tip: new Vector3() };
-  sample.base.copy(base);
-  sample.tip.copy(tip);
-  trail.sourceSamples.push(sample);
-}
+const BLADE_RADIUS = 0.009;
+const CORE_RADIUS = 0.0036;
+const CORE_INSET = 0.004;
+const GRIP_START = 0.0032;
+const GRIP_LENGTH = 0.1424;
+const GRIP_RADIUS = 0.009;
+const GUARD_SIZE = 0.033;
+const GUARD_THICKNESS = 0.002;
+const COLLAR_SIZE = 0.0106;
+const COLLAR_THICKNESS = 0.002;
+const COLLAR_SPACING = 0.1408;
+const RING_SIZE = 0.0096;
+const RING_THICKNESS = 0.005;
+const POMMEL_LENGTH = 0.0144;
+const POMMEL_RADIUS = 0.0098;
+const HILT_LENGTH = GRIP_START + GRIP_LENGTH + POMMEL_LENGTH;
+const HILT_WIDTH = 1.05;
+const MAX_RINGS = 5;
 
 function cylinder(radius: number, length: number, segments = 12) {
   const geometry = new CylinderGeometry(radius, radius, length, segments);
@@ -143,221 +79,168 @@ function cylinder(radius: number, length: number, segments = 12) {
   return geometry;
 }
 
-function cone(radius: number, length: number) {
-  const geometry = new ConeGeometry(radius, length, 12);
+function taper(radius: number, length: number, tipWidth: number) {
+  const geometry = new CylinderGeometry(radius * tipWidth, radius, length, 12);
   geometry.rotateX(-Math.PI / 2);
   return geometry;
 }
 
 export function createReplaySaber(materials: SaberMaterials): ReplaySaberModel {
   const root = new Group();
+  const hilt = new Group();
   const geometries: BufferGeometry[] = [];
-  function add(geometry: BufferGeometry, material: Material, z: number) {
+  function add(parent: Object3D, geometry: BufferGeometry, material: Material, z: number) {
     const mesh = new Mesh(geometry, material);
     mesh.position.z = z;
-    root.add(mesh);
+    parent.add(mesh);
     geometries.push(geometry);
     return mesh;
   }
 
-  const defaults = DEFAULT_REPLAY_SABER_SETTINGS;
-  const blade = add(cone(defaults.saberBladeThickness, defaults.saberBladeLength), materials.blade, 0);
-  const core = add(
-    cone(defaults.saberCoreThickness, defaults.saberBladeLength - defaults.saberCoreInset),
-    materials.core,
-    0,
-  );
-  const guard = add(
-    new TorusGeometry(defaults.saberGuardSize, defaults.saberGuardThickness, 6, 32),
-    materials.blade,
-    0,
-  );
-  const grip = add(cylinder(defaults.saberGripThickness, defaults.saberGripLength, 16), materials.grip, 0);
-  const collars = [
-    add(new TorusGeometry(defaults.saberCollarSize, defaults.saberCollarThickness, 6, 24), materials.blade, 0),
-    add(new TorusGeometry(defaults.saberCollarSize, defaults.saberCollarThickness, 6, 24), materials.blade, 0),
-  ];
-  const rings: Mesh[] = [];
-  for (let index = 0; index < 5; index++) {
-    rings.push(add(cylinder(defaults.saberRingSize, defaults.saberRingThickness, 16), materials.metal, 0));
+  const blade = add(root, taper(BLADE_RADIUS, 1, 0), materials.blade, 0);
+  const core = add(root, taper(CORE_RADIUS, 1 - CORE_INSET, 0), materials.core, 0);
+  const guard = add(hilt, new TorusGeometry(GUARD_SIZE, GUARD_THICKNESS, 6, 32), materials.blade, GUARD_THICKNESS);
+  const grip = add(hilt, cylinder(GRIP_RADIUS, GRIP_LENGTH, 16), materials.grip, GRIP_START + GRIP_LENGTH / 2);
+  const collars: Mesh[] = [];
+  for (const side of [-0.5, 0.5]) {
+    collars.push(
+      add(
+        hilt,
+        new TorusGeometry(COLLAR_SIZE, COLLAR_THICKNESS, 6, 24),
+        materials.blade,
+        HILT_LENGTH / 2 + 0.008 + side * COLLAR_SPACING,
+      ),
+    );
   }
-  const pommel = add(cylinder(defaults.saberPommelThickness, defaults.saberPommelLength), materials.metal, 0);
+  const rings = Array.from({ length: MAX_RINGS }, () =>
+    add(hilt, cylinder(RING_SIZE, RING_THICKNESS, 16), materials.metal, 0),
+  );
+  const pommel = add(
+    hilt,
+    cylinder(POMMEL_RADIUS, POMMEL_LENGTH),
+    materials.metal,
+    GRIP_START + GRIP_LENGTH + POMMEL_LENGTH / 2,
+  );
 
   const trailBase = new Object3D();
   const tip = new Object3D();
-  root.add(trailBase, tip);
-  const saber = { root, trailBase, tip, geometries, blade, core, guard, grip, collars, rings, pommel };
-  setReplaySaberSettings(saber, defaults);
+  root.add(hilt, trailBase, tip);
+  const saber = {
+    root,
+    trailBase,
+    tip,
+    geometries,
+    blade,
+    core,
+    tipWidth: 0,
+    hilt,
+    guard,
+    grip,
+    collars,
+    pommel,
+    rings,
+  };
+  setReplaySaberSettings(saber, DEFAULT_REPLAY_SABER_SETTINGS);
   return saber;
 }
 
+function replaceGeometry(saber: ReplaySaberModel, mesh: Mesh, geometry: BufferGeometry) {
+  mesh.geometry.dispose();
+  saber.geometries[saber.geometries.indexOf(mesh.geometry)] = geometry;
+  mesh.geometry = geometry;
+}
+
 export function setReplaySaberSettings(saber: ReplaySaberModel, settings: ReplaySaberSettings) {
-  const bladeBase = 0;
-  const bladeLength = settings.saberBladeLength;
-  const bladeCenter = bladeBase - bladeLength / 2;
-  const coreLength = Math.max(bladeLength - settings.saberCoreInset, 0.01);
-  const gripStart = 0.0032;
-  const hiltEnd = gripStart + settings.saberGripLength + settings.saberPommelLength;
+  const length = settings.saberBladeLength;
+  if (settings.saberTipWidth !== saber.tipWidth) {
+    saber.tipWidth = settings.saberTipWidth;
+    replaceGeometry(saber, saber.blade, taper(BLADE_RADIUS, 1, saber.tipWidth));
+    replaceGeometry(saber, saber.core, taper(CORE_RADIUS, 1 - CORE_INSET, saber.tipWidth));
+  }
   saber.root.visible = settings.showSabers;
   saber.root.scale.set(
     settings.saberScale * settings.saberWidth,
     settings.saberScale * settings.saberWidth,
     settings.saberScale,
   );
-
-  saber.blade.position.z = bladeCenter;
-  saber.blade.scale.set(
-    settings.saberBladeThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberBladeThickness,
-    settings.saberBladeThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberBladeThickness,
-    bladeLength / DEFAULT_REPLAY_SABER_SETTINGS.saberBladeLength,
-  );
-  saber.core.position.z = bladeCenter;
-  saber.core.scale.set(
-    settings.saberCoreThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberCoreThickness,
-    settings.saberCoreThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberCoreThickness,
-    coreLength / (DEFAULT_REPLAY_SABER_SETTINGS.saberBladeLength - DEFAULT_REPLAY_SABER_SETTINGS.saberCoreInset),
-  );
-
-  saber.guard.position.z = bladeBase + settings.saberGuardThickness;
+  saber.blade.position.z = -length / 2;
+  const bladeWidth =
+    (settings.saberBladeWidth * settings.saberBladeThickness) / DEFAULT_REPLAY_SABER_SETTINGS.saberBladeThickness;
+  const coreWidth =
+    (settings.saberBladeWidth * settings.saberCoreThickness) / DEFAULT_REPLAY_SABER_SETTINGS.saberCoreThickness;
+  saber.blade.scale.set(bladeWidth, bladeWidth, length);
+  saber.core.position.z = -length / 2;
+  saber.core.scale.set(coreWidth, coreWidth, Math.max(length - settings.saberCoreInset, 0.01) / (1 - CORE_INSET));
+  const hiltWidth = settings.saberHiltWidth * HILT_WIDTH;
+  saber.hilt.scale.set(hiltWidth, hiltWidth, settings.saberHiltLength / HILT_LENGTH);
+  const defaults = DEFAULT_REPLAY_SABER_SETTINGS;
+  const hiltLength = GRIP_START + settings.saberGripLength + settings.saberPommelLength;
+  saber.guard.position.z = settings.saberGuardThickness;
   saber.guard.scale.set(
-    settings.saberGuardSize / DEFAULT_REPLAY_SABER_SETTINGS.saberGuardSize,
-    settings.saberGuardSize / DEFAULT_REPLAY_SABER_SETTINGS.saberGuardSize,
-    settings.saberGuardThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberGuardThickness,
+    settings.saberGuardSize / defaults.saberGuardSize,
+    settings.saberGuardSize / defaults.saberGuardSize,
+    settings.saberGuardThickness / defaults.saberGuardThickness,
   );
-  saber.grip.position.z = bladeBase + gripStart + settings.saberGripLength / 2;
+  saber.grip.position.z = GRIP_START + settings.saberGripLength / 2;
   saber.grip.scale.set(
-    settings.saberGripThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberGripThickness,
-    settings.saberGripThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberGripThickness,
-    settings.saberGripLength / DEFAULT_REPLAY_SABER_SETTINGS.saberGripLength,
+    settings.saberGripThickness / defaults.saberGripThickness,
+    settings.saberGripThickness / defaults.saberGripThickness,
+    settings.saberGripLength / defaults.saberGripLength,
   );
-
   saber.collars.forEach((collar, index) => {
-    collar.position.z = bladeBase + hiltEnd / 2 + 0.008 + (index === 0 ? -0.5 : 0.5) * settings.saberCollarSpacing;
+    collar.position.z = hiltLength / 2 + 0.008 + (index === 0 ? -0.5 : 0.5) * settings.saberCollarSpacing;
     collar.scale.set(
-      settings.saberCollarSize / DEFAULT_REPLAY_SABER_SETTINGS.saberCollarSize,
-      settings.saberCollarSize / DEFAULT_REPLAY_SABER_SETTINGS.saberCollarSize,
-      settings.saberCollarThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberCollarThickness,
+      settings.saberCollarSize / defaults.saberCollarSize,
+      settings.saberCollarSize / defaults.saberCollarSize,
+      settings.saberCollarThickness / defaults.saberCollarThickness,
     );
   });
-
+  saber.pommel.position.z = GRIP_START + settings.saberGripLength + settings.saberPommelLength / 2;
+  saber.pommel.scale.set(
+    settings.saberPommelThickness / defaults.saberPommelThickness,
+    settings.saberPommelThickness / defaults.saberPommelThickness,
+    settings.saberPommelLength / defaults.saberPommelLength,
+  );
   saber.rings.forEach((ring, index) => {
     ring.visible = index < settings.saberRingCount;
-    ring.position.z =
-      bladeBase + hiltEnd * 0.53 + (index - (settings.saberRingCount - 1) / 2) * settings.saberRingSpacing;
+    ring.position.z = hiltLength * 0.53 + (index - (settings.saberRingCount - 1) / 2) * settings.saberRingSpacing;
     ring.scale.set(
-      settings.saberRingSize / DEFAULT_REPLAY_SABER_SETTINGS.saberRingSize,
-      settings.saberRingSize / DEFAULT_REPLAY_SABER_SETTINGS.saberRingSize,
-      settings.saberRingThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberRingThickness,
+      settings.saberRingSize / defaults.saberRingSize,
+      settings.saberRingSize / defaults.saberRingSize,
+      settings.saberRingThickness / defaults.saberRingThickness,
     );
   });
-
-  saber.pommel.position.z = bladeBase + gripStart + settings.saberGripLength + settings.saberPommelLength / 2;
-  saber.pommel.scale.set(
-    settings.saberPommelThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberPommelThickness,
-    settings.saberPommelThickness / DEFAULT_REPLAY_SABER_SETTINGS.saberPommelThickness,
-    settings.saberPommelLength / DEFAULT_REPLAY_SABER_SETTINGS.saberPommelLength,
-  );
-  saber.tip.position.z = bladeBase - bladeLength;
-  saber.trailBase.position.z = saber.tip.position.z + settings.replayTrailLength;
+  saber.tip.position.z = -length;
+  saber.trailBase.position.z = -length * (1 - settings.saberTrailWidth);
 }
 
 function configureTrailGeometry(trail: ReplaySaberTrail) {
-  const trailSamples =
-    trail.settings.replayTrailSamples * (trail.settings.replayTrailSmoothing ? maximumReplayTrailPredictions + 1 : 1);
+  // Retain the fork's sample budget while sampling the upstream trail in song time.
+  const rows = Math.max(2, trail.settings.replayTrailSamples * (trail.settings.replayTrailSmoothing ? 5 : 1));
   const geometry = trail.mesh.geometry;
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array(trailSamples * 6), 3));
-  geometry.setAttribute('trailAlpha', new BufferAttribute(new Float32Array(trailSamples * 2), 1));
-  geometry.setAttribute('trailUv', new BufferAttribute(new Float32Array(trailSamples * 4), 2));
-  const indices = new Uint16Array((trailSamples - 1) * 6);
-  for (let index = 0; index < trailSamples - 1; index++) {
-    const offset = index * 6;
-    const vertex = index * 2;
-    indices.set([vertex, vertex + 1, vertex + 2, vertex + 2, vertex + 1, vertex + 3], offset);
+  const trailUv = new Float32Array(rows * 4);
+  const alpha = new Float32Array(rows * 2);
+  const uv = new Float32Array(rows * 4);
+  const indices = new Uint16Array((rows - 1) * 6);
+  for (let row = 0; row < rows; row++) {
+    const age = row / (rows - 1);
+    uv.set([0, age, 1, age], row * 4);
+    // Custom textures run from the live edge (u=0) to the oldest edge (u=1).
+    trailUv.set([age, 1, age, 0], row * 4);
+    const opacity =
+      (1 - age) ** trail.settings.replayTrailFade *
+      trail.settings.replayTrailOpacity *
+      trail.settings.saberTrailBrightness;
+    alpha.fill(opacity, row * 2, row * 2 + 2);
+    if (row === rows - 1) continue;
+    const vertex = row * 2;
+    indices.set([vertex, vertex + 1, vertex + 2, vertex + 2, vertex + 1, vertex + 3], row * 6);
   }
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(rows * 6), 3));
+  geometry.setAttribute('uv', new BufferAttribute(uv, 2));
+  geometry.setAttribute('trailUv', new BufferAttribute(trailUv, 2));
+  geometry.setAttribute('trailAlpha', new BufferAttribute(alpha, 1));
   geometry.setIndex(new BufferAttribute(indices, 1));
-}
-
-function recycleRenderedTrailSamples(trail: ReplaySaberTrail) {
-  while (trail.samples.length > 0) {
-    const sample = trail.samples.pop();
-    if (sample !== undefined) trail.samplePool.push(sample);
-  }
-}
-
-function rebuildReplaySaberTrail(trail: ReplaySaberTrail) {
-  recycleRenderedTrailSamples(trail);
-  const first = trail.sourceSamples[0];
-  if (first === undefined) {
-    trail.mesh.geometry.setDrawRange(0, 0);
-    return;
-  }
-
-  appendTrailSample(trail, first.base, first.tip);
-  for (let sourceIndex = 1; sourceIndex < trail.sourceSamples.length; sourceIndex++) {
-    const start = trail.sourceSamples[sourceIndex - 1];
-    const end = trail.sourceSamples[sourceIndex];
-    if (start === undefined || end === undefined) continue;
-    const before = trail.sourceSamples[sourceIndex - 2];
-    const predictions = trail.settings.replayTrailSmoothing
-      ? Math.min(
-          maximumReplayTrailPredictions,
-          Math.max(0, Math.ceil(start.tip.distanceTo(end.tip) / replayTrailPredictionSpacing) - 1),
-        )
-      : 0;
-    const baseTangentScale = before === undefined ? 0 : tangentScale(before.base, start.base, end.base);
-    const tipTangentScale = before === undefined ? 0 : tangentScale(before.tip, start.tip, end.tip);
-    for (let predictionIndex = 1; predictionIndex <= predictions; predictionIndex++) {
-      const t = predictionIndex / (predictions + 1);
-      if (before === undefined) appendLinearTrailSample(trail, start, end.base, end.tip, t);
-      else {
-        appendPredictedTrailSample(
-          trail,
-          before,
-          start,
-          end.base,
-          end.tip,
-          baseTangentScale,
-          tipTangentScale,
-          t,
-        );
-      }
-    }
-    appendTrailSample(trail, end.base, end.tip);
-  }
-  writeReplaySaberTrail(trail);
-}
-
-function writeReplaySaberTrail(trail: ReplaySaberTrail) {
-  const position = trail.mesh.geometry.getAttribute('position');
-  const alpha = trail.mesh.geometry.getAttribute('trailAlpha');
-  const uv = trail.mesh.geometry.getAttribute('trailUv');
-  const denominator = Math.max(trail.samples.length - 1, 1);
-  trail.samples.forEach((sample, index) => {
-    const span = index / denominator;
-    const styleCollapse = trail.settings.replayTrailStyle === 'flag' ? (1 - span) * 0.5 : 0;
-    const collapse = styleCollapse + (0.5 - styleCollapse) * trail.settings.replayTrailThinness;
-    position.setXYZ(
-      index * 2,
-      sample.base.x + (sample.tip.x - sample.base.x) * collapse,
-      sample.base.y + (sample.tip.y - sample.base.y) * collapse,
-      sample.base.z + (sample.tip.z - sample.base.z) * collapse,
-    );
-    position.setXYZ(
-      index * 2 + 1,
-      sample.tip.x + (sample.base.x - sample.tip.x) * collapse,
-      sample.tip.y + (sample.base.y - sample.tip.y) * collapse,
-      sample.tip.z + (sample.base.z - sample.tip.z) * collapse,
-    );
-    const opacity = span ** trail.settings.replayTrailFade * trail.settings.replayTrailOpacity;
-    alpha.setX(index * 2, opacity);
-    alpha.setX(index * 2 + 1, opacity);
-    uv.setXY(index * 2, 1 - span, 1);
-    uv.setXY(index * 2 + 1, 1 - span, 0);
-  });
-  position.needsUpdate = true;
-  alpha.needsUpdate = true;
-  uv.needsUpdate = true;
-  trail.mesh.geometry.setDrawRange(0, Math.max(trail.samples.length - 1, 0) * 6);
 }
 
 export function createReplaySaberTrail(
@@ -368,41 +251,116 @@ export function createReplaySaberTrail(
   geometry.setDrawRange(0, 0);
   const mesh = new Mesh(geometry, material);
   mesh.frustumCulled = false;
-  mesh.visible = settings.showSaberTrails;
-  const trail = { mesh, material, samples: [], sourceSamples: [], samplePool: [], settings: { ...settings } };
-  configureTrailGeometry(trail);
+  const trail = {
+    mesh,
+    nodes: [],
+    head: { time: 0, base: new Vector3(), axis: new Vector3() },
+    settings: { ...settings },
+  };
+  setReplaySaberTrailSettings(trail, settings);
   return trail;
 }
 
 export function setReplaySaberTrailSettings(trail: ReplaySaberTrail, settings: ReplayTrailSettings) {
-  const geometryChanged =
-    settings.replayTrailSamples !== trail.settings.replayTrailSamples ||
-    settings.replayTrailSmoothing !== trail.settings.replayTrailSmoothing;
   trail.settings = { ...settings };
   trail.mesh.visible = settings.showSaberTrails;
-  if (trail.sourceSamples.length > settings.replayTrailSamples) {
-    trail.sourceSamples.splice(0, trail.sourceSamples.length - settings.replayTrailSamples);
-  }
-  if (geometryChanged) configureTrailGeometry(trail);
-  rebuildReplaySaberTrail(trail);
+  const { _Brightness, _Duration } = trail.mesh.material.uniforms;
+  if (_Brightness !== undefined) _Brightness.value = settings.saberTrailBrightness * settings.replayTrailOpacity;
+  const fade = trail.mesh.material.uniforms._TrailFade;
+  if (fade !== undefined) fade.value = settings.replayTrailFade;
+  if (_Duration !== undefined) _Duration.value = settings.saberTrailDuration;
+  configureTrailGeometry(trail);
 }
 
 export function setReplaySaberTrailMaterial(trail: ReplaySaberTrail, material: ShaderMaterial) {
-  trail.material = material;
   trail.mesh.material = material;
+  setReplaySaberTrailSettings(trail, trail.settings);
 }
 
 export function clearReplaySaberTrail(trail: ReplaySaberTrail) {
-  recycleRenderedTrailSamples(trail);
-  trail.sourceSamples.length = 0;
+  trail.nodes.length = 0;
   trail.mesh.geometry.setDrawRange(0, 0);
 }
 
-export function updateReplaySaberTrail(trail: ReplaySaberTrail, base: Vector3, tip: Vector3) {
-  const previous = trail.sourceSamples.at(-1);
+export function addReplaySaberTrailNode(trail: ReplaySaberTrail, time: number, base: Vector3, tip: Vector3) {
+  const last = trail.nodes.at(-1);
+  if (last !== undefined && time <= last.time) return;
   const threshold = trail.settings.replayTrailMotionThreshold;
-  if (previous !== undefined && previous.tip.distanceToSquared(tip) < threshold * threshold) return;
+  if (
+    last !== undefined &&
+    last.base.distanceToSquared(base) < threshold * threshold &&
+    last.base.clone().add(last.axis).distanceToSquared(tip) < threshold * threshold
+  )
+    return;
+  trail.nodes.push({ time, base: base.clone(), axis: tip.clone().sub(base) });
+}
 
-  rememberTrailSourceSample(trail, base, tip);
-  rebuildReplaySaberTrail(trail);
+const fromTangent = new Vector3();
+const toTangent = new Vector3();
+const basePoint = new Vector3();
+const axis = new Vector3();
+
+function hermite(
+  target: Vector3,
+  key: 'base' | 'axis',
+  previous: TrailNode,
+  from: TrailNode,
+  to: TrailNode,
+  next: TrailNode,
+  amount: number,
+) {
+  const span = to.time - from.time;
+  fromTangent.subVectors(to[key], previous[key]).multiplyScalar(span / (to.time - previous.time));
+  toTangent.subVectors(next[key], from[key]).multiplyScalar(span / (next.time - from.time));
+  const squared = amount * amount;
+  const cubed = squared * amount;
+  return target
+    .copy(from[key])
+    .multiplyScalar(2 * cubed - 3 * squared + 1)
+    .addScaledVector(fromTangent, cubed - 2 * squared + amount)
+    .addScaledVector(to[key], 3 * squared - 2 * cubed)
+    .addScaledVector(toTangent, cubed - squared);
+}
+
+export function updateReplaySaberTrail(trail: ReplaySaberTrail, time: number, base: Vector3, tip: Vector3) {
+  const cutoff = time - trail.settings.saberTrailDuration;
+  const { nodes, head } = trail;
+  while ((nodes[1]?.time ?? Number.POSITIVE_INFINITY) <= cutoff) nodes.shift();
+  head.time = time;
+  head.base.copy(base);
+  head.axis.subVectors(tip, base);
+  const points = nodes.at(-1)?.time === time ? [...nodes] : [...nodes, head];
+  const first = points[0];
+  if (first === undefined || first === head) {
+    trail.mesh.geometry.setDrawRange(0, 0);
+    return;
+  }
+
+  const position = trail.mesh.geometry.getAttribute('position');
+  const rows = position.count / 2;
+  let segment = points.length - 2;
+  for (let row = 0; row < rows; row++) {
+    const sampleTime = Math.max(time - (trail.settings.saberTrailDuration * row) / (rows - 1), first.time);
+    while (segment > 0 && (points[segment]?.time ?? 0) > sampleTime) segment--;
+    const from = points[segment] ?? first;
+    const to = points[segment + 1] ?? from;
+    const span = to.time - from.time;
+    const amount = span <= 0 ? 0 : Math.min(Math.max((sampleTime - from.time) / span, 0), 1);
+    const previous = points[segment - 1] ?? from;
+    const next = points[segment + 2] ?? to;
+    if (trail.settings.replayTrailSmoothing && span > 0) hermite(axis, 'axis', previous, from, to, next, amount);
+    else axis.lerpVectors(from.axis, to.axis, amount);
+    axis.setLength(from.axis.length() + (to.axis.length() - from.axis.length()) * amount);
+    if (trail.settings.replayTrailSmoothing && span > 0) hermite(basePoint, 'base', previous, from, to, next, amount);
+    else basePoint.lerpVectors(from.base, to.base, amount);
+    const age = row / (rows - 1);
+    const styleCollapse = trail.settings.replayTrailStyle === 'flag' ? age * 0.5 : 0;
+    const collapse = styleCollapse + (0.5 - styleCollapse) * trail.settings.replayTrailThinness;
+    basePoint.addScaledVector(axis, collapse);
+    axis.multiplyScalar(1 - 2 * collapse);
+    position.setXYZ(row * 2, basePoint.x, basePoint.y, basePoint.z);
+    position.setXYZ(row * 2 + 1, basePoint.x + axis.x, basePoint.y + axis.y, basePoint.z + axis.z);
+  }
+  position.needsUpdate = true;
+  trail.mesh.geometry.setDrawRange(0, (rows - 1) * 6);
 }

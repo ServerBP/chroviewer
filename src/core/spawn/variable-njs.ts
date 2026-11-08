@@ -13,6 +13,7 @@ export interface SpawnState {
 export interface SpawnProvider {
   baseHalfJumpDurationInBeats: number;
   maxHalfJumpDurationInBeats: number;
+  spawnAheadHalfJumpDurationInBeats: number;
   stateAt(songBpmTime: number): SpawnState;
 }
 
@@ -53,17 +54,25 @@ export function createSpawnProvider(
     recordedJumpDistance !== undefined && recordedJumpDistance > 0 && baseNoteJumpSpeed > 0
       ? recordedJumpDistance / baseNoteJumpSpeed / 2 / oneBeatDuration
       : calculateHalfJumpDuration(baseNoteJumpSpeed, noteStartBeatOffset, songBpm, minimumHalfJumpDurationInBeats);
+  const usesRecordedJumpDuration = recordedJumpDistance !== undefined && recordedJumpDistance > 0;
 
   const events: NjsEvent[] = [
     { jsonTime: 0, songBpmTime: 0, usePrevious: 0, easing: 0, relativeNjs: 0 },
     ...[...njsEvents].sort((a, b) => a.songBpmTime - b.songBpmTime),
   ];
+  const minimumRelativeNjs = Math.min(0, ...njsEvents.map((event) => event.relativeNjs));
+  const minimumSpeedFactor = Math.min(Math.max(baseNoteJumpSpeed + minimumRelativeNjs, 0.01) / baseNoteJumpSpeed, 1);
+  const spawnAheadHalfJumpDurationInBeats = usesRecordedJumpDuration
+    ? baseHalfJumpDurationInBeats
+    : baseHalfJumpDurationInBeats / minimumSpeedFactor;
 
   let maxHalfJumpDurationInBeats = 0;
   const resolved: number[] = [];
   for (const event of events) {
     const insertRelativeNjs = event.usePrevious === 1 ? 0 : event.relativeNjs;
-    const factor = Math.min((baseNoteJumpSpeed + insertRelativeNjs) / baseNoteJumpSpeed, 1);
+    const factor = usesRecordedJumpDuration
+      ? 1
+      : Math.min(Math.max(baseNoteJumpSpeed + insertRelativeNjs, 0.01) / baseNoteJumpSpeed, 1);
     maxHalfJumpDurationInBeats = Math.max(maxHalfJumpDurationInBeats, Math.ceil(baseHalfJumpDurationInBeats / factor));
     const previous = resolved[resolved.length - 1] ?? 0;
     resolved.push(event.usePrevious === 1 ? previous : event.relativeNjs);
@@ -82,7 +91,7 @@ export function createSpawnProvider(
   });
 
   function stateFor(noteJumpSpeed: number): SpawnState {
-    const factor = Math.min(noteJumpSpeed / baseNoteJumpSpeed, 1);
+    const factor = usesRecordedJumpDuration ? 1 : Math.min(noteJumpSpeed / baseNoteJumpSpeed, 1);
     const halfJumpDuration = (oneBeatDuration * baseHalfJumpDurationInBeats) / factor;
     const jumpDuration = halfJumpDuration * 2;
     const jumpDistance = noteJumpSpeed * jumpDuration;
@@ -112,5 +121,5 @@ export function createSpawnProvider(
     return stateFor(noteJumpSpeed);
   }
 
-  return { baseHalfJumpDurationInBeats, maxHalfJumpDurationInBeats, stateAt };
+  return { baseHalfJumpDurationInBeats, maxHalfJumpDurationInBeats, spawnAheadHalfJumpDurationInBeats, stateAt };
 }

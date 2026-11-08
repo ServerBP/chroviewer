@@ -35,6 +35,7 @@ interface ViewerSessionOptions {
   lightshowMode: LightshowMode;
   lightshowModeRef: RefObject<LightshowMode>;
   authoritativeLightshowMode?: LightshowMode | null;
+  requestedMapRow?: DifficultyRow;
   skipInitialMenuEnvironment: boolean;
   setActivePanel: Dispatch<SetStateAction<ViewerPanel>>;
   setError: (message: string) => void;
@@ -68,6 +69,7 @@ export function useViewerSession({
   lightshowMode,
   lightshowModeRef,
   authoritativeLightshowMode = null,
+  requestedMapRow,
   skipInitialMenuEnvironment,
   setActivePanel,
   setError,
@@ -196,12 +198,19 @@ export function useViewerSession({
     settings.saberCollarSize,
     settings.saberCollarThickness,
     settings.saberCollarSpacing,
+    settings.saberBladeWidth,
+    settings.saberTipWidth,
+    settings.saberHiltLength,
+    settings.saberHiltWidth,
     settings.saberRingCount,
     settings.saberRingSize,
     settings.saberRingThickness,
     settings.saberRingSpacing,
     settings.saberPommelLength,
     settings.saberPommelThickness,
+    settings.saberTrailDuration,
+    settings.saberTrailWidth,
+    settings.saberTrailBrightness,
     settings.saberXOffset,
     settings.saberYOffset,
     settings.saberZOffset,
@@ -418,29 +427,37 @@ export function useViewerSession({
 
   useEffect(() => {
     const pending = sources.pendingSharedViewRef.current;
-    if (!viewerReady || pending === null || sources.rows.length === 0 || sources.songBpm <= 0) return;
-    const indexedRow = pending.difficultyIndex === undefined ? undefined : sources.rows[pending.difficultyIndex];
-    const requestedCharacteristic = pending.characteristic?.toLowerCase();
-    const requestedRow = sources.rows.find(
-      (candidate) =>
-        candidate.infoDifficulty !== undefined &&
-        (pending.difficultyRank === undefined ||
-          difficultyRank(candidate.infoDifficulty.difficulty) === pending.difficultyRank) &&
-        (requestedCharacteristic === undefined ||
-          candidate.infoDifficulty.characteristic.toLowerCase() === requestedCharacteristic ||
-          `solo${candidate.infoDifficulty.characteristic.toLowerCase()}` === requestedCharacteristic),
-    );
+    if (
+      !viewerReady ||
+      (pending === null && requestedMapRow === undefined) ||
+      sources.rows.length === 0 ||
+      sources.songBpm <= 0
+    )
+      return;
+    const requestedCharacteristic = pending?.characteristic?.toLowerCase();
+    const requestedRow =
+      pending?.difficultyRank === undefined && requestedCharacteristic === undefined
+        ? undefined
+        : sources.rows.find(
+            (candidate) =>
+              candidate.infoDifficulty !== undefined &&
+              (pending?.difficultyRank === undefined ||
+                difficultyRank(candidate.infoDifficulty.difficulty) === pending?.difficultyRank) &&
+              (requestedCharacteristic === undefined ||
+                candidate.infoDifficulty.characteristic.toLowerCase() === requestedCharacteristic ||
+                `solo${candidate.infoDifficulty.characteristic.toLowerCase()}` === requestedCharacteristic),
+          );
     const row =
+      requestedMapRow ??
       (requestedRow?.difficulty === undefined ? undefined : requestedRow) ??
-      (indexedRow?.difficulty === undefined ? undefined : indexedRow) ??
       sources.rows.find((candidate) => sources.replayRef.current !== null && candidate.replayMatch === true) ??
       sources.rows.find((candidate) => candidate.difficulty !== undefined);
     if (row === undefined) return;
     sources.pendingSharedViewRef.current = null;
-    void applyPendingView(row, pending.beat, pending.startSeconds).then(() => {
-      if (pending.autoplay === true) transport.play({ autoplay: true });
+    void applyPendingView(row, pending?.beat, pending?.startSeconds).then(() => {
+      if (pending?.autoplay === true) transport.play({ autoplay: true });
     });
-  }, [sources.rows, sources.songBpm, viewerReady]);
+  }, [requestedMapRow, sources.rows, sources.songBpm, viewerReady]);
 
   function clearViewer() {
     selectionGenerationRef.current = ++selectionRequestRef.current;
@@ -549,7 +566,6 @@ export function useViewerSession({
     leaderboardPlatform,
     orthoOverlayRef,
     selectDifficulty,
-    selectedDifficultyIndex,
     selectedKey,
     viewerReady,
   };

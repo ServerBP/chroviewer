@@ -264,7 +264,9 @@ export interface InfoColorScheme {
   customColors?: LegacyColorOverrides;
 }
 
-export function difficultyRank(difficulty: string): number {
+export type DifficultyRank = 1 | 3 | 5 | 7 | 9;
+
+export function difficultyRank(difficulty: string): DifficultyRank | -1 {
   switch (difficulty) {
     case 'ExpertPlus':
     case 'Expert+':

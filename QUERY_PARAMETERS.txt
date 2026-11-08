@@ -70,6 +70,13 @@ saber=cg5                     Select CG5 (alias for saberModel=cg5).
 saberModel=default|beatkhana|cg5|cube-community-new|cube-community-v1|euc
 saberWidth=0.25..3            Scale the saber's width without changing its length.
 saberScale=0.25..3
+saberBladeWidth=0.25..4       Blade width multiplier.
+saberTipWidth=0..1            Blade taper at the tip.
+saberHiltLength=0.04..0.4      Overall default hilt length in meters.
+saberHiltWidth=0.25..3        Overall default hilt width multiplier.
+saberTrailDuration=0.05..1    Trail history in song seconds.
+saberTrailWidth=0.05..1       Blade fraction covered by the trail.
+saberTrailBrightness=0..2     Trail brightness multiplier.
 saberBladeLength=0.1..2
 saberBladeThickness=0.001..0.03
 saberCoreThickness=0.0005..0.02
@@ -126,7 +133,8 @@ tarfPath=<path or HTTPS URL>  Load a TournamentAssistant (.tarf) replay from a p
                               the replay is used instead of downloading it from BeatSaver.
 scoreId=<ScoreSaber score>    Load a ScoreSaber replay.
 beat=<number>                 Initial beat for non-live playback.
-difficulty=<zero-based index> Difficulty index for a map preview.
+difficulty=1|3|5|7|9          Easy, Normal, Hard, Expert, or ExpertPlus map preview.
+characteristic=<name>         Map characteristic, for example Standard or OneSaber.
 
 EXAMPLE
 ?liveSource=ta&playerId=76561199016011545&hideUI=true&masterVolume=0.8&songVolume=0.7&hitsoundVolume=0.5&lights=static&renderScale=0.75

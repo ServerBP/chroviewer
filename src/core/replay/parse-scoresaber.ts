@@ -277,28 +277,36 @@ function replayNoteEventType(value: number): ReplayNoteEventType {
   }
 }
 
-function note(reader: BinaryReader, version3: boolean): ReplayNoteEvent {
+function note(reader: BinaryReader, version3: boolean, quest: boolean): ReplayNoteEvent {
   const id = noteId(reader, version3);
   const eventType = replayNoteEventType(reader.int32());
+  const uninitialised = quest && eventType === 3;
+  const cutFloat = () => {
+    if (!uninitialised) return reader.float32();
+    reader.skip(4);
+    return 0;
+  };
+  const cutVector = () => ({ x: cutFloat(), y: cutFloat(), z: cutFloat() });
   const value: ReplayNoteEvent = {
     noteId: id,
     eventType,
-    cutPoint: vector3(reader),
-    cutNormal: vector3(reader),
-    saberDirection: vector3(reader),
+    cutPoint: cutVector(),
+    cutNormal: cutVector(),
+    saberDirection: cutVector(),
     saberType: reader.int32(),
     directionOk: reader.bool(),
-    saberSpeed: reader.float32(),
-    cutAngle: reader.float32(),
-    cutDistanceToCenter: reader.float32(),
-    cutDirectionDeviation: reader.float32(),
-    beforeCutRating: reader.float32(),
-    afterCutRating: reader.float32(),
+    saberSpeed: cutFloat(),
+    cutAngle: cutFloat(),
+    cutDistanceToCenter: cutFloat(),
+    cutDirectionDeviation: cutFloat(),
+    beforeCutRating: cutFloat(),
+    afterCutRating: cutFloat(),
     time: reader.float32(),
     unityTimescale: reader.float32(),
     timeSyncTimescale: reader.float32(),
   };
-  if (version3) {
+  if (version3 && uninitialised) reader.skip(64);
+  else if (version3) {
     value.timeDeviation = reader.float32();
     value.worldRotation = quaternion(reader);
     value.inverseWorldRotation = quaternion(reader);
@@ -720,7 +728,8 @@ export function parseScoreSaberPayload(bytes: Uint8Array): Replay {
   reader.seek(heightPointer, notePointer);
   const heights = list(reader, 'height', 8, height);
   reader.seek(notePointer, scorePointer);
-  const notes = list(reader, 'note', version3 ? 177 : 101, (source) => note(source, version3));
+  const quest = replayMetadata.platform === 'Quest';
+  const notes = list(reader, 'note', version3 ? 177 : 101, (source) => note(source, version3, quest));
   reader.seek(scorePointer, comboPointer);
   const scores = list(reader, 'score', version3 ? 12 : 8, (source) => score(source, version3));
   reader.seek(comboPointer, multiplierPointer);

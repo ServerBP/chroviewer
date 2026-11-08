@@ -361,6 +361,10 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     return clock.isPlaying() ? pause() : play();
   }
 
+  function unlockHitsounds() {
+    hitsounds.resume();
+  }
+
   async function unlockAudio() {
     const clock = clockRef.current;
     if (clock === null) return false;
@@ -421,5 +425,6 @@ export function useSongTransport({ lightshowModeRef, settings, settingsRef }: Us
     time,
     togglePlay,
     unlockAudio,
+    unlockHitsounds,
   };
 }

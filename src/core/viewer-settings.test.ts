@@ -151,8 +151,11 @@ describe('independent player cosmetics', () => {
       compositorSyncType: 'wait-for-all',
       compositorWaitSeconds: 60,
       replayTrailSmoothing: false,
-      saberModel: 'euc',
       saberWidth: 0.72,
+      saberModel: 'cg5',
+      saberTipWidth: 0.4,
+      saberTrailDuration: 0.5,
+      saberTrailBrightness: 1.4,
     });
     const saved = { ...DEFAULT_VIEWER_SETTINGS, ...patch };
     const restored = loadViewerSettings({ getItem: () => JSON.stringify(saved) }, false);

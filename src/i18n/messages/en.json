@@ -225,7 +225,17 @@
       "showSaberTrails": "Show trails",
       "trail": "Trail",
       "trailFlag": "Flag",
-      "trailRectangle": "Rectangle"
+      "trailRectangle": "Rectangle",
+      "milliseconds": "{value} ms",
+      "ofBlade": "{value} of blade",
+      "saber": "Saber",
+      "saberBladeWidth": "Blade width",
+      "saberHiltLength": "Hilt length",
+      "saberHiltWidth": "Hilt width",
+      "saberTipWidth": "Tip width",
+      "saberTrailBrightness": "Brightness",
+      "saberTrailDuration": "Length",
+      "saberTrailWidth": "Width"
     },
     "reset": "Reset",
     "resetAll": "Reset all",

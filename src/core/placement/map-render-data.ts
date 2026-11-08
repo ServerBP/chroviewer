@@ -101,12 +101,14 @@ interface ChainReplayIdentity {
 }
 
 export interface ArcInstance {
+  enterBeat: number;
   headBeat: number;
   tailBeat: number;
   spawnBeat: number;
   despawnBeat: number;
   hjdBeats: number;
   unitsPerBeat: number;
+  usesGlobalNjs: boolean;
   zDistance: number;
   pathLength: number;
   headFadeLength: number;
@@ -144,7 +146,7 @@ export interface MapRenderData {
   legacyNoodleV2Semantics?: boolean;
   noteJumpSpeed?: number;
   noteStartBeatOffset?: number;
-  movementStateAt?: (beat: number) => SpawnState;
+  movementStateAt(beat: number): SpawnState;
 }
 
 export interface MapRenderOptions {
@@ -236,15 +238,27 @@ function replayCutDirection(note: Difficulty['notes'][number], majorVersion: num
     : cutDirection;
 }
 
-function motionFor(state: SpawnState, beat: number, leadInBeats: number, despawnBeat?: number): ObjectMotion {
-  const spawnBeat = beat - state.halfJumpDurationInBeats;
+function motionFor(
+  state: SpawnState,
+  beat: number,
+  leadInBeats: number,
+  usesGlobalNjs: boolean,
+  activationHjdBeats: number,
+  movementEndBeat = beat,
+  spawnAnchorBeat = beat,
+): ObjectMotion {
+  const spawnBeat = spawnAnchorBeat - state.halfJumpDurationInBeats;
   return {
     beat,
-    enterBeat: spawnBeat - leadInBeats,
+    enterBeat: spawnAnchorBeat - activationHjdBeats - leadInBeats,
     spawnBeat,
-    despawnBeat: despawnBeat ?? beat + state.halfJumpDurationInBeats,
+    despawnBeat: movementEndBeat + activationHjdBeats,
     hjdBeats: state.halfJumpDurationInBeats,
     unitsPerBeat: state.halfJumpDistance / state.halfJumpDurationInBeats,
+    leadInBeats,
+    movementEndBeat,
+    spawnAnchorBeat,
+    usesGlobalNjs,
   };
 }
 
@@ -289,6 +303,8 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
     }
     return objectProvider.stateAt(beat);
   }
+  const usesGlobalNjs = (noodle: NoodleObjectData | undefined) =>
+    noodle?.noteJumpSpeed === undefined && noodle?.noteSpawnOffset === undefined;
   function takeReplayEvent(matches: (event: ReplayNoteEvent) => boolean) {
     const index = replayNotes.findIndex(matches);
     if (index < 0) return undefined;
@@ -312,7 +328,14 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
     const interactable = !note.customFake && noodle?.uninteractable !== true;
     const replayable = !note.customFake && heck.canBecomeInteractable(note);
     const state = stateAt(note.songBpmTime, noodle, legacyTiming.notes.has(note));
-    const motion = motionFor(state, note.songBpmTime, leadInBeats);
+    const globalNjs = usesGlobalNjs(noodle);
+    const motion = motionFor(
+      state,
+      note.songBpmTime,
+      leadInBeats,
+      globalNjs,
+      globalNjs ? provider.spawnAheadHalfJumpDurationInBeats : state.halfJumpDurationInBeats,
+    );
     const grid = heck.position(note);
     const x = options.leftHanded === true ? -grid.x : grid.x;
     const startGrid = gridPosition(formation.startLineIndex, formation.startLineLayer);
@@ -406,12 +429,15 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
     const extension = heck.resolve(obstacle);
     const { noodle, worldRotation } = extension;
     const state = stateAt(obstacle.songBpmTime, noodle, legacyTiming.obstacles.has(obstacle));
+    const globalNjs = usesGlobalNjs(noodle);
     const unitsPerBeat = state.halfJumpDistance / state.halfJumpDurationInBeats;
     const motion = motionFor(
       state,
       obstacle.songBpmTime,
       leadInBeats,
-      obstacle.songBpmTime + obstacle.durationSongBpmTime + state.halfJumpDurationInBeats,
+      globalNjs,
+      globalNjs ? provider.spawnAheadHalfJumpDurationInBeats : state.halfJumpDurationInBeats,
+      obstacle.songBpmTime + obstacle.durationSongBpmTime,
     );
     const bounds = heck.obstacleBounds(obstacle, obstacleBounds(obstacle, majorVersion));
     const placement = obstaclePlacement(bounds);
@@ -445,8 +471,7 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
     const interactable = !chain.customFake && noodle?.uninteractable !== true;
     const replayable = !chain.customFake && heck.canBecomeInteractable(chain);
     const state = stateAt(chain.songBpmTime, noodle);
-    const hjdBeats = state.halfJumpDurationInBeats;
-    const unitsPerBeat = state.halfJumpDistance / hjdBeats;
+    const globalNjs = usesGlobalNjs(noodle);
     const head = heck.position(chain);
     const tail = heck.tailPosition(chain);
     const colorIndex = chain.color === 1 ? 1 : 0;
@@ -465,12 +490,15 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
               event.noteId.colorType === replayColorType,
           );
       links.push({
-        beat,
-        enterBeat: chain.songBpmTime - hjdBeats - leadInBeats,
-        spawnBeat: chain.songBpmTime - hjdBeats,
-        despawnBeat: chain.tailSongBpmTime + hjdBeats,
-        hjdBeats,
-        unitsPerBeat,
+        ...motionFor(
+          state,
+          beat,
+          leadInBeats,
+          globalNjs,
+          globalNjs ? provider.spawnAheadHalfJumpDurationInBeats : state.halfJumpDurationInBeats,
+          chain.tailSongBpmTime,
+          chain.songBpmTime,
+        ),
         x: (head.x + link.x) * (options.leftHanded === true ? -1 : 1),
         y: head.y + NOTE_Y_OFFSET + link.y,
         rotationDeg: link.rotationDeg * (options.leftHanded === true ? -1 : 1),
@@ -491,6 +519,8 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
     const extension = heck.resolve(arc);
     const { noodle, worldRotation } = extension;
     const state = stateAt(arc.songBpmTime, noodle);
+    const globalNjs = usesGlobalNjs(noodle);
+    const activationHjdBeats = globalNjs ? provider.spawnAheadHalfJumpDurationInBeats : state.halfJumpDurationInBeats;
     const unitsPerBeat = state.halfJumpDistance / state.halfJumpDurationInBeats;
     const zDistance = (arc.tailSongBpmTime - arc.songBpmTime) * unitsPerBeat;
     const head = heck.position(arc);
@@ -519,12 +549,14 @@ export function buildMapRenderData(difficulty: Difficulty, options: MapRenderOpt
           }))
         : path.points;
     arcs.push({
+      enterBeat: arc.songBpmTime - activationHjdBeats - leadInBeats,
       headBeat: arc.songBpmTime,
       tailBeat: arc.tailSongBpmTime,
       spawnBeat: arc.songBpmTime - state.halfJumpDurationInBeats,
-      despawnBeat: arc.tailSongBpmTime + state.halfJumpDurationInBeats,
+      despawnBeat: arc.tailSongBpmTime + activationHjdBeats,
       hjdBeats: state.halfJumpDurationInBeats,
       unitsPerBeat,
+      usesGlobalNjs: globalNjs,
       zDistance,
       pathLength: path.length,
       headFadeLength: hasHeadNote ? 0.4 : 1,

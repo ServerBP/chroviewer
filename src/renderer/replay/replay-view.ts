@@ -14,8 +14,8 @@ import { DEFAULT_COLORS, type ColorScheme, type Rgb } from '../../core/colors';
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import type { NoodleTransform } from '../../core/noodle-runtime';
 import type { HitScoreVisualizerConfig } from '../../core/replay/hit-score-visualizer';
-import { sampleReplayFrames } from '../../core/replay/sampling';
-import type { Replay, ReplayTransform } from '../../core/replay/types';
+import { sampleReplayFrames, type ReplayFrameSample } from '../../core/replay/sampling';
+import type { Replay, ReplayPose, ReplayTransform } from '../../core/replay/types';
 import {
   DEFAULT_REPLAY_CAMERA_SETTINGS,
   DEFAULT_REPLAY_SABER_SETTINGS,
@@ -51,6 +51,7 @@ import {
   type ReplayDirectionalLights,
 } from './replay-headset';
 import {
+  addReplaySaberTrailNode,
   clearReplaySaberTrail,
   createReplaySaber,
   createReplaySaberTrail,
@@ -136,20 +137,12 @@ export class ReplayView {
     const metalMaterial = createReplaySurfaceMaterial(fog, directionalLights, SABER_METAL_SURFACE);
     const gripMaterial = createReplaySurfaceMaterial(fog, directionalLights, SABER_GRIP_SURFACE);
     const sabers = [
-      {
-        color: DEFAULT_COLORS.leftNote,
-        offset: this.replayLeftOffset,
-        tip: this.replayLeftTip,
-        trailBase: this.replayLeftTrailBase,
-      },
-      {
-        color: DEFAULT_COLORS.rightNote,
-        offset: this.replayRightOffset,
-        tip: this.replayRightTip,
-        trailBase: this.replayRightTrailBase,
-      },
+      { color: DEFAULT_COLORS.leftNote, offset: this.replayLeftOffset },
+      { color: DEFAULT_COLORS.rightNote, offset: this.replayRightOffset },
     ];
-    for (const [index, { color, offset, tip, trailBase }] of sabers.entries()) {
+    for (const [index, { color, offset }] of sabers.entries()) {
+      const tip = index === 0 ? this.replayLeftTip : this.replayRightTip;
+      const trailBase = index === 0 ? this.replayLeftTrailBase : this.replayRightTrailBase;
       const bladeMaterial = createSaberGlowMaterial(fog, color, saberCoreColor(color));
       const coreMaterial = createSaberCoreMaterial(fog, saberCoreColor(color));
       const saber = createReplaySaber({
@@ -166,7 +159,6 @@ export class ReplayView {
       setReplaySaberSettings(saber, this.saberSettings);
       offset.add(saber.root, this.customSaberRoots[index] ?? new Group(), trailBase, tip);
       this.replaySabers.push(saber);
-      this.replayGeometries.push(...saber.geometries);
       this.replayMaterials.push(bladeMaterial, coreMaterial);
       this.replaySaberColorMaterials.push({ blade: bladeMaterial, core: coreMaterial });
       const trailMaterial = createSaberTrailMaterial(color);
@@ -365,7 +357,7 @@ export class ReplayView {
       const coreColor = shaderUniformValue(materials?.core, '_Color');
       coreColor?.setRGB(...saberCoreColor(color)).convertSRGBToLinear();
       const trail = this.replayTrails[index];
-      const trailColor = shaderUniformValue(trail?.material, '_Color');
+      const trailColor = shaderUniformValue(trail?.mesh.material, '_Color');
       trailColor?.setRGB(...color).convertSRGBToLinear();
       for (const binding of this.customSaberColorBindings[index] ?? []) {
         const bindingColor = this.saberColors[binding.colorIndex];
@@ -475,7 +467,7 @@ export class ReplayView {
       this.noodlePlayerTransform.apply(this.replayRightHandTrack, noodle.rightHand, leftHanded);
     }
     this.hasSampledReplayPose = true;
-    this.updateTrails(time);
+    this.updateTrails(time, this.replay.poses, sample);
     this.cameraController.update(this.replayHeadset.root, time);
   }
 
@@ -537,8 +529,12 @@ export class ReplayView {
     const nativeCustomTrailLength = customTrail === null ? 0 : customTrail.tip - customTrail.base;
     const trailLength =
       customTrail === null
-        ? settings.replayTrailLength
-        : nativeCustomTrailLength * (settings.replayTrailLength / DEFAULT_REPLAY_SABER_SETTINGS.replayTrailLength);
+        ? settings.saberBladeLength *
+          settings.saberTrailWidth *
+          (settings.replayTrailLength / DEFAULT_REPLAY_SABER_SETTINGS.replayTrailLength)
+        : nativeCustomTrailLength *
+          (settings.replayTrailLength / DEFAULT_REPLAY_SABER_SETTINGS.replayTrailLength) *
+          (settings.saberTrailWidth / DEFAULT_REPLAY_SABER_SETTINGS.saberTrailWidth);
     const baseDistance = tipDistance - trailLength;
     const scale = custom ? 1 : settings.saberScale;
     for (const [tip, trailBase] of [
@@ -607,28 +603,46 @@ export class ReplayView {
     }
   }
 
-  private updateTrails(time: number) {
+  private updateTrails(time: number, frames: readonly ReplayPose[], sample: ReplayFrameSample) {
     for (const trail of this.replayTrails) {
-      const timeUniform: IUniform<number> | undefined = trail.material.uniforms._Time;
+      const timeUniform: IUniform<number> | undefined = trail.mesh.material.uniforms._Time;
       if (timeUniform !== undefined) timeUniform.value = time;
     }
-    if (time < this.replayTrailTime || time - this.replayTrailTime > 0.25) this.clearTrails();
-    if (time === this.replayTrailTime) return;
+    const duration = this.saberSettings.saberTrailDuration;
+    if (!this.saberSettings.showSaberTrails || time === this.replayTrailTime) return;
+    if (time < this.replayTrailTime || time - this.replayTrailTime > duration) this.clearTrails();
+    const last = this.replayTrails[0]?.nodes.at(-1);
+    const start =
+      last === undefined ? Math.max(countBefore(frames, time - duration) - 1, 0) : countBefore(frames, last.time);
+    const end = countBefore(frames, time);
+    for (const frame of frames.slice(start, end)) {
+      this.applyTransform(this.replayLeftHand, frame.leftHand);
+      this.applyTransform(this.replayRightHand, frame.rightHand);
+      this.forEachTrailPoint((trail, base, tip) => {
+        addReplaySaberTrailNode(trail, frame.time, base, tip);
+      });
+    }
+    this.sampleTransform(this.replayLeftHand, sample.from.leftHand, sample.to.leftHand, sample.amount);
+    this.sampleTransform(this.replayRightHand, sample.from.rightHand, sample.to.rightHand, sample.amount);
+    this.forEachTrailPoint((trail, base, tip) => {
+      updateReplaySaberTrail(trail, time, base, tip);
+    });
+    this.replayTrailTime = time;
+  }
+
+  private forEachTrailPoint(visit: (trail: ReplaySaberTrail, base: Vector3, tip: Vector3) => void) {
     this.root.updateMatrixWorld(true);
-    for (let index = 0; index < 2; index++) {
-      const base = index === 0 ? this.replayLeftTrailBase : this.replayRightTrailBase;
-      const tip = index === 0 ? this.replayLeftTip : this.replayRightTip;
+    this.replaySabers.forEach((saber, index) => {
       const trail = this.replayTrails[index];
-      if (trail === undefined) continue;
-      base.getWorldPosition(this.position);
-      tip.getWorldPosition(this.replayPosition);
+      if (trail === undefined) return;
+      saber.trailBase.getWorldPosition(this.position);
+      saber.tip.getWorldPosition(this.replayPosition);
       if (this.localSpaceSaberTrail) {
         this.replayPlayerRoot.worldToLocal(this.position);
         this.replayPlayerRoot.worldToLocal(this.replayPosition);
       }
-      updateReplaySaberTrail(trail, this.position, this.replayPosition);
-    }
-    this.replayTrailTime = time;
+      visit(trail, this.position, this.replayPosition);
+    });
   }
 
   dispose() {
@@ -638,6 +652,7 @@ export class ReplayView {
     this.replayHeadset.dispose();
     this.gameplayHud.dispose();
     for (const geometry of this.replayGeometries) geometry.dispose();
+    for (const saber of this.replaySabers) for (const geometry of saber.geometries) geometry.dispose();
     for (const material of this.replayMaterials) material.dispose();
   }
 }
@@ -651,4 +666,15 @@ function latestAt<T extends { time: number }>(events: readonly T[], time: number
     else high = middle;
   }
   return events[low - 1];
+}
+
+function countBefore(frames: readonly ReplayPose[], time: number) {
+  let low = 0;
+  let high = frames.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if ((frames[middle]?.time ?? Number.POSITIVE_INFINITY) < time) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }
