@@ -9,7 +9,7 @@ import { enumDesc, fileDesc, messageDesc } from '@bufbuild/protobuf/codegenv2';
  * Describes the file tarf/v1/tarf.proto.
  */
 export const file_tarf_v1_tarf: GenFile /*@__PURE__*/ = fileDesc(
-  'ChJ0YXJmL3YxL3RhcmYucHJvdG8SB3RhcmYudjEioQQKBkhlYWRlchIjCghyZWNvcmRlchgBIAEoCzIRLnRhcmYudjEuUmVjb3JkZXISGwoTcmVjb3JkZWRfYXRfdW5peF9tcxgCIAEoAxIfCgZwbGF5ZXIYAyABKAsyDy50YXJmLnYxLlBsYXllchIZCgNtYXAYBCABKAsyDC50YXJmLnYxLk1hcBInCghzZXR0aW5ncxgFIAEoCzIVLnRhcmYudjEuUGxheVNldHRpbmdzEiQKBmNvbG9ycxgGIAEoCzIULnRhcmYudjEuQ29sb3JTY2hlbWUSIAoDaHN2GAcgASgLMhMudGFyZi52MS5Ic3ZQcm9maWxlEhoKBG1vZHMYCCADKAsyDC50YXJmLnYxLk1vZBI2ChJjb250cm9sbGVyX29mZnNldHMYCSABKAsyGi50YXJmLnYxLkNvbnRyb2xsZXJPZmZzZXRzEjAKD21vdGlvbl9lbmNvZGluZxgKIAEoCzIXLnRhcmYudjEuTW90aW9uRW5jb2RpbmcSLgoKdG91cm5hbWVudBgLIAEoCzIaLnRhcmYudjEuVG91cm5hbWVudENvbnRleHQSPQoaaW5pdGlhbF9taWRfcGxheV9tb2RpZmllcnMYDCABKAsyGS50YXJmLnYxLk1pZFBsYXlNb2RpZmllcnMSMwoRc291cmNlX2V4dGVuc2lvbnMYDSADKAsyGC50YXJmLnYxLlNvdXJjZUV4dGVuc2lvbiJZCghSZWNvcmRlchIlCgZzb3VyY2UYASABKA4yFS50YXJmLnYxLlJlcGxheVNvdXJjZRIWCg5zb3VyY2VfdmVyc2lvbhgCIAEoCRIOCgZ3cml0ZXIYAyABKAkihAEKBlBsYXllchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHBsYXRmb3JtGAMgASgJEhQKDGdhbWVfdmVyc2lvbhgEIAEoCRILCgNobWQYBSABKAkSEgoKY29udHJvbGxlchgGIAEoCRIXCg90cmFja2luZ19zeXN0ZW0YByABKAki2wEKA01hcBIMCgRoYXNoGAEgASgJEhAKCGxldmVsX2lkGAIgASgJEhYKDmNoYXJhY3RlcmlzdGljGAMgASgJEicKCmRpZmZpY3VsdHkYBCABKA4yEy50YXJmLnYxLkRpZmZpY3VsdHkSEQoJc29uZ19uYW1lGAUgASgJEhUKDXNvbmdfc3ViX25hbWUYBiABKAkSEwoLc29uZ19hdXRob3IYByABKAkSDgoGbWFwcGVyGAggASgJEhMKC2Vudmlyb25tZW50GAkgASgJEg8KB2FyY2hpdmUYCiABKAwinQcKDFBsYXlTZXR0aW5ncxIRCgltb2RpZmllcnMYASADKAkSEwoLbGVmdF9oYW5kZWQYAiABKAgSFQoNcGxheWVyX2hlaWdodBgDIAEoAhIaCg1qdW1wX2Rpc3RhbmNlGAQgASgCSACIAQESHgoRbm90ZV9zcGF3bl9vZmZzZXQYBSABKAJIAYgBARIXCgpzb25nX3NwZWVkGAYgASgCSAKIAQESIwoIcHJhY3RpY2UYByABKAsyES50YXJmLnYxLlByYWN0aWNlEhoKDXJvb21fcm90YXRpb24YCCABKAJIA4gBARIlCgtyb29tX2NlbnRlchgJIAEoCzIQLnRhcmYudjEuVmVjdG9yMxI2CillbnZpcm9ubWVudF9lZmZlY3RzX2ZpbHRlcl9kZWZhdWx0X3ByZXNldBgKIAEoBUgEiAEBEjoKLWVudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX2V4cGVydF9wbHVzX3ByZXNldBgLIAEoBUgFiAEBEi4KIWVudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX3ByZXNldBgMIAEoBUgGiAEBEh4KEW5vX3RleHRzX2FuZF9odWRzGA0gASgISAeIAQESIgoVc2FiZXJfdHJhaWxfaW50ZW5zaXR5GA4gASgCSAiIAQESIwoWaGlkZV9ub3RlX3NwYXduX2VmZmVjdBgPIAEoCEgJiAEBEiEKFGFyY3NfaGFwdGljX2ZlZWRiYWNrGBAgASgISAqIAQESGwoOYXJjX3Zpc2liaWxpdHkYESABKAVIC4gBAUIQCg5fanVtcF9kaXN0YW5jZUIUChJfbm90ZV9zcGF3bl9vZmZzZXRCDQoLX3Nvbmdfc3BlZWRCEAoOX3Jvb21fcm90YXRpb25CLAoqX2Vudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX2RlZmF1bHRfcHJlc2V0QjAKLl9lbnZpcm9ubWVudF9lZmZlY3RzX2ZpbHRlcl9leHBlcnRfcGx1c19wcmVzZXRCJAoiX2Vudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX3ByZXNldEIUChJfbm9fdGV4dHNfYW5kX2h1ZHNCGAoWX3NhYmVyX3RyYWlsX2ludGVuc2l0eUIZChdfaGlkZV9ub3RlX3NwYXduX2VmZmVjdEIXChVfYXJjc19oYXB0aWNfZmVlZGJhY2tCEQoPX2FyY192aXNpYmlsaXR5IjIKCFByYWN0aWNlEhIKCnN0YXJ0X3RpbWUYASABKAISEgoKc29uZ19zcGVlZBgCIAEoAiK9AwoLQ29sb3JTY2hlbWUSHwoHc2FiZXJfYRgBIAEoCzIOLnRhcmYudjEuQ29sb3ISHwoHc2FiZXJfYhgCIAEoCzIOLnRhcmYudjEuQ29sb3ISIAoIb2JzdGFjbGUYAyABKAsyDi50YXJmLnYxLkNvbG9yEiUKDWVudmlyb25tZW50XzAYBCABKAsyDi50YXJmLnYxLkNvbG9yEiUKDWVudmlyb25tZW50XzEYBSABKAsyDi50YXJmLnYxLkNvbG9yEikKEWVudmlyb25tZW50X3doaXRlGAYgASgLMg4udGFyZi52MS5Db2xvchIrChNlbnZpcm9ubWVudF8wX2Jvb3N0GAcgASgLMg4udGFyZi52MS5Db2xvchIrChNlbnZpcm9ubWVudF8xX2Jvb3N0GAggASgLMg4udGFyZi52MS5Db2xvchIvChdlbnZpcm9ubWVudF93aGl0ZV9ib29zdBgJIAEoCzIOLnRhcmYudjEuQ29sb3ISJwoac3VwcG9ydHNfZW52aXJvbm1lbnRfYm9vc3QYCiABKAhIAIgBAUIdChtfc3VwcG9ydHNfZW52aXJvbm1lbnRfYm9vc3QiQgoKSHN2UHJvZmlsZRIMCgRqc29uGAEgASgJEiYKCHBsYXRmb3JtGAIgASgOMhQudGFyZi52MS5Ic3ZQbGF0Zm9ybSIkCgNNb2QSDAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJIpEBChFDb250cm9sbGVyT2Zmc2V0cxIpCgZzaGFyZWQYASABKAsyGS50YXJmLnYxLkNvbnRyb2xsZXJPZmZzZXQSJwoEbGVmdBgCIAEoCzIZLnRhcmYudjEuQ29udHJvbGxlck9mZnNldBIoCgVyaWdodBgDIAEoCzIZLnRhcmYudjEuQ29udHJvbGxlck9mZnNldCKYAQoQQ29udHJvbGxlck9mZnNldBIiCghwb3NpdGlvbhgBIAEoCzIQLnRhcmYudjEuVmVjdG9yMxIpCgpxdWF0ZXJuaW9uGAIgASgLMhMudGFyZi52MS5RdWF0ZXJuaW9uSAASKQoNZXVsZXJfZGVncmVlcxgDIAEoCzIQLnRhcmYudjEuVmVjdG9yM0gAQgoKCHJvdGF0aW9uIl8KDk1vdGlvbkVuY29kaW5nEhgKEHBvc2l0aW9uX3N0ZXBfbm0YASABKA0SGgoScm90YXRpb25fc3RlcF9uYW5vGAIgASgNEhcKD2FuY2hvcl9pbnRlcnZhbBgDIAEoDSJSChFUb3VybmFtZW50Q29udGV4dBIVCg10b3VybmFtZW50X2lkGAEgASgJEhAKCG1hdGNoX2lkGAIgASgJEhQKDHF1YWxpZmllcl9pZBgDIAEoCSJ7ChBNaWRQbGF5TW9kaWZpZXJzEhUKDWludmVydF9jb2xvcnMYASABKAgSGQoRaW52ZXJ0X2hhbmRlZG5lc3MYAiABKAgSGgoSZGlzYWJsZV9ibHVlX25vdGVzGAMgASgIEhkKEWRpc2FibGVfcmVkX25vdGVzGAQgASgIIj8KD1NvdXJjZUV4dGVuc2lvbhIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNEg8KB3BheWxvYWQYAyABKAwiTQoLTW90aW9uQmxvY2sSGQoRZmlyc3RfZnJhbWVfaW5kZXgYASABKA0SEwoLZnJhbWVfY291bnQYAiABKA0SDgoGZnJhbWVzGAMgASgMIiwKCkV2ZW50QmF0Y2gSHgoGZXZlbnRzGAEgAygLMg4udGFyZi52MS5FdmVudCKZAwoFRXZlbnQSDwoHdGltZV91cxgBIAEoEhIiCgRub3RlGAIgASgLMhIudGFyZi52MS5Ob3RlRXZlbnRIABIiCgR3YWxsGAMgASgLMhIudGFyZi52MS5XYWxsRXZlbnRIABImCgZoZWlnaHQYBCABKAsyFC50YXJmLnYxLkhlaWdodEV2ZW50SAASJAoFcGF1c2UYBSABKAsyEy50YXJmLnYxLlBhdXNlRXZlbnRIABIkCgVzY29yZRgGIAEoCzITLnRhcmYudjEuU2NvcmVFdmVudEgAEiQKBWNvbWJvGAcgASgLMhMudGFyZi52MS5Db21ib0V2ZW50SAASLgoKbXVsdGlwbGllchgIIAEoCzIYLnRhcmYudjEuTXVsdGlwbGllckV2ZW50SAASJgoGZW5lcmd5GAkgASgLMhQudGFyZi52MS5FbmVyZ3lFdmVudEgAEjoKEW1pZF9wbGF5X21vZGlmaWVyGAogASgLMh0udGFyZi52MS5NaWRQbGF5TW9kaWZpZXJFdmVudEgAQgkKB3BheWxvYWQimAMKCU5vdGVFdmVudBIjCgRub3RlGAEgASgLMhUudGFyZi52MS5Ob3RlSWRlbnRpdHkSJAoEa2luZBgCIAEoDjIWLnRhcmYudjEuTm90ZUV2ZW50S2luZBIdCgNjdXQYAyABKAsyEC50YXJmLnYxLk5vdGVDdXQSHAoPdW5pdHlfdGltZXNjYWxlGAQgASgCSACIAQESIAoTdGltZV9zeW5jX3RpbWVzY2FsZRgFIAEoAkgBiAEBEisKDndvcmxkX3JvdGF0aW9uGAYgASgLMhMudGFyZi52MS5RdWF0ZXJuaW9uEjMKFmludmVyc2Vfd29ybGRfcm90YXRpb24YByABKAsyEy50YXJmLnYxLlF1YXRlcm5pb24SKgoNbm90ZV9yb3RhdGlvbhgIIAEoCzITLnRhcmYudjEuUXVhdGVybmlvbhInCg1ub3RlX3Bvc2l0aW9uGAkgASgLMhAudGFyZi52MS5WZWN0b3IzQhIKEF91bml0eV90aW1lc2NhbGVCFgoUX3RpbWVfc3luY190aW1lc2NhbGUivQIKDE5vdGVJZGVudGl0eRIMCgR0aW1lGAEgASgCEhIKCmxpbmVfaW5kZXgYAiABKAUSEgoKbGluZV9sYXllchgDIAEoBRISCgpjb2xvcl90eXBlGAQgASgFEhUKDWN1dF9kaXJlY3Rpb24YBSABKAUSGQoMc2NvcmluZ190eXBlGAYgASgFSACIAQESGgoNZ2FtZXBsYXlfdHlwZRgHIAEoBUgBiAEBEicKGmN1dF9kaXJlY3Rpb25fYW5nbGVfb2Zmc2V0GAggASgCSAKIAQESGQoMYnNvcl9ub3RlX2lkGAkgASgFSAOIAQFCDwoNX3Njb3JpbmdfdHlwZUIQCg5fZ2FtZXBsYXlfdHlwZUIdChtfY3V0X2RpcmVjdGlvbl9hbmdsZV9vZmZzZXRCDwoNX2Jzb3Jfbm90ZV9pZCL9AwoHTm90ZUN1dBIVCghzcGVlZF9vaxgBIAEoCEgAiAEBEhQKDGRpcmVjdGlvbl9vaxgCIAEoCBIaCg1zYWJlcl90eXBlX29rGAMgASgISAGIAQESHQoQd2FzX2N1dF90b29fc29vbhgEIAEoCEgCiAEBEhMKC3NhYmVyX3NwZWVkGAUgASgCEikKD3NhYmVyX2RpcmVjdGlvbhgGIAEoCzIQLnRhcmYudjEuVmVjdG9yMxISCgpzYWJlcl90eXBlGAcgASgFEhsKDnRpbWVfZGV2aWF0aW9uGAggASgCSAOIAQESHwoXY3V0X2RpcmVjdGlvbl9kZXZpYXRpb24YCSABKAISIwoJY3V0X3BvaW50GAogASgLMhAudGFyZi52MS5WZWN0b3IzEiQKCmN1dF9ub3JtYWwYCyABKAsyEC50YXJmLnYxLlZlY3RvcjMSHgoWY3V0X2Rpc3RhbmNlX3RvX2NlbnRlchgMIAEoAhIRCgljdXRfYW5nbGUYDSABKAISGQoRYmVmb3JlX2N1dF9yYXRpbmcYDiABKAISGAoQYWZ0ZXJfY3V0X3JhdGluZxgPIAEoAkILCglfc3BlZWRfb2tCEAoOX3NhYmVyX3R5cGVfb2tCEwoRX3dhc19jdXRfdG9vX3Nvb25CEQoPX3RpbWVfZGV2aWF0aW9uImwKCVdhbGxFdmVudBIjCgR3YWxsGAEgASgLMhUudGFyZi52MS5XYWxsSWRlbnRpdHkSDgoGZW5lcmd5GAIgASgCEhkKDGV4aXRfdGltZV91cxgDIAEoEkgAiAEBQg8KDV9leGl0X3RpbWVfdXMi+gEKDFdhbGxJZGVudGl0eRIMCgR0aW1lGAEgASgCEhUKCGR1cmF0aW9uGAIgASgCSACIAQESFwoKbGluZV9pbmRleBgDIAEoBUgBiAEBEhcKCmxpbmVfbGF5ZXIYBCABKAVIAogBARISCgV3aWR0aBgFIAEoBUgDiAEBEhMKBmhlaWdodBgGIAEoBUgEiAEBEhkKDGJzb3Jfd2FsbF9pZBgHIAEoBUgFiAEBQgsKCV9kdXJhdGlvbkINCgtfbGluZV9pbmRleEINCgtfbGluZV9sYXllckIICgZfd2lkdGhCCQoHX2hlaWdodEIPCg1fYnNvcl93YWxsX2lkIh0KC0hlaWdodEV2ZW50Eg4KBmhlaWdodBgBIAEoAiKNAQoKUGF1c2VFdmVudBITCgtkdXJhdGlvbl9tcxgBIAEoAxIfChJzdGFydGVkX2F0X3VuaXhfbXMYAiABKANIAIgBARIdChBlbmRlZF9hdF91bml4X21zGAMgASgDSAGIAQFCFQoTX3N0YXJ0ZWRfYXRfdW5peF9tc0ITChFfZW5kZWRfYXRfdW5peF9tcyJnCgpTY29yZUV2ZW50Eg0KBXNjb3JlGAEgASgFEikKHGltbWVkaWF0ZV9tYXhfcG9zc2libGVfc2NvcmUYAiABKAVIAIgBAUIfCh1faW1tZWRpYXRlX21heF9wb3NzaWJsZV9zY29yZSIbCgpDb21ib0V2ZW50Eg0KBWNvbWJvGAEgASgFIkcKD011bHRpcGxpZXJFdmVudBISCgptdWx0aXBsaWVyGAEgASgFEiAKGG5leHRfbXVsdGlwbGllcl9wcm9ncmVzcxgCIAEoAiIdCgtFbmVyZ3lFdmVudBIOCgZlbmVyZ3kYASABKAIiawoUTWlkUGxheU1vZGlmaWVyRXZlbnQSKQoHdG9nZ2xlZBgBIAEoDjIYLnRhcmYudjEuTWlkUGxheU1vZGlmaWVyEigKBXN0YXRlGAIgASgLMhkudGFyZi52MS5NaWRQbGF5TW9kaWZpZXJzIq8BCgZGb290ZXISJwoKY29tcGxldGlvbhgBIAEoDjITLnRhcmYudjEuQ29tcGxldGlvbhIYCgtlbmRfdGltZV91cxgCIAEoEkgAiAEBEhgKC2ZpbmFsX3Njb3JlGAMgASgFSAGIAQESEwoLZnJhbWVfY291bnQYBCABKA0SEwoLZXZlbnRfY291bnQYBSABKA1CDgoMX2VuZF90aW1lX3VzQg4KDF9maW5hbF9zY29yZSIqCgdWZWN0b3IzEgkKAXgYASABKAISCQoBeRgCIAEoAhIJCgF6GAMgASgCIjgKClF1YXRlcm5pb24SCQoBeBgBIAEoAhIJCgF5GAIgASgCEgkKAXoYAyABKAISCQoBdxgEIAEoAiIzCgVDb2xvchIJCgFyGAEgASgCEgkKAWcYAiABKAISCQoBYhgDIAEoAhIJCgFhGAQgASgCKosBCgxSZXBsYXlTb3VyY2USHQoZUkVQTEFZX1NPVVJDRV9VTlNQRUNJRklFRBAAEiYKIlJFUExBWV9TT1VSQ0VfVE9VUk5BTUVOVF9BU1NJU1RBTlQQARIWChJSRVBMQVlfU09VUkNFX0JTT1IQAhIcChhSRVBMQVlfU09VUkNFX1NDT1JFU0FCRVIQAyqcAQoKRGlmZmljdWx0eRIaChZESUZGSUNVTFRZX1VOU1BFQ0lGSUVEEAASEwoPRElGRklDVUxUWV9FQVNZEAESFQoRRElGRklDVUxUWV9OT1JNQUwQAhITCg9ESUZGSUNVTFRZX0hBUkQQAxIVChFESUZGSUNVTFRZX0VYUEVSVBAEEhoKFkRJRkZJQ1VMVFlfRVhQRVJUX1BMVVMQBSpYCgtIc3ZQbGF0Zm9ybRIcChhIU1ZfUExBVEZPUk1fVU5TUEVDSUZJRUQQABITCg9IU1ZfUExBVEZPUk1fUEMQARIWChJIU1ZfUExBVEZPUk1fUVVFU1QQAiqfAQoNTm90ZUV2ZW50S2luZBIfChtOT1RFX0VWRU5UX0tJTkRfVU5TUEVDSUZJRUQQABIcChhOT1RFX0VWRU5UX0tJTkRfR09PRF9DVVQQARIbChdOT1RFX0VWRU5UX0tJTkRfQkFEX0NVVBACEhgKFE5PVEVfRVZFTlRfS0lORF9NSVNTEAMSGAoUTk9URV9FVkVOVF9LSU5EX0JPTUIQBCrVAQoPTWlkUGxheU1vZGlmaWVyEiEKHU1JRF9QTEFZX01PRElGSUVSX1VOU1BFQ0lGSUVEEAASIwofTUlEX1BMQVlfTU9ESUZJRVJfSU5WRVJUX0NPTE9SUxABEicKI01JRF9QTEFZX01PRElGSUVSX0lOVkVSVF9IQU5ERURORVNTEAISKAokTUlEX1BMQVlfTU9ESUZJRVJfRElTQUJMRV9CTFVFX05PVEVTEAMSJwojTUlEX1BMQVlfTU9ESUZJRVJfRElTQUJMRV9SRURfTk9URVMQBCqGAQoKQ29tcGxldGlvbhIaChZDT01QTEVUSU9OX1VOU1BFQ0lGSUVEEAASFQoRQ09NUExFVElPTl9QQVNTRUQQARIVChFDT01QTEVUSU9OX0ZBSUxFRBACEhMKD0NPTVBMRVRJT05fUVVJVBADEhkKFUNPTVBMRVRJT05fSU5DT01QTEVURRAEQiiqAiVUb3VybmFtZW50QXNzaXN0YW50U2hhcmVkLk1vZGVscy5UYXJmYgZwcm90bzM',
+  'ChJ0YXJmL3YxL3RhcmYucHJvdG8SB3RhcmYudjEioQQKBkhlYWRlchIjCghyZWNvcmRlchgBIAEoCzIRLnRhcmYudjEuUmVjb3JkZXISGwoTcmVjb3JkZWRfYXRfdW5peF9tcxgCIAEoAxIfCgZwbGF5ZXIYAyABKAsyDy50YXJmLnYxLlBsYXllchIZCgNtYXAYBCABKAsyDC50YXJmLnYxLk1hcBInCghzZXR0aW5ncxgFIAEoCzIVLnRhcmYudjEuUGxheVNldHRpbmdzEiQKBmNvbG9ycxgGIAEoCzIULnRhcmYudjEuQ29sb3JTY2hlbWUSIAoDaHN2GAcgASgLMhMudGFyZi52MS5Ic3ZQcm9maWxlEhoKBG1vZHMYCCADKAsyDC50YXJmLnYxLk1vZBI2ChJjb250cm9sbGVyX29mZnNldHMYCSABKAsyGi50YXJmLnYxLkNvbnRyb2xsZXJPZmZzZXRzEjAKD21vdGlvbl9lbmNvZGluZxgKIAEoCzIXLnRhcmYudjEuTW90aW9uRW5jb2RpbmcSLgoKdG91cm5hbWVudBgLIAEoCzIaLnRhcmYudjEuVG91cm5hbWVudENvbnRleHQSPQoaaW5pdGlhbF9taWRfcGxheV9tb2RpZmllcnMYDCABKAsyGS50YXJmLnYxLk1pZFBsYXlNb2RpZmllcnMSMwoRc291cmNlX2V4dGVuc2lvbnMYDSADKAsyGC50YXJmLnYxLlNvdXJjZUV4dGVuc2lvbiJZCghSZWNvcmRlchIlCgZzb3VyY2UYASABKA4yFS50YXJmLnYxLlJlcGxheVNvdXJjZRIWCg5zb3VyY2VfdmVyc2lvbhgCIAEoCRIOCgZ3cml0ZXIYAyABKAkihAEKBlBsYXllchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhAKCHBsYXRmb3JtGAMgASgJEhQKDGdhbWVfdmVyc2lvbhgEIAEoCRILCgNobWQYBSABKAkSEgoKY29udHJvbGxlchgGIAEoCRIXCg90cmFja2luZ19zeXN0ZW0YByABKAki6wEKA01hcBIMCgRoYXNoGAEgASgJEhAKCGxldmVsX2lkGAIgASgJEhYKDmNoYXJhY3RlcmlzdGljGAMgASgJEicKCmRpZmZpY3VsdHkYBCABKA4yEy50YXJmLnYxLkRpZmZpY3VsdHkSEQoJc29uZ19uYW1lGAUgASgJEhUKDXNvbmdfc3ViX25hbWUYBiABKAkSEwoLc29uZ19hdXRob3IYByABKAkSDgoGbWFwcGVyGAggASgJEhMKC2Vudmlyb25tZW50GAkgASgJEh8KBWZpbGVzGAogAygLMhAudGFyZi52MS5NYXBGaWxlIlEKB01hcEZpbGUSDAoEbmFtZRgBIAEoCRIqCghlbmNvZGluZxgCIAEoDjIYLnRhcmYudjEuTWFwRmlsZUVuY29kaW5nEgwKBGRhdGEYAyABKAwinQcKDFBsYXlTZXR0aW5ncxIRCgltb2RpZmllcnMYASADKAkSEwoLbGVmdF9oYW5kZWQYAiABKAgSFQoNcGxheWVyX2hlaWdodBgDIAEoAhIaCg1qdW1wX2Rpc3RhbmNlGAQgASgCSACIAQESHgoRbm90ZV9zcGF3bl9vZmZzZXQYBSABKAJIAYgBARIXCgpzb25nX3NwZWVkGAYgASgCSAKIAQESIwoIcHJhY3RpY2UYByABKAsyES50YXJmLnYxLlByYWN0aWNlEhoKDXJvb21fcm90YXRpb24YCCABKAJIA4gBARIlCgtyb29tX2NlbnRlchgJIAEoCzIQLnRhcmYudjEuVmVjdG9yMxI2CillbnZpcm9ubWVudF9lZmZlY3RzX2ZpbHRlcl9kZWZhdWx0X3ByZXNldBgKIAEoBUgEiAEBEjoKLWVudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX2V4cGVydF9wbHVzX3ByZXNldBgLIAEoBUgFiAEBEi4KIWVudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX3ByZXNldBgMIAEoBUgGiAEBEh4KEW5vX3RleHRzX2FuZF9odWRzGA0gASgISAeIAQESIgoVc2FiZXJfdHJhaWxfaW50ZW5zaXR5GA4gASgCSAiIAQESIwoWaGlkZV9ub3RlX3NwYXduX2VmZmVjdBgPIAEoCEgJiAEBEiEKFGFyY3NfaGFwdGljX2ZlZWRiYWNrGBAgASgISAqIAQESGwoOYXJjX3Zpc2liaWxpdHkYESABKAVIC4gBAUIQCg5fanVtcF9kaXN0YW5jZUIUChJfbm90ZV9zcGF3bl9vZmZzZXRCDQoLX3Nvbmdfc3BlZWRCEAoOX3Jvb21fcm90YXRpb25CLAoqX2Vudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX2RlZmF1bHRfcHJlc2V0QjAKLl9lbnZpcm9ubWVudF9lZmZlY3RzX2ZpbHRlcl9leHBlcnRfcGx1c19wcmVzZXRCJAoiX2Vudmlyb25tZW50X2VmZmVjdHNfZmlsdGVyX3ByZXNldEIUChJfbm9fdGV4dHNfYW5kX2h1ZHNCGAoWX3NhYmVyX3RyYWlsX2ludGVuc2l0eUIZChdfaGlkZV9ub3RlX3NwYXduX2VmZmVjdEIXChVfYXJjc19oYXB0aWNfZmVlZGJhY2tCEQoPX2FyY192aXNpYmlsaXR5IjIKCFByYWN0aWNlEhIKCnN0YXJ0X3RpbWUYASABKAISEgoKc29uZ19zcGVlZBgCIAEoAiK9AwoLQ29sb3JTY2hlbWUSHwoHc2FiZXJfYRgBIAEoCzIOLnRhcmYudjEuQ29sb3ISHwoHc2FiZXJfYhgCIAEoCzIOLnRhcmYudjEuQ29sb3ISIAoIb2JzdGFjbGUYAyABKAsyDi50YXJmLnYxLkNvbG9yEiUKDWVudmlyb25tZW50XzAYBCABKAsyDi50YXJmLnYxLkNvbG9yEiUKDWVudmlyb25tZW50XzEYBSABKAsyDi50YXJmLnYxLkNvbG9yEikKEWVudmlyb25tZW50X3doaXRlGAYgASgLMg4udGFyZi52MS5Db2xvchIrChNlbnZpcm9ubWVudF8wX2Jvb3N0GAcgASgLMg4udGFyZi52MS5Db2xvchIrChNlbnZpcm9ubWVudF8xX2Jvb3N0GAggASgLMg4udGFyZi52MS5Db2xvchIvChdlbnZpcm9ubWVudF93aGl0ZV9ib29zdBgJIAEoCzIOLnRhcmYudjEuQ29sb3ISJwoac3VwcG9ydHNfZW52aXJvbm1lbnRfYm9vc3QYCiABKAhIAIgBAUIdChtfc3VwcG9ydHNfZW52aXJvbm1lbnRfYm9vc3QiQgoKSHN2UHJvZmlsZRIMCgRqc29uGAEgASgJEiYKCHBsYXRmb3JtGAIgASgOMhQudGFyZi52MS5Ic3ZQbGF0Zm9ybSIkCgNNb2QSDAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJIpEBChFDb250cm9sbGVyT2Zmc2V0cxIpCgZzaGFyZWQYASABKAsyGS50YXJmLnYxLkNvbnRyb2xsZXJPZmZzZXQSJwoEbGVmdBgCIAEoCzIZLnRhcmYudjEuQ29udHJvbGxlck9mZnNldBIoCgVyaWdodBgDIAEoCzIZLnRhcmYudjEuQ29udHJvbGxlck9mZnNldCKYAQoQQ29udHJvbGxlck9mZnNldBIiCghwb3NpdGlvbhgBIAEoCzIQLnRhcmYudjEuVmVjdG9yMxIpCgpxdWF0ZXJuaW9uGAIgASgLMhMudGFyZi52MS5RdWF0ZXJuaW9uSAASKQoNZXVsZXJfZGVncmVlcxgDIAEoCzIQLnRhcmYudjEuVmVjdG9yM0gAQgoKCHJvdGF0aW9uIl8KDk1vdGlvbkVuY29kaW5nEhgKEHBvc2l0aW9uX3N0ZXBfbm0YASABKA0SGgoScm90YXRpb25fc3RlcF9uYW5vGAIgASgNEhcKD2FuY2hvcl9pbnRlcnZhbBgDIAEoDSJSChFUb3VybmFtZW50Q29udGV4dBIVCg10b3VybmFtZW50X2lkGAEgASgJEhAKCG1hdGNoX2lkGAIgASgJEhQKDHF1YWxpZmllcl9pZBgDIAEoCSJ7ChBNaWRQbGF5TW9kaWZpZXJzEhUKDWludmVydF9jb2xvcnMYASABKAgSGQoRaW52ZXJ0X2hhbmRlZG5lc3MYAiABKAgSGgoSZGlzYWJsZV9ibHVlX25vdGVzGAMgASgIEhkKEWRpc2FibGVfcmVkX25vdGVzGAQgASgIIj8KD1NvdXJjZUV4dGVuc2lvbhIKCgJpZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgNEg8KB3BheWxvYWQYAyABKAwiTQoLTW90aW9uQmxvY2sSGQoRZmlyc3RfZnJhbWVfaW5kZXgYASABKA0SEwoLZnJhbWVfY291bnQYAiABKA0SDgoGZnJhbWVzGAMgASgMIiwKCkV2ZW50QmF0Y2gSHgoGZXZlbnRzGAEgAygLMg4udGFyZi52MS5FdmVudCKZAwoFRXZlbnQSDwoHdGltZV91cxgBIAEoEhIiCgRub3RlGAIgASgLMhIudGFyZi52MS5Ob3RlRXZlbnRIABIiCgR3YWxsGAMgASgLMhIudGFyZi52MS5XYWxsRXZlbnRIABImCgZoZWlnaHQYBCABKAsyFC50YXJmLnYxLkhlaWdodEV2ZW50SAASJAoFcGF1c2UYBSABKAsyEy50YXJmLnYxLlBhdXNlRXZlbnRIABIkCgVzY29yZRgGIAEoCzITLnRhcmYudjEuU2NvcmVFdmVudEgAEiQKBWNvbWJvGAcgASgLMhMudGFyZi52MS5Db21ib0V2ZW50SAASLgoKbXVsdGlwbGllchgIIAEoCzIYLnRhcmYudjEuTXVsdGlwbGllckV2ZW50SAASJgoGZW5lcmd5GAkgASgLMhQudGFyZi52MS5FbmVyZ3lFdmVudEgAEjoKEW1pZF9wbGF5X21vZGlmaWVyGAogASgLMh0udGFyZi52MS5NaWRQbGF5TW9kaWZpZXJFdmVudEgAQgkKB3BheWxvYWQimAMKCU5vdGVFdmVudBIjCgRub3RlGAEgASgLMhUudGFyZi52MS5Ob3RlSWRlbnRpdHkSJAoEa2luZBgCIAEoDjIWLnRhcmYudjEuTm90ZUV2ZW50S2luZBIdCgNjdXQYAyABKAsyEC50YXJmLnYxLk5vdGVDdXQSHAoPdW5pdHlfdGltZXNjYWxlGAQgASgCSACIAQESIAoTdGltZV9zeW5jX3RpbWVzY2FsZRgFIAEoAkgBiAEBEisKDndvcmxkX3JvdGF0aW9uGAYgASgLMhMudGFyZi52MS5RdWF0ZXJuaW9uEjMKFmludmVyc2Vfd29ybGRfcm90YXRpb24YByABKAsyEy50YXJmLnYxLlF1YXRlcm5pb24SKgoNbm90ZV9yb3RhdGlvbhgIIAEoCzITLnRhcmYudjEuUXVhdGVybmlvbhInCg1ub3RlX3Bvc2l0aW9uGAkgASgLMhAudGFyZi52MS5WZWN0b3IzQhIKEF91bml0eV90aW1lc2NhbGVCFgoUX3RpbWVfc3luY190aW1lc2NhbGUivQIKDE5vdGVJZGVudGl0eRIMCgR0aW1lGAEgASgCEhIKCmxpbmVfaW5kZXgYAiABKAUSEgoKbGluZV9sYXllchgDIAEoBRISCgpjb2xvcl90eXBlGAQgASgFEhUKDWN1dF9kaXJlY3Rpb24YBSABKAUSGQoMc2NvcmluZ190eXBlGAYgASgFSACIAQESGgoNZ2FtZXBsYXlfdHlwZRgHIAEoBUgBiAEBEicKGmN1dF9kaXJlY3Rpb25fYW5nbGVfb2Zmc2V0GAggASgCSAKIAQESGQoMYnNvcl9ub3RlX2lkGAkgASgFSAOIAQFCDwoNX3Njb3JpbmdfdHlwZUIQCg5fZ2FtZXBsYXlfdHlwZUIdChtfY3V0X2RpcmVjdGlvbl9hbmdsZV9vZmZzZXRCDwoNX2Jzb3Jfbm90ZV9pZCL9AwoHTm90ZUN1dBIVCghzcGVlZF9vaxgBIAEoCEgAiAEBEhQKDGRpcmVjdGlvbl9vaxgCIAEoCBIaCg1zYWJlcl90eXBlX29rGAMgASgISAGIAQESHQoQd2FzX2N1dF90b29fc29vbhgEIAEoCEgCiAEBEhMKC3NhYmVyX3NwZWVkGAUgASgCEikKD3NhYmVyX2RpcmVjdGlvbhgGIAEoCzIQLnRhcmYudjEuVmVjdG9yMxISCgpzYWJlcl90eXBlGAcgASgFEhsKDnRpbWVfZGV2aWF0aW9uGAggASgCSAOIAQESHwoXY3V0X2RpcmVjdGlvbl9kZXZpYXRpb24YCSABKAISIwoJY3V0X3BvaW50GAogASgLMhAudGFyZi52MS5WZWN0b3IzEiQKCmN1dF9ub3JtYWwYCyABKAsyEC50YXJmLnYxLlZlY3RvcjMSHgoWY3V0X2Rpc3RhbmNlX3RvX2NlbnRlchgMIAEoAhIRCgljdXRfYW5nbGUYDSABKAISGQoRYmVmb3JlX2N1dF9yYXRpbmcYDiABKAISGAoQYWZ0ZXJfY3V0X3JhdGluZxgPIAEoAkILCglfc3BlZWRfb2tCEAoOX3NhYmVyX3R5cGVfb2tCEwoRX3dhc19jdXRfdG9vX3Nvb25CEQoPX3RpbWVfZGV2aWF0aW9uImwKCVdhbGxFdmVudBIjCgR3YWxsGAEgASgLMhUudGFyZi52MS5XYWxsSWRlbnRpdHkSDgoGZW5lcmd5GAIgASgCEhkKDGV4aXRfdGltZV91cxgDIAEoEkgAiAEBQg8KDV9leGl0X3RpbWVfdXMi+gEKDFdhbGxJZGVudGl0eRIMCgR0aW1lGAEgASgCEhUKCGR1cmF0aW9uGAIgASgCSACIAQESFwoKbGluZV9pbmRleBgDIAEoBUgBiAEBEhcKCmxpbmVfbGF5ZXIYBCABKAVIAogBARISCgV3aWR0aBgFIAEoBUgDiAEBEhMKBmhlaWdodBgGIAEoBUgEiAEBEhkKDGJzb3Jfd2FsbF9pZBgHIAEoBUgFiAEBQgsKCV9kdXJhdGlvbkINCgtfbGluZV9pbmRleEINCgtfbGluZV9sYXllckIICgZfd2lkdGhCCQoHX2hlaWdodEIPCg1fYnNvcl93YWxsX2lkIh0KC0hlaWdodEV2ZW50Eg4KBmhlaWdodBgBIAEoAiKNAQoKUGF1c2VFdmVudBITCgtkdXJhdGlvbl9tcxgBIAEoAxIfChJzdGFydGVkX2F0X3VuaXhfbXMYAiABKANIAIgBARIdChBlbmRlZF9hdF91bml4X21zGAMgASgDSAGIAQFCFQoTX3N0YXJ0ZWRfYXRfdW5peF9tc0ITChFfZW5kZWRfYXRfdW5peF9tcyJnCgpTY29yZUV2ZW50Eg0KBXNjb3JlGAEgASgFEikKHGltbWVkaWF0ZV9tYXhfcG9zc2libGVfc2NvcmUYAiABKAVIAIgBAUIfCh1faW1tZWRpYXRlX21heF9wb3NzaWJsZV9zY29yZSIbCgpDb21ib0V2ZW50Eg0KBWNvbWJvGAEgASgFIkcKD011bHRpcGxpZXJFdmVudBISCgptdWx0aXBsaWVyGAEgASgFEiAKGG5leHRfbXVsdGlwbGllcl9wcm9ncmVzcxgCIAEoAiIdCgtFbmVyZ3lFdmVudBIOCgZlbmVyZ3kYASABKAIiawoUTWlkUGxheU1vZGlmaWVyRXZlbnQSKQoHdG9nZ2xlZBgBIAEoDjIYLnRhcmYudjEuTWlkUGxheU1vZGlmaWVyEigKBXN0YXRlGAIgASgLMhkudGFyZi52MS5NaWRQbGF5TW9kaWZpZXJzIq8BCgZGb290ZXISJwoKY29tcGxldGlvbhgBIAEoDjITLnRhcmYudjEuQ29tcGxldGlvbhIYCgtlbmRfdGltZV91cxgCIAEoEkgAiAEBEhgKC2ZpbmFsX3Njb3JlGAMgASgFSAGIAQESEwoLZnJhbWVfY291bnQYBCABKA0SEwoLZXZlbnRfY291bnQYBSABKA1CDgoMX2VuZF90aW1lX3VzQg4KDF9maW5hbF9zY29yZSIqCgdWZWN0b3IzEgkKAXgYASABKAISCQoBeRgCIAEoAhIJCgF6GAMgASgCIjgKClF1YXRlcm5pb24SCQoBeBgBIAEoAhIJCgF5GAIgASgCEgkKAXoYAyABKAISCQoBdxgEIAEoAiIzCgVDb2xvchIJCgFyGAEgASgCEgkKAWcYAiABKAISCQoBYhgDIAEoAhIJCgFhGAQgASgCKosBCgxSZXBsYXlTb3VyY2USHQoZUkVQTEFZX1NPVVJDRV9VTlNQRUNJRklFRBAAEiYKIlJFUExBWV9TT1VSQ0VfVE9VUk5BTUVOVF9BU1NJU1RBTlQQARIWChJSRVBMQVlfU09VUkNFX0JTT1IQAhIcChhSRVBMQVlfU09VUkNFX1NDT1JFU0FCRVIQAyqcAQoKRGlmZmljdWx0eRIaChZESUZGSUNVTFRZX1VOU1BFQ0lGSUVEEAASEwoPRElGRklDVUxUWV9FQVNZEAESFQoRRElGRklDVUxUWV9OT1JNQUwQAhITCg9ESUZGSUNVTFRZX0hBUkQQAxIVChFESUZGSUNVTFRZX0VYUEVSVBAEEhoKFkRJRkZJQ1VMVFlfRVhQRVJUX1BMVVMQBSqUAQoPTWFwRmlsZUVuY29kaW5nEiEKHU1BUF9GSUxFX0VOQ09ESU5HX1VOU1BFQ0lGSUVEEAASHAoYTUFQX0ZJTEVfRU5DT0RJTkdfU1RPUkVEEAESHQoZTUFQX0ZJTEVfRU5DT0RJTkdfREVGTEFURRACEiEKHU1BUF9GSUxFX0VOQ09ESU5HX1BBQ0tFRF9KU09OEAMqWAoLSHN2UGxhdGZvcm0SHAoYSFNWX1BMQVRGT1JNX1VOU1BFQ0lGSUVEEAASEwoPSFNWX1BMQVRGT1JNX1BDEAESFgoSSFNWX1BMQVRGT1JNX1FVRVNUEAIqnwEKDU5vdGVFdmVudEtpbmQSHwobTk9URV9FVkVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASHAoYTk9URV9FVkVOVF9LSU5EX0dPT0RfQ1VUEAESGwoXTk9URV9FVkVOVF9LSU5EX0JBRF9DVVQQAhIYChROT1RFX0VWRU5UX0tJTkRfTUlTUxADEhgKFE5PVEVfRVZFTlRfS0lORF9CT01CEAQq1QEKD01pZFBsYXlNb2RpZmllchIhCh1NSURfUExBWV9NT0RJRklFUl9VTlNQRUNJRklFRBAAEiMKH01JRF9QTEFZX01PRElGSUVSX0lOVkVSVF9DT0xPUlMQARInCiNNSURfUExBWV9NT0RJRklFUl9JTlZFUlRfSEFOREVETkVTUxACEigKJE1JRF9QTEFZX01PRElGSUVSX0RJU0FCTEVfQkxVRV9OT1RFUxADEicKI01JRF9QTEFZX01PRElGSUVSX0RJU0FCTEVfUkVEX05PVEVTEAQqhgEKCkNvbXBsZXRpb24SGgoWQ09NUExFVElPTl9VTlNQRUNJRklFRBAAEhUKEUNPTVBMRVRJT05fUEFTU0VEEAESFQoRQ09NUExFVElPTl9GQUlMRUQQAhITCg9DT01QTEVUSU9OX1FVSVQQAxIZChVDT01QTEVUSU9OX0lOQ09NUExFVEUQBEIoqgIlVG91cm5hbWVudEFzc2lzdGFudFNoYXJlZC5Nb2RlbHMuVGFyZmIGcHJvdG8z',
 );
 
 /**
@@ -220,11 +220,11 @@ export type Map = Message<'tarf.v1.Map'> & {
   environment: string;
 
   /**
-   * Optional zip of the map folder, so the replay can be watched without downloading the map
+   * Optional files of the map with only the recorded difficulty, so the replay can be watched without downloading the map
    *
-   * @generated from field: bytes archive = 10;
+   * @generated from field: repeated tarf.v1.MapFile files = 10;
    */
-  archive: Uint8Array;
+  files: MapFile[];
 };
 
 /**
@@ -232,6 +232,32 @@ export type Map = Message<'tarf.v1.Map'> & {
  * Use `create(MapSchema)` to create a new message.
  */
 export const MapSchema: GenMessage<Map> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 3);
+
+/**
+ * @generated from message tarf.v1.MapFile
+ */
+export type MapFile = Message<'tarf.v1.MapFile'> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: tarf.v1.MapFileEncoding encoding = 2;
+   */
+  encoding: MapFileEncoding;
+
+  /**
+   * @generated from field: bytes data = 3;
+   */
+  data: Uint8Array;
+};
+
+/**
+ * Describes the message tarf.v1.MapFile.
+ * Use `create(MapFileSchema)` to create a new message.
+ */
+export const MapFileSchema: GenMessage<MapFile> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 4);
 
 /**
  * @generated from message tarf.v1.PlaySettings
@@ -327,7 +353,7 @@ export type PlaySettings = Message<'tarf.v1.PlaySettings'> & {
  * Describes the message tarf.v1.PlaySettings.
  * Use `create(PlaySettingsSchema)` to create a new message.
  */
-export const PlaySettingsSchema: GenMessage<PlaySettings> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 4);
+export const PlaySettingsSchema: GenMessage<PlaySettings> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 5);
 
 /**
  * Only present when the play was started from practice mode
@@ -350,7 +376,7 @@ export type Practice = Message<'tarf.v1.Practice'> & {
  * Describes the message tarf.v1.Practice.
  * Use `create(PracticeSchema)` to create a new message.
  */
-export const PracticeSchema: GenMessage<Practice> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 5);
+export const PracticeSchema: GenMessage<Practice> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 6);
 
 /**
  * Beat Sabers color scheme
@@ -413,7 +439,7 @@ export type ColorScheme = Message<'tarf.v1.ColorScheme'> & {
  * Describes the message tarf.v1.ColorScheme.
  * Use `create(ColorSchemeSchema)` to create a new message.
  */
-export const ColorSchemeSchema: GenMessage<ColorScheme> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 6);
+export const ColorSchemeSchema: GenMessage<ColorScheme> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 7);
 
 /**
  * The players HSV config, stored as the exact JSON text of the file they had selected. PC and Quest read some keys differently, so the platform says which implementation the JSON is meant for
@@ -436,7 +462,7 @@ export type HsvProfile = Message<'tarf.v1.HsvProfile'> & {
  * Describes the message tarf.v1.HsvProfile.
  * Use `create(HsvProfileSchema)` to create a new message.
  */
-export const HsvProfileSchema: GenMessage<HsvProfile> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 7);
+export const HsvProfileSchema: GenMessage<HsvProfile> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 8);
 
 /**
  * @generated from message tarf.v1.Mod
@@ -457,7 +483,7 @@ export type Mod = Message<'tarf.v1.Mod'> & {
  * Describes the message tarf.v1.Mod.
  * Use `create(ModSchema)` to create a new message.
  */
-export const ModSchema: GenMessage<Mod> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 8);
+export const ModSchema: GenMessage<Mod> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 9);
 
 /**
  * @generated from message tarf.v1.ControllerOffsets
@@ -483,7 +509,7 @@ export type ControllerOffsets = Message<'tarf.v1.ControllerOffsets'> & {
  * Describes the message tarf.v1.ControllerOffsets.
  * Use `create(ControllerOffsetsSchema)` to create a new message.
  */
-export const ControllerOffsetsSchema: GenMessage<ControllerOffsets> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 9);
+export const ControllerOffsetsSchema: GenMessage<ControllerOffsets> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 10);
 
 /**
  * @generated from message tarf.v1.ControllerOffset
@@ -521,7 +547,7 @@ export type ControllerOffset = Message<'tarf.v1.ControllerOffset'> & {
  * Describes the message tarf.v1.ControllerOffset.
  * Use `create(ControllerOffsetSchema)` to create a new message.
  */
-export const ControllerOffsetSchema: GenMessage<ControllerOffset> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 10);
+export const ControllerOffsetSchema: GenMessage<ControllerOffset> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 11);
 
 /**
  * Describes how MotionBlock frames were quantized.
@@ -555,7 +581,7 @@ export type MotionEncoding = Message<'tarf.v1.MotionEncoding'> & {
  * Describes the message tarf.v1.MotionEncoding.
  * Use `create(MotionEncodingSchema)` to create a new message.
  */
-export const MotionEncodingSchema: GenMessage<MotionEncoding> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 11);
+export const MotionEncodingSchema: GenMessage<MotionEncoding> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 12);
 
 /**
  * @generated from message tarf.v1.TournamentContext
@@ -581,7 +607,7 @@ export type TournamentContext = Message<'tarf.v1.TournamentContext'> & {
  * Describes the message tarf.v1.TournamentContext.
  * Use `create(TournamentContextSchema)` to create a new message.
  */
-export const TournamentContextSchema: GenMessage<TournamentContext> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 12);
+export const TournamentContextSchema: GenMessage<TournamentContext> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 13);
 
 /**
  * The TA "modify gameplay" state. Every command toggles one of these flags, and the flags only affect notes which spawn after the change.
@@ -614,7 +640,7 @@ export type MidPlayModifiers = Message<'tarf.v1.MidPlayModifiers'> & {
  * Describes the message tarf.v1.MidPlayModifiers.
  * Use `create(MidPlayModifiersSchema)` to create a new message.
  */
-export const MidPlayModifiersSchema: GenMessage<MidPlayModifiers> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 13);
+export const MidPlayModifiersSchema: GenMessage<MidPlayModifiers> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 14);
 
 /**
  * @generated from message tarf.v1.SourceExtension
@@ -640,7 +666,7 @@ export type SourceExtension = Message<'tarf.v1.SourceExtension'> & {
  * Describes the message tarf.v1.SourceExtension.
  * Use `create(SourceExtensionSchema)` to create a new message.
  */
-export const SourceExtensionSchema: GenMessage<SourceExtension> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 14);
+export const SourceExtensionSchema: GenMessage<SourceExtension> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 15);
 
 /**
  * One anchor frame followed by up to (anchor_interval - 1) delta frames, packed into `frames` as described in README.md. Every block can be decoded on its own.
@@ -668,7 +694,7 @@ export type MotionBlock = Message<'tarf.v1.MotionBlock'> & {
  * Describes the message tarf.v1.MotionBlock.
  * Use `create(MotionBlockSchema)` to create a new message.
  */
-export const MotionBlockSchema: GenMessage<MotionBlock> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 15);
+export const MotionBlockSchema: GenMessage<MotionBlock> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 16);
 
 /**
  * @generated from message tarf.v1.EventBatch
@@ -684,7 +710,7 @@ export type EventBatch = Message<'tarf.v1.EventBatch'> & {
  * Describes the message tarf.v1.EventBatch.
  * Use `create(EventBatchSchema)` to create a new message.
  */
-export const EventBatchSchema: GenMessage<EventBatch> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 16);
+export const EventBatchSchema: GenMessage<EventBatch> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 17);
 
 /**
  * @generated from message tarf.v1.Event
@@ -769,7 +795,7 @@ export type Event = Message<'tarf.v1.Event'> & {
  * Describes the message tarf.v1.Event.
  * Use `create(EventSchema)` to create a new message.
  */
-export const EventSchema: GenMessage<Event> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 17);
+export const EventSchema: GenMessage<Event> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 18);
 
 /**
  * @generated from message tarf.v1.NoteEvent
@@ -827,7 +853,7 @@ export type NoteEvent = Message<'tarf.v1.NoteEvent'> & {
  * Describes the message tarf.v1.NoteEvent.
  * Use `create(NoteEventSchema)` to create a new message.
  */
-export const NoteEventSchema: GenMessage<NoteEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 18);
+export const NoteEventSchema: GenMessage<NoteEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 19);
 
 /**
  * @generated from message tarf.v1.NoteIdentity
@@ -889,7 +915,7 @@ export type NoteIdentity = Message<'tarf.v1.NoteIdentity'> & {
  * Describes the message tarf.v1.NoteIdentity.
  * Use `create(NoteIdentitySchema)` to create a new message.
  */
-export const NoteIdentitySchema: GenMessage<NoteIdentity> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 19);
+export const NoteIdentitySchema: GenMessage<NoteIdentity> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 20);
 
 /**
  * @generated from message tarf.v1.NoteCut
@@ -975,7 +1001,7 @@ export type NoteCut = Message<'tarf.v1.NoteCut'> & {
  * Describes the message tarf.v1.NoteCut.
  * Use `create(NoteCutSchema)` to create a new message.
  */
-export const NoteCutSchema: GenMessage<NoteCut> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 20);
+export const NoteCutSchema: GenMessage<NoteCut> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 21);
 
 /**
  * @generated from message tarf.v1.WallEvent
@@ -1003,7 +1029,7 @@ export type WallEvent = Message<'tarf.v1.WallEvent'> & {
  * Describes the message tarf.v1.WallEvent.
  * Use `create(WallEventSchema)` to create a new message.
  */
-export const WallEventSchema: GenMessage<WallEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 21);
+export const WallEventSchema: GenMessage<WallEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 22);
 
 /**
  * @generated from message tarf.v1.WallIdentity
@@ -1053,7 +1079,7 @@ export type WallIdentity = Message<'tarf.v1.WallIdentity'> & {
  * Describes the message tarf.v1.WallIdentity.
  * Use `create(WallIdentitySchema)` to create a new message.
  */
-export const WallIdentitySchema: GenMessage<WallIdentity> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 22);
+export const WallIdentitySchema: GenMessage<WallIdentity> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 23);
 
 /**
  * @generated from message tarf.v1.HeightEvent
@@ -1069,7 +1095,7 @@ export type HeightEvent = Message<'tarf.v1.HeightEvent'> & {
  * Describes the message tarf.v1.HeightEvent.
  * Use `create(HeightEventSchema)` to create a new message.
  */
-export const HeightEventSchema: GenMessage<HeightEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 23);
+export const HeightEventSchema: GenMessage<HeightEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 24);
 
 /**
  * @generated from message tarf.v1.PauseEvent
@@ -1095,7 +1121,7 @@ export type PauseEvent = Message<'tarf.v1.PauseEvent'> & {
  * Describes the message tarf.v1.PauseEvent.
  * Use `create(PauseEventSchema)` to create a new message.
  */
-export const PauseEventSchema: GenMessage<PauseEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 24);
+export const PauseEventSchema: GenMessage<PauseEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 25);
 
 /**
  * @generated from message tarf.v1.ScoreEvent
@@ -1116,7 +1142,7 @@ export type ScoreEvent = Message<'tarf.v1.ScoreEvent'> & {
  * Describes the message tarf.v1.ScoreEvent.
  * Use `create(ScoreEventSchema)` to create a new message.
  */
-export const ScoreEventSchema: GenMessage<ScoreEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 25);
+export const ScoreEventSchema: GenMessage<ScoreEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 26);
 
 /**
  * @generated from message tarf.v1.ComboEvent
@@ -1132,7 +1158,7 @@ export type ComboEvent = Message<'tarf.v1.ComboEvent'> & {
  * Describes the message tarf.v1.ComboEvent.
  * Use `create(ComboEventSchema)` to create a new message.
  */
-export const ComboEventSchema: GenMessage<ComboEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 26);
+export const ComboEventSchema: GenMessage<ComboEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 27);
 
 /**
  * @generated from message tarf.v1.MultiplierEvent
@@ -1153,7 +1179,7 @@ export type MultiplierEvent = Message<'tarf.v1.MultiplierEvent'> & {
  * Describes the message tarf.v1.MultiplierEvent.
  * Use `create(MultiplierEventSchema)` to create a new message.
  */
-export const MultiplierEventSchema: GenMessage<MultiplierEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 27);
+export const MultiplierEventSchema: GenMessage<MultiplierEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 28);
 
 /**
  * @generated from message tarf.v1.EnergyEvent
@@ -1169,7 +1195,7 @@ export type EnergyEvent = Message<'tarf.v1.EnergyEvent'> & {
  * Describes the message tarf.v1.EnergyEvent.
  * Use `create(EnergyEventSchema)` to create a new message.
  */
-export const EnergyEventSchema: GenMessage<EnergyEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 28);
+export const EnergyEventSchema: GenMessage<EnergyEvent> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 29);
 
 /**
  * Written when TA toggles a mid-play modifier. `state` is the full state after the toggle, so a viewer only needs the latest event before a given time.
@@ -1194,7 +1220,7 @@ export type MidPlayModifierEvent = Message<'tarf.v1.MidPlayModifierEvent'> & {
  */
 export const MidPlayModifierEventSchema: GenMessage<MidPlayModifierEvent> /*@__PURE__*/ = messageDesc(
   file_tarf_v1_tarf,
-  29,
+  30,
 );
 
 /**
@@ -1233,7 +1259,7 @@ export type Footer = Message<'tarf.v1.Footer'> & {
  * Describes the message tarf.v1.Footer.
  * Use `create(FooterSchema)` to create a new message.
  */
-export const FooterSchema: GenMessage<Footer> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 30);
+export const FooterSchema: GenMessage<Footer> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 31);
 
 /**
  * @generated from message tarf.v1.Vector3
@@ -1259,7 +1285,7 @@ export type Vector3 = Message<'tarf.v1.Vector3'> & {
  * Describes the message tarf.v1.Vector3.
  * Use `create(Vector3Schema)` to create a new message.
  */
-export const Vector3Schema: GenMessage<Vector3> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 31);
+export const Vector3Schema: GenMessage<Vector3> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 32);
 
 /**
  * @generated from message tarf.v1.Quaternion
@@ -1290,7 +1316,7 @@ export type Quaternion = Message<'tarf.v1.Quaternion'> & {
  * Describes the message tarf.v1.Quaternion.
  * Use `create(QuaternionSchema)` to create a new message.
  */
-export const QuaternionSchema: GenMessage<Quaternion> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 32);
+export const QuaternionSchema: GenMessage<Quaternion> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 33);
 
 /**
  * @generated from message tarf.v1.Color
@@ -1321,7 +1347,7 @@ export type Color = Message<'tarf.v1.Color'> & {
  * Describes the message tarf.v1.Color.
  * Use `create(ColorSchema)` to create a new message.
  */
-export const ColorSchema: GenMessage<Color> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 33);
+export const ColorSchema: GenMessage<Color> /*@__PURE__*/ = messageDesc(file_tarf_v1_tarf, 34);
 
 /**
  * @generated from enum tarf.v1.ReplaySource
@@ -1394,6 +1420,42 @@ export enum Difficulty {
 export const DifficultySchema: GenEnum<Difficulty> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 1);
 
 /**
+ * @generated from enum tarf.v1.MapFileEncoding
+ */
+export enum MapFileEncoding {
+  /**
+   * @generated from enum value: MAP_FILE_ENCODING_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * The file as it is, for audio and images which are already compressed
+   *
+   * @generated from enum value: MAP_FILE_ENCODING_STORED = 1;
+   */
+  STORED = 1,
+
+  /**
+   * Raw deflate of the file
+   *
+   * @generated from enum value: MAP_FILE_ENCODING_DEFLATE = 2;
+   */
+  DEFLATE = 2,
+
+  /**
+   * Raw deflate of the JSON packed into columns, as described in README.md. Numbers keep the precision Beat Saber reads them with
+   *
+   * @generated from enum value: MAP_FILE_ENCODING_PACKED_JSON = 3;
+   */
+  PACKED_JSON = 3,
+}
+
+/**
+ * Describes the enum tarf.v1.MapFileEncoding.
+ */
+export const MapFileEncodingSchema: GenEnum<MapFileEncoding> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 2);
+
+/**
  * @generated from enum tarf.v1.HsvPlatform
  */
 export enum HsvPlatform {
@@ -1416,7 +1478,7 @@ export enum HsvPlatform {
 /**
  * Describes the enum tarf.v1.HsvPlatform.
  */
-export const HsvPlatformSchema: GenEnum<HsvPlatform> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 2);
+export const HsvPlatformSchema: GenEnum<HsvPlatform> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 3);
 
 /**
  * @generated from enum tarf.v1.NoteEventKind
@@ -1451,7 +1513,7 @@ export enum NoteEventKind {
 /**
  * Describes the enum tarf.v1.NoteEventKind.
  */
-export const NoteEventKindSchema: GenEnum<NoteEventKind> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 3);
+export const NoteEventKindSchema: GenEnum<NoteEventKind> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 4);
 
 /**
  * @generated from enum tarf.v1.MidPlayModifier
@@ -1486,7 +1548,7 @@ export enum MidPlayModifier {
 /**
  * Describes the enum tarf.v1.MidPlayModifier.
  */
-export const MidPlayModifierSchema: GenEnum<MidPlayModifier> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 4);
+export const MidPlayModifierSchema: GenEnum<MidPlayModifier> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 5);
 
 /**
  * @generated from enum tarf.v1.Completion
@@ -1523,4 +1585,4 @@ export enum Completion {
 /**
  * Describes the enum tarf.v1.Completion.
  */
-export const CompletionSchema: GenEnum<Completion> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 5);
+export const CompletionSchema: GenEnum<Completion> /*@__PURE__*/ = enumDesc(file_tarf_v1_tarf, 6);

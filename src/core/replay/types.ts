@@ -191,8 +191,8 @@ export interface Replay {
   hsvProfile?: string;
   // Which HitScoreVisualizer the profile JSON was written for. Quest when unset.
   hsvProfilePlatform?: HitScoreVisualizerPlatform;
-  // A zip of the map, for replays which carry their own map.
-  mapArchive?: Uint8Array;
+  // The map's files by name, for replays which carry their own map.
+  mapFiles?: Record<string, Uint8Array>;
   legacyScoreSaber?: LegacyScoreSaberData;
   liveHistoryBase?: {
     scoringNotes: number;

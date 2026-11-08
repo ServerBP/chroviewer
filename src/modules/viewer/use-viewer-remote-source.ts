@@ -12,7 +12,7 @@ import type { Replay } from '../../core/replay/types';
 import { replayMapHash } from '../../core/replay/types';
 import { applySharedViewerSettings } from '../../core/share-link';
 import type { ViewerSettings } from '../../core/viewer-settings';
-import { extractMapArchive } from '../../sources/archive';
+import { extractMapArchive, mapSourceFiles } from '../../sources/archive';
 import {
   beatLeaderReference,
   fetchBeatLeaderLeaderboards,
@@ -258,9 +258,8 @@ export function useViewerRemoteSource({
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
 
       // TARF replays can carry their own map, which also works for maps that aren't on BeatSaver
-      if (replay.mapArchive !== undefined) {
-        const files = yield* Result.await(extractMapArchive(replay.mapArchive));
-        if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
+      if (replay.mapFiles !== undefined) {
+        const files = yield* mapSourceFiles(replay.mapFiles);
         pendingSharedViewRef.current = pending;
         yield* Result.await(loadSourceFiles(requestId, files, replay, { sourceLink }));
         return Result.ok(undefined);

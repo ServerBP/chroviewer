@@ -7,6 +7,7 @@ import {
   type Event,
   type Footer,
   type Header,
+  type MapFile,
   type MotionBlock,
   type MotionEncoding,
   type Quaternion,
@@ -17,9 +18,11 @@ import {
   FooterSchema,
   HeaderSchema,
   HsvPlatform,
+  MapFileEncoding,
   MotionBlockSchema,
   ReplaySource,
 } from './generated/proto/tarf/v1/tarf_pb';
+import { unpackJson } from './packed-json';
 import { simulateReplayScoring } from './parse-beatleader';
 import type {
   Replay,
@@ -127,9 +130,24 @@ export function parseTarfReplay(data: Uint8Array): Replay {
     if (scoreSaberHsv !== undefined) replay.hsvConfig = scoreSaberHsv.payload;
   }
 
-  if (header.map !== undefined && header.map.archive.byteLength > 0) replay.mapArchive = header.map.archive;
+  if (header.map !== undefined && header.map.files.length > 0) replay.mapFiles = decodeMapFiles(header.map.files);
 
   return replay;
+}
+
+// Returns undefined for files from a newer writer, the map can then still be
+// downloaded from BeatSaver.
+function decodeMapFiles(files: MapFile[]) {
+  const encoder = new TextEncoder();
+  const decoded: Record<string, Uint8Array> = {};
+  for (const file of files) {
+    if (file.encoding === MapFileEncoding.STORED) decoded[file.name] = file.data;
+    else if (file.encoding === MapFileEncoding.DEFLATE) decoded[file.name] = inflateSync(file.data);
+    else if (file.encoding === MapFileEncoding.PACKED_JSON) {
+      decoded[file.name] = encoder.encode(JSON.stringify(unpackJson(inflateSync(file.data))));
+    } else return undefined;
+  }
+  return decoded;
 }
 
 interface TarfRecord {

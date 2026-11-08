@@ -1,5 +1,11 @@
 # Asset attributions
 
+## CG5 saber
+
+- CG5 Saber-Trail by Snowwisslow and Xanadu, from the supplied saber bundle.
+- CG5 fire-trail shader adapted from [BeatSaber shaders](https://github.com/Ikeiwa/BeatSaber-shaders)
+  by Ikeiwa ([MIT](public/sabers/cg5-trail-shader-LICENSE.txt)).
+
 ## VR headset
 
 [VR Headset](https://poly.pizza/m/raCB2tOkk3) by J-Toastie

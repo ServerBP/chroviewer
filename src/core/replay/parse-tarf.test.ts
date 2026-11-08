@@ -10,6 +10,7 @@ import {
   FooterSchema,
   HeaderSchema,
   HsvPlatform,
+  MapFileEncoding,
   MotionBlockSchema,
   NoteEventKind,
   ReplaySource,
@@ -173,6 +174,33 @@ describe('parseTarfReplay', () => {
     expect(replay.pauses[0]?.duration).toBe(3_000n);
     // Without score events, scores are worked out from the notes.
     expect(replay.scores).toHaveLength(1);
+  });
+
+  test('decodes the embedded map files', () => {
+    const info = new TextEncoder().encode('{"_version":"2.0.0","_songName":"Song"}');
+    const cover = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const withMap = create(HeaderSchema, {
+      map: {
+        hash: header.map?.hash,
+        files: [
+          { name: 'Info.dat', encoding: MapFileEncoding.DEFLATE, data: new Uint8Array(deflateRawSync(info)) },
+          { name: 'cover.png', encoding: MapFileEncoding.STORED, data: cover },
+        ],
+      },
+    });
+
+    const replay = parseTarfReplay(tarfFile([record(1, HeaderSchema, withMap, false)]));
+    expect(replay.mapFiles).toEqual({ 'Info.dat': info, 'cover.png': cover });
+  });
+
+  test('leaves out a map whose files it cannot read', () => {
+    const withMap = create(HeaderSchema, {
+      map: {
+        hash: header.map?.hash,
+        files: [{ name: 'Info.dat', encoding: 99 as MapFileEncoding, data: new Uint8Array() }],
+      },
+    });
+    expect(parseTarfReplay(tarfFile([record(1, HeaderSchema, withMap)])).mapFiles).toBeUndefined();
   });
 
   test('keeps everything before a record that was cut off', () => {

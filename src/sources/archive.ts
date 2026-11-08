@@ -12,7 +12,8 @@ function exactArrayBuffer(bytes: Uint8Array) {
     : bytes.slice().buffer;
 }
 
-function mapArchiveFiles(entries: Record<string, Uint8Array>) {
+// Map files by name, from a zip or from a replay which carries its own map.
+export function mapSourceFiles(entries: Record<string, Uint8Array>) {
   const files = Object.entries(entries).flatMap(([path, bytes]) => {
     const name = path.replaceAll('\\', '/').split('/').at(-1) ?? path;
     if (name === '' || path.includes('__MACOSX/') || name.startsWith('.')) return [];
@@ -55,7 +56,7 @@ export function extractMapArchive(data: Uint8Array): Promise<SourceResult<MapSou
                 operation: 'extract-map-archive',
               }),
           });
-          return mapArchiveFiles(extracted);
+          return mapSourceFiles(extracted);
         }),
       );
     });

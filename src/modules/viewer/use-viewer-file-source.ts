@@ -8,7 +8,7 @@ import { isBeatLeaderReplay } from '../../core/replay/parse-beatleader';
 import { applyLegacyScoreSaberMetadata, isScoreSaberReplay } from '../../core/replay/parse-scoresaber';
 import { isTarfReplay } from '../../core/replay/parse-tarf';
 import { replayMapHash, type Replay } from '../../core/replay/types';
-import { extractMapArchive } from '../../sources/archive';
+import { extractMapArchive, mapSourceFiles } from '../../sources/archive';
 import { isViewerSourceEnabled } from '../../sources/source-config';
 import { SourceError, sourceError } from '../../sources/source-error';
 import type {
@@ -296,11 +296,9 @@ export function useViewerFileSource({
           } else sourceFiles.push(file);
         } else sourceFiles.push(file);
       }
-      if (replay !== null && sourceFiles.length === 0 && replay.mapArchive !== undefined) {
+      if (replay !== null && sourceFiles.length === 0 && replay.mapFiles !== undefined) {
         // TARF replays can carry their own map.
-        const archive = yield* Result.await(extractMapArchive(replay.mapArchive));
-        if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
-        sourceFiles.push(...archive);
+        sourceFiles.push(...(yield* mapSourceFiles(replay.mapFiles)));
       } else if (replay !== null && sourceFiles.length === 0) {
         const hash = replayMapHash(replay);
         if (hash === null) {
