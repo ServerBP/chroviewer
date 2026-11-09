@@ -23,6 +23,7 @@ import { LiveMapCache } from '../live/live-map-cache';
 import type { PendingSharedView } from './use-viewer-file-source';
 import { useViewerFileSource } from './use-viewer-file-source';
 import { useViewerRemoteSource } from './use-viewer-remote-source';
+import type { ViewerSearch } from './viewer-search';
 
 interface UseViewerSourcesOptions {
   remoteSourcesEnabled?: boolean;
@@ -32,6 +33,8 @@ interface UseViewerSourcesOptions {
   onMapLoaded: () => void;
   liveMapCache?: LiveMapCache;
   sharedParser?: import('../../core/beatmap/worker/client').BeatmapParser;
+  /** Source parameters to use instead of the page URL, for viewers embedded in a compositor. */
+  searchOverride?: ViewerSearch;
 }
 
 export interface PreparedBeatLeaderShowcase {
@@ -72,6 +75,7 @@ export function useViewerSources({
   onMapLoaded,
   liveMapCache: sharedLiveMapCache,
   sharedParser,
+  searchOverride,
 }: UseViewerSourcesOptions) {
   const [sourceChoices, setSourceChoices] = useState<MapLookup[]>([]);
   const [liveDownloadProgress, setLiveDownloadProgress] = useState<DownloadProgress>(null);
@@ -97,6 +101,7 @@ export function useViewerSources({
     setError,
     setSettings,
     setSourceChoices,
+    searchOverride,
   });
 
   return {

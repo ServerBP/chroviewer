@@ -42,7 +42,7 @@ import type {
 } from '../../sources/source-types';
 import { sourceErrorMessage } from './source-error-message';
 import type { LoadedSourceContext, PendingSharedView } from './use-viewer-file-source';
-import { isRemoteSourceUrl } from './viewer-search';
+import { isRemoteSourceUrl, type ViewerSearch } from './viewer-search';
 import type { DifficultyRow, MapIdentity, ViewerSource, ViewerSourceLink } from './viewer-types';
 
 type RemoteSourceCommand = { requestId: number } & (
@@ -88,6 +88,8 @@ interface UseViewerRemoteSourceOptions {
   pendingSharedViewRef: RefObject<PendingSharedView | null>;
   setError: (message: string) => void;
   setSettings: Dispatch<SetStateAction<ViewerSettings>>;
+  /** Source parameters to use instead of the page URL, for viewers embedded in a compositor. */
+  searchOverride?: ViewerSearch;
   setSourceChoices: Dispatch<SetStateAction<MapLookup[]>>;
 }
 
@@ -102,11 +104,13 @@ export function useViewerRemoteSource({
   setError,
   setSettings,
   setSourceChoices,
+  searchOverride,
 }: UseViewerRemoteSourceOptions) {
   const t = useTranslations('viewer');
   const sourceT = useTranslations('source');
   const navigate = useNavigate({ from: '/' });
-  const search = useSearch({ from: '/' });
+  const routeSearch = useSearch({ from: '/' });
+  const search = searchOverride ?? routeSearch;
   const [sourceInput, setSourceInput] = useState('');
   const [sourceDownload, setSourceDownload] = useState<SourceDownload | null>(null);
 

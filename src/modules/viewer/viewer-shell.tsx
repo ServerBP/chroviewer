@@ -202,6 +202,9 @@ export interface MultiviewPlaybackSnapshot {
   playbackRate: number;
   seek(time: number): void;
   correctDrift(time: number): void;
+  play(): void;
+  pause(): void;
+  setPlaybackRate(rate: number): void;
 }
 
 interface ViewerShellProps {
@@ -216,6 +219,8 @@ interface ViewerShellProps {
     lights: 'full' | 'static' | 'none';
     timeline: MultiviewTimeline;
     startBarrier: MultiviewStartBarrier;
+    /** Plays this TARF replay, driven by the compositor, instead of following the player live. */
+    tarfPath?: string;
     settings?: Record<string, string | number | boolean>;
     mapCache: LiveMapCache;
     parser: BeatmapParser;
@@ -233,8 +238,9 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
           ...routeSearch,
           ...multiview.settings,
           hideUI: true as const,
-          playerId: multiview.playerId,
-          liveSource: 'ta' as const,
+          ...(multiview.tarfPath === undefined
+            ? { playerId: multiview.playerId, liveSource: 'ta' as const }
+            : { playerId: undefined, liveSource: undefined, tarfPath: multiview.tarfPath, autoplay: false }),
           masterVolume: multiview.masterVolume,
           hitsoundVolume: multiview.hitsoundVolume,
           disableGameUI: multiview.disableGameUI,
@@ -361,6 +367,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     },
     liveMapCache: multiview?.mapCache,
     sharedParser: multiview?.parser,
+    searchOverride: multiview?.tarfPath === undefined ? undefined : search,
   });
   const mapSelectionRow =
     search.map === undefined || search.previewSource !== undefined
@@ -885,6 +892,9 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
       playbackRate: transport.clockRef.current?.getRate() ?? 1,
       seek: transport.seek,
       correctDrift: (time) => transport.clockRef.current?.correctDrift(time),
+      play: () => void transport.play(),
+      pause: () => void transport.pause(),
+      setPlaybackRate: transport.setPlaybackRate,
     });
   }, [
     error,
