@@ -44,7 +44,7 @@ function sameBaseSite(origin: string) {
   }
 }
 
-function trustedParentOrigin(origin: string) {
+export function trustedParentOrigin(origin: string) {
   if (sameBaseSite(origin) || isBeatKhanaFrameAncestor(origin)) return true;
   try {
     const { hostname, protocol } = new URL(origin);
