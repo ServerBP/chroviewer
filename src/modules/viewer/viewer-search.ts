@@ -81,6 +81,7 @@ export const viewerSearchSchema = z.pipe(
     hideUI: z.catch(z.optional(z.boolean()), undefined),
     isolatedSettings: z.catch(z.optional(z.boolean()), undefined),
     multiview: z.catch(z.optional(z.boolean()), undefined),
+    compositor: z.catch(z.optional(z.literal('replay')), undefined),
     showcase: z.catch(z.optional(z.boolean()), undefined),
     showcaseConfig: z.catch(z.optional(z.string().check(z.maxLength(250_000))), undefined),
     poolShowcase: z.catch(z.optional(z.boolean()), undefined),

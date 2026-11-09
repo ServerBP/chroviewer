@@ -25,6 +25,26 @@ Cross-origin embeds can update audio without reloading by posting a message to t
 viewer iframe:
 { type: 'beatkhana:viewer-settings', masterVolume: 0.4, hitsoundVolume: 0.8 }
 
+REPLAY COMPOSITOR
+compositor=replay              Play several TARF replays of one map in a single renderer, driven by the
+                              parent page's clock like a video. The parent posts:
+  { type: 'beatkhana:replay-compositor-config', version: 1,
+    players: [{ id, tarfPath, side, name, avatarUrl?, color?, offsetSeconds?, settings? }],
+    layout?: 'auto' | 'columns' | 'rows', focus?: id | null, audio?: id | null,
+    volume?: 0..1, hitsoundVolume?: 0..1, showNames?: boolean, disableGameUI?: boolean }
+  { type: 'beatkhana:replay-compositor-transport', version: 1, playing, time, rate }
+                              Players with the same side share their half of the view: left and right,
+                              or top and bottom when each side has three players (layout=auto). focus
+                              shows one player full size. Only the audio player is heard (the focused or
+                              first one by default). time is in song seconds; send the transport on every
+                              play, pause, seek and rate change, tiles keep in step in between. A replay
+                              waits on its first or last frame outside its own song.
+                              The compositor posts beatkhana:replay-compositor-ready when it can take a
+                              config, and beatkhana:replay-compositor-state five times a second:
+                              { ready, time, duration, players: [{ id, status, error, time, duration }] }
+                              with status loading, ready, playing or error. tarfPath URLs on other sites
+                              are fetched directly when they allow it (CORS), otherwise through the proxy.
+
 TA IFRAME SYNCHRONISATION
 TA viewers on the same origin announce their platform ID, map hash, available replay
 range, and playback clock to one another. Viewers with the same map hash rendezvous at
