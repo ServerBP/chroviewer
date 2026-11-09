@@ -308,7 +308,7 @@ export function useViewerRemoteSource({
     });
   }
 
-  // Paths on this site are fetched directly, other sites go through the source proxy like replayUrl does
+  // Paths on this site and sites that allow it (CORS) are fetched directly, others go through the source proxy like replayUrl does
   async function loadTarfPath(
     requestId: number,
     tarfPath: string,
@@ -316,14 +316,17 @@ export function useViewerRemoteSource({
   ) {
     const url = new URL(tarfPath, window.location.origin);
     const sameOrigin = url.origin === window.location.origin;
+    const request = (href: string) =>
+      requestArrayBuffer(href, {
+        source: 'local',
+        label: 'Replay',
+        operation: 'download-replay',
+        ...downloadOptions('replay', requestId),
+      });
     return Result.gen(async function* () {
+      const direct = await request(url.href);
       const data = yield* Result.await(
-        requestArrayBuffer(sameOrigin ? url.href : sourceDownloadUrl(url.href), {
-          source: 'local',
-          label: 'Replay',
-          operation: 'download-replay',
-          ...downloadOptions('replay', requestId),
-        }),
+        direct.isOk() || sameOrigin ? Promise.resolve(direct) : request(sourceDownloadUrl(url.href)),
       );
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
       yield* Result.await(loadReplayData(requestId, data, pending, { type: 'replay', url: url.href }));
