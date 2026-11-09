@@ -80,7 +80,26 @@ export function fetchBeatSaverMap(input: string, options: ResolveOptions = {}) {
     : fetchBeatSaver(`/maps/id/${key}`, `BeatSaver map ${key}`, options);
 }
 
+// Viewers that load the same map at once, like the tiles of a compositor, share one download
+const pendingHashSources = new Map<string, ReturnType<typeof resolveBeatSaverHash>>();
+
 export async function fetchBeatSaverHash(hash: string, options: ResolveOptions = {}) {
+  if (options.signal !== undefined || options.cache !== undefined || !/^[0-9a-f]{40}$/i.test(hash)) {
+    return resolveBeatSaverHash(hash, options);
+  }
+  const key = hash.toLowerCase();
+  const pending = pendingHashSources.get(key);
+  if (pending !== undefined) {
+    const shared = await pending;
+    if (shared.isOk()) options.onProgress?.(1);
+    return shared;
+  }
+  const request = resolveBeatSaverHash(hash, options).finally(() => pendingHashSources.delete(key));
+  pendingHashSources.set(key, request);
+  return request;
+}
+
+async function resolveBeatSaverHash(hash: string, options: ResolveOptions) {
   if (!/^[0-9a-f]{40}$/i.test(hash)) {
     return Result.err(
       new SourceError({
