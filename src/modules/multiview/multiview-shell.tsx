@@ -143,6 +143,8 @@ export function MultiviewShell() {
   const nextSyncCheckRef = useRef(new Map<string, number>());
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
   const playerIdentitiesRef = useRef(new Map<string, string>());
+  // The latest config's ids. Effects see the players of an earlier render, so they must not drop newer data.
+  const configuredIdsRef = useRef(new Set<string>());
   const lastStatePublishRef = useRef(Number.NEGATIVE_INFINITY);
   const [scoreRate, setScoreRate] = useState(0);
   const scoreHistoriesRef = useRef(new Map<string, MultiviewScoreHistory>());
@@ -177,6 +179,7 @@ export function MultiviewShell() {
         new Set(next.map((player) => player.id)).size !== next.length
       )
         return;
+      configuredIdsRef.current = new Set(next.map((player) => player.id));
       for (const player of next) {
         let scoreTimeline = scoreTimelinesRef.current.get(player.id);
         if (playerIdentitiesRef.current.get(player.id) !== player.playerId) {
@@ -249,13 +252,13 @@ export function MultiviewShell() {
       return new Map([...current].filter(([id]) => activeIds.has(id)));
     });
     for (const id of scoreTimelinesRef.current.keys()) {
-      if (!activeIds.has(id)) {
+      if (!activeIds.has(id) && !configuredIdsRef.current.has(id)) {
         scoreTimelinesRef.current.delete(id);
         playerIdentitiesRef.current.delete(id);
       }
     }
     for (const id of scoreHistoriesRef.current.keys()) {
-      if (!activeIds.has(id)) scoreHistoriesRef.current.delete(id);
+      if (!activeIds.has(id) && !configuredIdsRef.current.has(id)) scoreHistoriesRef.current.delete(id);
     }
   }, [host, players, timeline]);
 
