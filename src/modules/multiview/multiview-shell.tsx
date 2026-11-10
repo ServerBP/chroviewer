@@ -7,6 +7,7 @@ import { broadcastSettingsForPlayerCount } from '../../renderer/render-performan
 import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-sync';
 import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
+import { advanceGroupHold, createGroupHoldState } from './multiview-group-hold';
 import type {
   MultiviewConfigMessage,
   MultiviewPlayerConfig,
@@ -98,7 +99,8 @@ interface TilePlaybackState {
   status: MultiviewPlaybackSnapshot['status'];
 }
 
-function waitingLabel(player: MultiviewPlayerConfig, playback: TilePlaybackState | undefined) {
+function waitingLabel(player: MultiviewPlayerConfig, playback: TilePlaybackState | undefined, held: boolean) {
+  if (held) return 'Waiting for every player';
   if (
     playback !== undefined &&
     playback.status === 'watching' &&
@@ -148,6 +150,8 @@ export function MultiviewShell() {
   const lastStatePublishRef = useRef(Number.NEGATIVE_INFINITY);
   const [scoreRate, setScoreRate] = useState(0);
   const scoreHistoriesRef = useRef(new Map<string, MultiviewScoreHistory>());
+  const groupHoldRef = useRef(createGroupHoldState());
+  const [heldIds, setHeldIds] = useState<ReadonlySet<string>>(() => new Set());
   const nativeBridge = typeof window === 'undefined' ? undefined : window.beatKhanaNativeCompositor;
 
   useEffect(() => {
@@ -313,6 +317,43 @@ export function MultiviewShell() {
         );
       const now = performance.now();
       const primarySample = timeline.primary(now);
+      if (startBarrier.enabled) {
+        const mapHash = primarySample?.mapHash?.toLowerCase() ?? null;
+        const tiles = players.flatMap((player) => {
+          const playback = playbackRef.current.get(player.id);
+          if (playback === undefined) return [];
+          const time = timeline.ownSample(player.id, now)?.time ?? playback.time;
+          return [
+            {
+              id: player.id,
+              status: playback.status,
+              playing: playback.playing,
+              mapHash: playback.mapHash?.toLowerCase() ?? null,
+              time,
+            },
+          ];
+        });
+        const hold = advanceGroupHold(groupHoldRef.current, tiles, mapHash, now, startBarrier.waitSeconds * 1000);
+        // Held tiles ran on for a moment after the pause; they continue from the paused player's time.
+        if (hold.resumeAt !== null) for (const id of hold.resume) playbackRef.current.get(id)?.seek(hold.resumeAt);
+        startBarrier.setHeld(hold.held);
+        setHeldIds((current) =>
+          current.size === hold.held.size && [...current].every((id) => hold.held.has(id))
+            ? current
+            : new Set(hold.held),
+        );
+        startBarrier.setGroupClock(
+          primarySample === null || mapHash === null || primarySample.duration <= 0
+            ? null
+            : {
+                mapHash,
+                time: primarySample.time,
+                observedAt: now,
+                playbackRate: primarySample.playbackRate,
+                playing: primarySample.playing && hold.held.size === 0,
+              },
+        );
+      }
       if (primarySample === null) return;
       const primary = snapshots.find((entry) => entry.player.id === primarySample.id);
       if (primary === undefined) return;
@@ -395,7 +436,7 @@ export function MultiviewShell() {
       }
     }, 100);
     return () => window.clearInterval(timer);
-  }, [nativeBridge, players, timeline]);
+  }, [nativeBridge, players, startBarrier, timeline]);
 
   const handlePlayback = useCallback(
     (id: string, snapshot: MultiviewPlaybackSnapshot) => {
@@ -451,7 +492,7 @@ export function MultiviewShell() {
   return (
     <main data-multiview-root className="relative size-full overflow-hidden bg-transparent">
       {runtimePlayers.map((player) => {
-        const label = waitingLabel(player, tilePlayback.get(player.id));
+        const label = waitingLabel(player, tilePlayback.get(player.id), heldIds.has(player.id));
         return label === null ? null : (
           <div
             key={`${player.id}:waiting`}

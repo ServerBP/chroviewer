@@ -189,10 +189,11 @@ describe('TA compositor pose retention through the connection', () => {
     expect(players.every((player) => !player.clock.isPlaying())).toBe(true);
 
     await vi.advanceTimersByTimeAsync(30_100);
+    // The four that are ready start together when the others never come; they keep the delayed stream's buffer.
     for (const player of players) {
       expect(player.status).toBe('watching');
-      expect(player.runtimeRef.current?.compositorBufferSeconds).toBe(0);
-      expect(player.runtimeRef.current?.compositorStartAligned).toBe(false);
+      expect(player.runtimeRef.current?.compositorBufferSeconds).toBe(30);
+      expect(player.runtimeRef.current?.compositorStartAligned).toBe(true);
       expect(player.transport.seek).toHaveBeenCalledExactlyOnceWith(0);
       expect(player.runtimeRef.current?.replay?.poses[0]?.time).toBe(0);
     }

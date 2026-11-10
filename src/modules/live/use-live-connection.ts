@@ -3,6 +3,7 @@ import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'r
 import { fromBinary } from '@bufbuild/protobuf';
 import { Result } from 'better-result';
 
+import type { SongClock } from '../../core/clock/song-clock';
 import type { LiveChatMessage } from './generated/proto/scoresaber/live/v1/chat_pb';
 import { LudusPlayState } from './generated/proto/scoresaber/live/v1/common_pb';
 import {
@@ -535,6 +536,23 @@ export function useLiveConnection(
           return;
         }
       }
+      if (
+        startBarrier !== undefined &&
+        runtime.replay !== null &&
+        runtime.playbackStarted &&
+        startBarrier.barrier.isHeld(startBarrier.id)
+      ) {
+        if (clock?.isPlaying()) pausePlayback();
+        return;
+      }
+      const groupTime =
+        startBarrier === undefined || runtime.replay === null || runtime.playbackStarted
+          ? null
+          : startBarrier.barrier.groupTime(runtime.taLiveMapHash);
+      if (groupTime !== null && clock !== null && first !== undefined) {
+        joinGroup(clock, first, groupTime);
+        return;
+      }
       if (!runtime.compositorStartAligned) runtime.compositorBufferSeconds = 0;
       tickLivePlayback(runtime, clock, optionsRef.current.selectedKey, playbackActions);
       const replay = runtime.replay;
@@ -567,6 +585,30 @@ export function useLiveConnection(
           updateStatus: updateConnectionState,
         },
       );
+    }
+
+    /** A stream that starts while the others already play waits, black, until it can show their moment of the song. */
+    function joinGroup(clock: SongClock, firstFrameTime: number, groupTime: number) {
+      const ready =
+        runtime.mapLoaded &&
+        optionsRef.current.selectedKey !== '' &&
+        clock.duration > 0 &&
+        !runtime.streamPaused &&
+        groupTime >= firstFrameTime &&
+        runtime.latestFrameTime >= groupTime + Math.max(0.75, runtime.playbackDelay);
+      if (!ready) {
+        if (clock.isPlaying()) pausePlayback();
+        updateConnectionState('buffering');
+        return;
+      }
+      runtime.playbackClock = clock;
+      runtime.playbackStarted = true;
+      runtime.compositorStartAligned = true;
+      runtime.playbackAttemptPending = false;
+      clock.setRate(runtime.playbackRate);
+      seekPlayback(groupTime);
+      resumePlayback();
+      updateConnectionState('watching');
     }
 
     void connect();
