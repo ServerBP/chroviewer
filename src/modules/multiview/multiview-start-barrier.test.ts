@@ -25,6 +25,21 @@ const participant = (changes: Partial<BufferedStartParticipant> = {}): BufferedS
 afterEach(() => vi.useRealTimers());
 
 describe('buffered compositor startup', () => {
+  test('a stream joined mid-song waits only briefly for tiles that never begin', () => {
+    vi.useFakeTimers();
+    const barrier = new MultiviewStartBarrier(() => 0);
+    barrier.configure(roster(2));
+    const member = participant({ firstFrameTime: 60, latestFrameTime: 62 });
+    barrier.begin('0', 'stream-0', 'map:9:Standard:1', true);
+    expect(barrier.update('0', 'stream-0', member)).toBe(true);
+    vi.advanceTimersByTime(2_900);
+    expect(barrier.isWaitingFor('0', 'stream-0')).toBe(true);
+    vi.advanceTimersByTime(200);
+    expect(barrier.isWaitingFor('0', 'stream-0')).toBe(false);
+    expect(member.start).not.toHaveBeenCalled();
+    barrier.dispose();
+  });
+
   test('starts eight POVs exactly once in one task with a common timeline', () => {
     vi.useFakeTimers();
     const barrier = new MultiviewStartBarrier(() => 12_345);

@@ -1,6 +1,8 @@
 export type CompositorSyncType = 'slow' | 'wait-for-all';
 export const defaultCompositorWaitSeconds = 30;
 export const maximumCompositorWaitSeconds = 60;
+/** A stream joined mid-song (an overlay reload) only waits for the tiles that join with it. */
+export const lateJoinWaitSeconds = 3;
 
 interface SyncPlayer {
   id: string;
@@ -75,7 +77,7 @@ export class MultiviewStartBarrier {
     return this.type === 'wait-for-all';
   }
 
-  begin(id: string, streamId: string, mapKey: string) {
+  begin(id: string, streamId: string, mapKey: string, lateJoin = false) {
     if (!this.enabled || !this.ids.includes(id)) return;
     const previous = this.members.get(id);
     if (previous?.streamId === streamId && previous.mapKey === mapKey) return;
@@ -87,7 +89,8 @@ export class MultiviewStartBarrier {
       this.members.clear();
       this.mapKey = mapKey;
       this.phase = 'waiting';
-      this.timer = setTimeout(() => this.release(false), this.waitSeconds * 1000);
+      const seconds = lateJoin ? Math.min(this.waitSeconds, lateJoinWaitSeconds) : this.waitSeconds;
+      this.timer = setTimeout(() => this.release(false), seconds * 1000);
     }
     this.members.set(id, { mapKey, streamId });
     if (this.phase === 'waiting' && mapKey !== this.mapKey) this.release(false);

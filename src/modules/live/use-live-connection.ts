@@ -19,6 +19,8 @@ import {
   acceptLiveReplayPacket,
   applyLivePlaybackBuffer,
   createLiveRuntime,
+  lateJoinedStream,
+  liveStreamStale,
   maxBufferedPackets,
   reconnectDelays,
   replayPacketTargetsPlayer,
@@ -170,6 +172,7 @@ export function useLiveConnection(
       const buffered = runtime.bufferedPackets;
       resetLiveStream(runtime);
       runtime.currentStreamId = packet.streamId;
+      runtime.streamStartedAt = performance.now();
       const replay = createLiveReplay(start, activeTarget.source === 'ta' || activeTarget.source === 'cocu');
       runtime.replay = replay;
       const startBarrier = optionsRef.current.startBarrier;
@@ -179,6 +182,7 @@ export function useLiveConnection(
           startBarrier.id,
           packet.streamId,
           `${liveMapHash(start)}:${replay.metadata.difficulty}:${replay.metadata.characteristic}:${replay.metadata.songSpeed ?? 1}`,
+          lateJoinedStream(start.serverStartTimeUnixMs),
         );
       }
       runtime.playbackRate = replay.metadata.songSpeed && replay.metadata.songSpeed > 0 ? replay.metadata.songSpeed : 1;
@@ -483,6 +487,10 @@ export function useLiveConnection(
       const clock = transport.clockRef.current;
       const startBarrier = optionsRef.current.startBarrier;
       const first = runtime.replay?.poses[0]?.time;
+      if (runtime.mapLoaded && liveStreamStale(runtime)) {
+        updateConnectionState('waiting');
+        return;
+      }
       if (
         startBarrier !== undefined &&
         runtime.replay !== null &&

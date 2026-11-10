@@ -56,6 +56,8 @@ export interface LiveRuntime {
   socket: WebSocket | null;
   streamEnding: boolean;
   streamPaused: boolean;
+  /** performance.now() when the current stream's start packet arrived. */
+  streamStartedAt: number;
   taLive: boolean;
   taBufferingStartedAt: number;
   taLiveMapHash: string;
@@ -100,6 +102,7 @@ export function createLiveRuntime(target: LiveTarget): LiveRuntime {
     socket: null,
     streamEnding: false,
     streamPaused: false,
+    streamStartedAt: 0,
     taLive: target.source === 'ta' || target.source === 'cocu',
     taBufferingStartedAt: 0,
     taLiveMapHash: '',
@@ -141,9 +144,32 @@ export function resetLiveStream(runtime: LiveRuntime) {
   runtime.replay = null;
   runtime.streamEnding = false;
   runtime.streamPaused = false;
+  runtime.streamStartedAt = 0;
   runtime.taLiveMapHash = '';
   runtime.taBufferingStartedAt = 0;
   runtime.taSyncHolding = false;
+}
+
+/** How long a stream may go without frames after its start before it is treated as one that has already ended. */
+export const staleStreamSeconds = 5;
+
+/**
+ * TournamentAssistant hands a new viewer the last start packet it saw, which can belong to a play that ended without
+ * the server hearing of it. Such a stream never delivers frames and must not read as "preparing" forever.
+ */
+export function liveStreamStale(runtime: LiveRuntime, now = performance.now()) {
+  return (
+    runtime.replay !== null &&
+    runtime.receivedPoseFrameCount === 0 &&
+    runtime.streamStartedAt > 0 &&
+    now - runtime.streamStartedAt >= staleStreamSeconds * 1000
+  );
+}
+
+/** A start packet for a play that began well before this viewer connected: an overlay reload mid-song. */
+export function lateJoinedStream(serverStartTimeUnixMs: bigint | number | undefined, now = Date.now()) {
+  const startedAt = Number(serverStartTimeUnixMs ?? 0);
+  return startedAt > 0 && now - startedAt > 10_000;
 }
 
 export function replayPacketTargetsPlayer(packet: ReplayStreamPacket, playerId: string) {
