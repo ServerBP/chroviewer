@@ -33,7 +33,9 @@ export function applyLiveReplayChunk(
     appendLivePause(replay, event);
     scheduleReplayPause(runtime.pendingPauseEvents, event, runtime.receivedPoseFrameCount);
   }
-  replay.poses.push(...events.poseFrames.map(livePose));
+  const poses = events.poseFrames.map(livePose);
+  if (replay.liveStartTime === undefined && poses[0] !== undefined) replay.liveStartTime = poses[0].time;
+  replay.poses.push(...poses);
   runtime.receivedPoseFrameCount += events.poseFrames.length;
   replay.heights.push(...heights);
   appendReplayHeightEvents(heights);

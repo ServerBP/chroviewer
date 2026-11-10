@@ -176,9 +176,20 @@ environmentRightBoostColor=%23rrggbb
 environmentWhiteBoostColor=%23rrggbb
 Saber overrides do not replace environment colors. Existing shared customColors palettes retain their old behavior until the new controls are explicitly set.
 
+MULTIVIEW REPLAY SCORES
+A multiview parent may add scores: { rateHz } (1..60) to beatkhana:multiview-config. Each tile's score is
+then read from the replay it is drawing, at its own playback time, and posted that many times a second
+(only when something changed):
+  { type: 'beatkhana:multiview-scores', version: 1,
+    players: [{ id, playerId, platformIds, time, score: { scoreWithModifiers, maxScoreWithModifiers,
+      accuracy, combo, maxCombo, notesMissed, badCuts, bombHits, wallHits, playerHealth, songPosition } | null }] }
+score is null until the tile's playback reaches its replay. TournamentAssistant streams scores with
+modifiers applied, so no unmodified score is sent. A stream joined mid-song takes the misses, cuts, hits
+and highest combo it did not see from the realtime score the parent sent for that moment.
+
 COMPOSITOR SYNCHRONIZATION
 compositorSyncType=slow|wait-for-all
 compositorWaitSeconds=1..60   Default 30 seconds, maximum 60 seconds.
 All visible players must select wait-for-all. Missing or mixed settings default to slow.
-Waiting holds stream playback until the same map hash, difficulty, characteristic and song speed are buffered for every visible player. All clocks are started in one compositor task using a common time reference. A timeout or incompatible map falls back to normal gradual playback. Waiting is only applied at stream startup, never periodically during playback. Replay memory is bounded while waiting and while playing the delayed stream.
+Waiting holds stream playback until the same map hash, difficulty, characteristic and song speed are buffered for every visible player. All clocks are started in one compositor task using a common time reference. A timeout or incompatible map falls back to normal gradual playback. Waiting is only applied at stream startup, never periodically during playback. A stream that began more than ten seconds before the viewer connected (an overlay reloaded mid-song) waits at most three seconds for the other players, and a start packet that delivers no frames for five seconds is shown as waiting rather than preparing. Replay memory is bounded while waiting and while playing the delayed stream.
 For multiview embeds these values belong in each player's settings object. Slow mode remains the default. Browser, OBS, windowed and Spout bridges all use the same compositor protocol and render host.

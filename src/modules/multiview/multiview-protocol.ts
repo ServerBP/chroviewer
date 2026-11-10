@@ -23,6 +23,8 @@ export interface MultiviewConfigMessage {
   type: 'beatkhana:multiview-config';
   version: 1;
   players: MultiviewPlayerConfig[];
+  /** Stream each tile's replay score back at this many updates per second (1 to 60). Omitted or 0 sends none. */
+  scores?: { rateHz: number };
 }
 
 export interface MultiviewStateMessage {
@@ -47,4 +49,17 @@ export interface MultiviewStateMessage {
 export interface MultiviewReadyMessage {
   type: 'beatkhana:multiview-ready';
   version: 1;
+}
+
+export interface MultiviewScoresMessage {
+  type: 'beatkhana:multiview-scores';
+  version: 1;
+  players: Array<{
+    id: string;
+    playerId: string;
+    platformIds: string[];
+    /** Read from the replay the tile is drawing; null until its playback reaches the replay. */
+    score: Record<string, number> | null;
+    time: number;
+  }>;
 }

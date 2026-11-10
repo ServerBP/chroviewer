@@ -244,6 +244,26 @@ export function replayScoreAt(timeline: ReplayScoreTimeline, time: number) {
   return replayStateAt(timeline.replay, timeline.stateIndex, time);
 }
 
+interface CachedStateIndex {
+  signature: string;
+  index: ReplayStateIndex;
+}
+
+const liveStateIndexes = new WeakMap<Replay, CachedStateIndex>();
+
+/** The score state of a replay that may still be growing or pruned, as a live stream is. */
+export function liveReplayScoreAt(replay: Replay, time: number) {
+  const base = replay.liveHistoryBase;
+  // A live replay is appended to and its consumed history moved into liveHistoryBase; rebuild only when that happens.
+  const signature = `${replay.notes.length}:${replay.notes[0]?.time ?? ''}:${replay.combos.length}:${replay.combos[0]?.time ?? ''}:${base?.scoringNotes ?? ''}:${base?.maxCombo ?? ''}`;
+  let cached = liveStateIndexes.get(replay);
+  if (cached?.signature !== signature) {
+    cached = { signature, index: buildReplayStateIndex(replay) };
+    liveStateIndexes.set(replay, cached);
+  }
+  return replayStateAt(replay, cached.index, time);
+}
+
 export function replayEventIndexAfter(timeline: ReplayScoreTimeline, time: number) {
   return upperBound(timeline.events, time, (event) => event.time);
 }

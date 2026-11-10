@@ -18,6 +18,8 @@ import { useTranslations } from 'use-intl';
 import { difficultyRank } from '../../core/beatmap/info';
 import type { BeatmapParser } from '../../core/beatmap/worker/client';
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
+import { liveReplayScoreAt, type ReplayScoreState } from '../../core/replay/scoring';
+import type { Replay } from '../../core/replay/types';
 import {
   DEFAULT_VIEWER_SETTINGS,
   defaultViewerSettings,
@@ -188,6 +190,14 @@ function replaceDynamicLocation(values: Record<string, unknown>) {
   window.history.replaceState(window.history.state, '', url);
 }
 
+export interface MultiviewReplayScore {
+  replay: Replay;
+  state: ReplayScoreState;
+  time: number;
+  /** First song time the replay holds; later than zero when the stream was joined mid-song. */
+  startTime: number;
+}
+
 export interface MultiviewPlaybackSnapshot {
   playerId: string;
   time: number;
@@ -200,6 +210,8 @@ export interface MultiviewPlaybackSnapshot {
   map: MapMeta | null;
   mapHash: string | null;
   playbackRate: number;
+  /** The score this tile's replay has reached at its current time, or null before its playback reaches the replay. */
+  readScore(): MultiviewReplayScore | null;
   seek(time: number): void;
   correctDrift(time: number): void;
   play(): void;
@@ -890,6 +902,16 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
       map: sources.mapMeta,
       mapHash: sources.mapIdentity?.hash ?? null,
       playbackRate: transport.clockRef.current?.getRate() ?? 1,
+      readScore: () => {
+        const replay = sources.replayRef.current;
+        const clock = transport.clockRef.current;
+        if (replay === null || clock === null) return null;
+        const startTime = replay.liveStartTime ?? replay.poses[0]?.time;
+        const time = clock.currentTime();
+        // Before playback reaches the replay the clock sits at zero, which would read as an empty score.
+        if (startTime === undefined || time + 0.05 < startTime) return null;
+        return { replay, state: liveReplayScoreAt(replay, time), time, startTime: replay.liveStartTime ?? 0 };
+      },
       seek: transport.seek,
       correctDrift: (time) => transport.clockRef.current?.correctDrift(time),
       play: () => void transport.play(),

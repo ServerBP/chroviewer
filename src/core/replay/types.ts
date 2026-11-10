@@ -194,6 +194,8 @@ export interface Replay {
   // The map's files by name, for replays which carry their own map.
   mapFiles?: Record<string, Uint8Array>;
   legacyScoreSaber?: LegacyScoreSaberData;
+  /** Song time of the first frame a live stream delivered; later than the song start when joined mid-song. */
+  liveStartTime?: number;
   liveHistoryBase?: {
     scoringNotes: number;
     misses: number;

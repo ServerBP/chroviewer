@@ -7,7 +7,18 @@ import { broadcastSettingsForPlayerCount } from '../../renderer/render-performan
 import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-sync';
 import { LiveMapCache } from '../live/live-map-cache';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
-import type { MultiviewConfigMessage, MultiviewPlayerConfig, MultiviewStateMessage } from './multiview-protocol';
+import type {
+  MultiviewConfigMessage,
+  MultiviewPlayerConfig,
+  MultiviewScoresMessage,
+  MultiviewStateMessage,
+} from './multiview-protocol';
+import {
+  multiviewReplayScore,
+  multiviewScoreHistory,
+  multiviewScoreRate,
+  type MultiviewScoreHistory,
+} from './multiview-replay-scores';
 import { MultiviewStartBarrier } from './multiview-start-barrier';
 import {
   advanceMultiviewCorrection,
@@ -133,6 +144,8 @@ export function MultiviewShell() {
   const scoreTimelinesRef = useRef(new Map<string, EmbeddedRealtimeScoreTimeline>());
   const playerIdentitiesRef = useRef(new Map<string, string>());
   const lastStatePublishRef = useRef(Number.NEGATIVE_INFINITY);
+  const [scoreRate, setScoreRate] = useState(0);
+  const scoreHistoriesRef = useRef(new Map<string, MultiviewScoreHistory>());
   const nativeBridge = typeof window === 'undefined' ? undefined : window.beatKhanaNativeCompositor;
 
   useEffect(() => {
@@ -155,7 +168,8 @@ export function MultiviewShell() {
   useEffect(() => {
     function applyConfig(data: unknown) {
       if (!isRecord(data) || data.type !== 'beatkhana:multiview-config' || data.version !== 1) return;
-      const next = (data as unknown as MultiviewConfigMessage).players;
+      const config = data as unknown as MultiviewConfigMessage;
+      const next = config.players;
       if (
         !Array.isArray(next) ||
         next.length > 12 ||
@@ -186,6 +200,7 @@ export function MultiviewShell() {
         startBarrier.configure(next);
         setPlayers(next);
       }
+      setScoreRate(multiviewScoreRate(config.scores?.rateHz));
     }
     if (nativeBridge !== undefined) {
       const removeListener = nativeBridge.onMessage(applyConfig);
@@ -239,7 +254,51 @@ export function MultiviewShell() {
         playerIdentitiesRef.current.delete(id);
       }
     }
+    for (const id of scoreHistoriesRef.current.keys()) {
+      if (!activeIds.has(id)) scoreHistoriesRef.current.delete(id);
+    }
   }, [host, players, timeline]);
+
+  useEffect(() => {
+    if (scoreRate <= 0) return;
+    const signatures = new Map<string, string>();
+    const send = (message: MultiviewScoresMessage) => {
+      if (nativeBridge !== undefined) nativeBridge.send(message);
+      else if (parentOriginRef.current !== null) window.parent.postMessage(message, parentOriginRef.current);
+    };
+    const timer = window.setInterval(() => {
+      let changed = false;
+      const scores = players.map((player) => {
+        const reading = playbackRef.current.get(player.id)?.readScore() ?? null;
+        let history = scoreHistoriesRef.current.get(player.id) ?? null;
+        if (reading !== null && history?.replay !== reading.replay) {
+          // A stream joined mid-song lacks the misses and cuts before its first frame; the parent's realtime
+          // score at that moment supplies them.
+          const parentScores = scoreTimelinesRef.current.get(player.id);
+          // The parent's first score after a reload can land just after the replay's first frame.
+          const before =
+            reading.startTime > 1
+              ? ((parentScores?.at(reading.startTime) ?? parentScores?.at(reading.startTime + 2))?.score ?? null)
+              : null;
+          history = multiviewScoreHistory(reading.replay, before);
+          if (reading.startTime <= 1 || before !== null) scoreHistoriesRef.current.set(player.id, history);
+        }
+        const score = reading === null ? null : multiviewReplayScore(reading.state, reading.time, history);
+        const signature = JSON.stringify(score);
+        if (signatures.get(player.id) !== signature) changed = true;
+        signatures.set(player.id, signature);
+        return {
+          id: player.id,
+          playerId: player.playerId,
+          platformIds: player.platformIds,
+          score,
+          time: reading?.time ?? 0,
+        };
+      });
+      if (changed) send({ type: 'beatkhana:multiview-scores', version: 1, players: scores });
+    }, 1000 / scoreRate);
+    return () => window.clearInterval(timer);
+  }, [nativeBridge, players, scoreRate]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {

@@ -12,6 +12,9 @@ The iframe remains a deployed web application at `view.replay.beatkhana.com`.
 The parent at `beatkhana.com` sends `beatkhana:multiview-config`; ChroViewer
 validates the sender, player IDs, and configuration, and returns
 `beatkhana:multiview-state` for overlay progress and delayed score consumers.
+When the config asks for `scores: { rateHz }`, it also posts
+`beatkhana:multiview-scores`: every tile's score read from the replay it draws, up
+to 60 times a second.
 Local HTTP development and the alternate ChroViewer host remain supported.
 No browser security headers or deployment topology were changed.
 
