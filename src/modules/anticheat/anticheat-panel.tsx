@@ -39,6 +39,10 @@ const number = (value: number | null | undefined, digits = 1) =>
 
 const HANDS = ['left', 'right', 'head'] as const;
 
+// Past 99% the decimal matters: 99.8% of pairs is not every pair
+const closerShare = (share: number) =>
+  share >= 0.99 && share < 1 ? Math.min(99.9, share * 100).toFixed(1) : String(Math.round(share * 100));
+
 /** A finding's measure over the play, with the current moment and where most people are */
 function SeriesChart({ series, time }: { series: AnticheatSeries; time: number }) {
   const points = series.points.filter((point) => Number.isFinite(point[2]));
@@ -266,7 +270,7 @@ function ComparisonSummary({
               <span className="text-muted-foreground text-xs">
                 {pair.closerThan === null
                   ? t('distanceOnly', { distance: number(pair.distance, 2) })
-                  : t('closerThan', { share: Math.round(pair.closerThan * 100), pairs: pair.usualPairs })}
+                  : t('closerThan', { share: closerShare(pair.closerThan), pairs: pair.usualPairs })}
               </span>
               {pair.timingCorrelation !== null && (
                 <span className="text-muted-foreground text-xs">
