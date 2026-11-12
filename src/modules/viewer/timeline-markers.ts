@@ -2,7 +2,7 @@ import { secondsToSongBpmTime, songBpmTimeToSeconds } from '../../core/beatmap/b
 import type { Bookmark, Difficulty } from '../../core/beatmap/types';
 import type { Replay } from '../../core/replay/types';
 
-export type TimelineMarkerKind = 'miss' | 'bad-cut' | 'pause' | 'bookmark';
+export type TimelineMarkerKind = 'miss' | 'bad-cut' | 'pause' | 'bookmark' | 'finding';
 
 export interface TimelineMarker {
   id: string;

@@ -29,6 +29,7 @@ interface TimelineSliderProps {
 interface MarkerTranslationKeys {
   'bad-cut': 'markerBadCut';
   bookmark: 'markerBookmark';
+  finding: 'markerFinding';
   miss: 'markerMiss';
   pause: 'markerPause';
 }
@@ -36,6 +37,7 @@ interface MarkerTranslationKeys {
 const markerTranslationKeys: MarkerTranslationKeys = {
   'bad-cut': 'markerBadCut',
   bookmark: 'markerBookmark',
+  finding: 'markerFinding',
   miss: 'markerMiss',
   pause: 'markerPause',
 };
@@ -61,6 +63,15 @@ function MarkerGlyph({ marker }: { marker: TimelineMarker }) {
   }
   if (marker.kind === 'pause') {
     return <Pause aria-hidden className="drop-shadow-sm" color="#0ff" strokeWidth={3.5} />;
+  }
+  if (marker.kind === 'finding') {
+    return (
+      <span
+        aria-hidden
+        className="size-2 rotate-45 border border-black/60 shadow-sm"
+        style={{ backgroundColor: marker.color }}
+      />
+    );
   }
   return (
     <span

@@ -413,6 +413,7 @@
       "muteSong": "Mute song",
       "markerBadCut": "Bad cut",
       "markerBookmark": "Bookmark",
+      "markerFinding": "Anticheat finding",
       "markerLane": "Lane {lane}",
       "markerMiss": "Miss",
       "markerPause": "Pause",
@@ -442,5 +443,51 @@
       "unmuteMaster": "Unmute all audio",
       "unmuteSong": "Unmute song"
     }
+  },
+  "anticheat": {
+    "open": "Anticheat report",
+    "reportTitle": "Anticheat report",
+    "comparisonTitle": "Anticheat comparison",
+    "nothing": "Nothing out of the ordinary.",
+    "humanity": "Humanity {score} of 100",
+    "findings": "{count, plural, =0 {Findings} one {# finding} other {# findings}}",
+    "findingsHint": "Pick a finding to see why and where. Notes it points at are ringed in the scene, swings show the path of the saber tip, and the timeline marks every place.",
+    "showAll": "Show all",
+    "places": "{count, plural, one {# place} other {# places}}",
+    "seekTo": "Go to {time}",
+    "unmatched": "{missing, plural, one {# marked note isn't} other {# marked notes aren't}} in this version of the map, so {missing, plural, one {it isn't} other {they aren't}} ringed.",
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "notice": "Notice",
+      "info": "Info"
+    },
+    "kind": {
+      "note": "Note",
+      "swing": "Swing",
+      "turn": "Turn",
+      "frame": "Frame",
+      "stretch": "Stretch"
+    },
+    "hand": {
+      "left": "left",
+      "right": "right",
+      "head": "head"
+    },
+    "players": "Players",
+    "played": "Played",
+    "showPlayer": "Show {name}",
+    "hidePlayer": "Hide {name}",
+    "pairs": "How alike they move",
+    "closerThan": "Closer than {share}% of {pairs} pairs of different people on this map",
+    "distanceOnly": "Distance {distance} (too few other players on this map to compare)",
+    "timing": "Early and late cuts agree note by note: {correlation} over {notes} notes",
+    "pairsHint": "Close to 100% on several maps is worth a closer look. One map alone never decides it.",
+    "closestMeasures": "Measures where they are closest",
+    "ordinary": "most people {low} to {high}",
+    "notesHere": "Notes around now",
+    "note": "Note",
+    "noteValues": "{timing} ms · {pre}° / {post}°",
+    "noteValuesHint": "Cut timing against the beat, then the swing before and after the cut."
   }
 }
