@@ -28,6 +28,8 @@ import {
 } from '../../core/viewer-settings';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
+import { activeFindings, findingMarkers, findingsOf, ghostsOf, sceneMarks } from '../anticheat/anticheat-marks';
+import { AnticheatPanel } from '../anticheat/anticheat-panel';
 import { useLightshowShowcase } from '../lightshow-showcase/use-lightshow-showcase';
 import { EmbeddedRealtimeScoreTimeline, isEmbeddedRealtimeScoreMessage } from '../live/embedded-realtime-score-sync';
 import { LudusPlayState } from '../live/generated/proto/scoresaber/live/v1/common_pb';
@@ -264,6 +266,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const t = useTranslations('viewer');
   const commonT = useTranslations('common');
   const partyT = useTranslations('watchParty');
+  const anticheatT = useTranslations('anticheat');
   const partyActive = search.party !== undefined;
   const hideUI = search.hideUI === true;
   const taLiveSource = search.liveSource === 'ta' || search.liveSource === 'cocu';
@@ -786,9 +789,48 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
   const replayNoteCount = replay?.notes.length ?? 0;
   const replayPauseCount = replay?.pauses.length ?? 0;
   const latestPauseDuration = replay?.pauses.at(-1)?.duration;
+  // BeatKhana anticheat files: the report's findings drawn into the scene and onto the timeline
+  const anticheat = replay?.anticheat ?? null;
+  const [anticheatOpen, setAnticheatOpen] = useState(false);
+  const [selectedFinding, setSelectedFinding] = useState<string | null>(null);
+  const [hiddenPlayers, setHiddenPlayers] = useState<ReadonlySet<number>>(new Set());
+  const [matchedNotes, setMatchedNotes] = useState(0);
+  useEffect(() => {
+    setAnticheatOpen(anticheat !== null);
+    setSelectedFinding(null);
+    setHiddenPlayers(new Set());
+  }, [anticheat]);
+  const activeAnticheat = useMemo(
+    () => (anticheat === null ? [] : activeFindings(findingsOf(anticheat), selectedFinding)),
+    [anticheat, selectedFinding],
+  );
+  const anticheatScene = useMemo(() => sceneMarks(activeAnticheat), [activeAnticheat]);
+  const anticheatGhosts = useMemo(() => (anticheat === null ? [] : ghostsOf(anticheat)), [anticheat]);
+  useEffect(() => {
+    const view = session.viewerRef.current?.view;
+    if (view === undefined || session.difficultyLoading) return;
+    view.setAnticheatMarks(anticheatScene.highlights, anticheatScene.paths);
+    view.setAnticheatGhosts(anticheatGhosts);
+    for (let index = 0; index < anticheatGhosts.length; index++)
+      view.setAnticheatGhostVisible(index, !hiddenPlayers.has(index + 1));
+    setMatchedNotes(view.matchedAnticheatNotes);
+  }, [
+    anticheatScene,
+    anticheatGhosts,
+    hiddenPlayers,
+    session.difficultyLoading,
+    session.selectedKey,
+    session.viewerReady,
+    replay,
+  ]);
   const timelineMarkers = useMemo(
-    () => buildTimelineMarkers(replay, selectedDifficulty, sources.songBpm, settings.showBookmarks),
+    () =>
+      [
+        ...buildTimelineMarkers(replay, selectedDifficulty, sources.songBpm, settings.showBookmarks),
+        ...findingMarkers(activeAnticheat, sources.songBpm),
+      ].sort((left, right) => left.time - right.time),
     [
+      activeAnticheat,
       latestPauseDuration,
       replay,
       replayNoteCount,
@@ -1089,7 +1131,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
         type="file"
         className="hidden"
         multiple
-        accept=".dat,.bsor,.tarf,.json,.zip,.ogg,.egg,.wav,.mp3"
+        accept=".dat,.bsor,.tarf,.bkacr,.bkaccmp,.json,.zip,.ogg,.egg,.wav,.mp3"
         onChange={(event) => {
           void sources.loadFiles([...(event.currentTarget.files ?? [])]);
           event.currentTarget.value = '';
@@ -1351,6 +1393,44 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
             <X />
           </Button>
         </Alert>
+      )}
+      {!hideUI && anticheat !== null && (
+        <>
+          {!anticheatOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="fixed right-4 bottom-24 z-40"
+              onClick={() => {
+                setAnticheatOpen(true);
+              }}
+            >
+              {anticheatT('open')}
+            </Button>
+          )}
+          <AnticheatPanel
+            attachment={anticheat}
+            open={anticheatOpen}
+            time={transport.time}
+            selected={selectedFinding}
+            hiddenPlayers={hiddenPlayers}
+            matchedNotes={matchedNotes}
+            noteMarks={new Set(anticheatScene.highlights.map((highlight) => JSON.stringify(highlight.note))).size}
+            onSelect={setSelectedFinding}
+            onSeek={transport.seek}
+            onTogglePlayer={(index, visible) => {
+              setHiddenPlayers((current) => {
+                const next = new Set(current);
+                if (visible) next.delete(index);
+                else next.add(index);
+                return next;
+              });
+            }}
+            onClose={() => {
+              setAnticheatOpen(false);
+            }}
+          />
+        </>
       )}
       {!hideUI && (
         <SettingsDrawer

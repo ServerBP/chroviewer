@@ -151,6 +151,14 @@ replayUrl=<HTTPS URL>         Load a replay file.
 tarfPath=<path or HTTPS URL>  Load a TournamentAssistant (.tarf) replay from a path on this site,
                               like /replays/match.tarf, or from another site. A map baked into
                               the replay is used instead of downloading it from BeatSaver.
+bkacrPath=<path or HTTPS URL> Load a BeatKhana anticheat replay (.bkacr): a replay with the anticheat's
+                              report. A panel lists the findings; notes they point at are ringed, swings
+                              show the path of the saber tip and the timeline marks every place.
+bkaccmpPath=<path or HTTPS URL>
+                              Load a BeatKhana anticheat comparison (.bkaccmp): several players' replays of
+                              one map. The first is played back, the others are drawn as coloured sabers
+                              with the same song clock, next to how alike the players move.
+t=<seconds>                   Initial song time for non-live playback, in seconds.
 scoreId=<ScoreSaber score>    Load a ScoreSaber replay.
 beat=<number>                 Initial beat for non-live playback.
 difficulty=1|3|5|7|9          Easy, Normal, Hard, Expert, or ExpertPlus map preview.
@@ -191,5 +199,5 @@ COMPOSITOR SYNCHRONIZATION
 compositorSyncType=slow|wait-for-all
 compositorWaitSeconds=1..60   Default 30 seconds, maximum 60 seconds.
 All visible players must select wait-for-all. Missing or mixed settings default to slow.
-Waiting holds stream playback until the same map hash, difficulty, characteristic and song speed are buffered for every visible player. All clocks are started in one compositor task using a common time reference. A timeout or incompatible map falls back to normal gradual playback. Waiting is only applied at stream startup, never periodically during playback. A stream that began more than ten seconds before the viewer connected (an overlay reloaded mid-song) waits at most three seconds for the other players, and a start packet that delivers no frames for five seconds is shown as waiting rather than preparing. Replay memory is bounded while waiting and while playing the delayed stream.
+Waiting holds stream playback until the same map hash, difficulty, characteristic and song speed are buffered for every visible player. All clocks are started in one compositor task using a common time reference. A timeout or incompatible map falls back to normal gradual playback. When the wait times out, the players that are ready start together; a player whose stream begins after the others started stays waiting until it has their moment of the song buffered, then joins at that time. While a player who has played this map is paused (or reconnecting, up to the wait time), the other players hold still and show waiting; when it plays again, everyone continues from its time. A stream that began more than ten seconds before the viewer connected (an overlay reloaded mid-song) waits at most three seconds for the other players, and a start packet that delivers no frames for five seconds is shown as waiting rather than preparing. Replay memory is bounded while waiting and while playing the delayed stream.
 For multiview embeds these values belong in each player's settings object. Slow mode remains the default. Browser, OBS, windowed and Spout bridges all use the same compositor protocol and render host.

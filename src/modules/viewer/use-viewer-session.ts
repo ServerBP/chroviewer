@@ -568,5 +568,6 @@ export function useViewerSession({
     selectDifficulty,
     selectedKey,
     viewerReady,
+    viewerRef,
   };
 }

@@ -3,6 +3,7 @@ export const defaultCompositorWaitSeconds = 30;
 export const maximumCompositorWaitSeconds = 60;
 /** A stream joined mid-song (an overlay reload) only waits for the tiles that join with it. */
 export const lateJoinWaitSeconds = 3;
+const groupClockLifetimeMs = 1500;
 
 interface SyncPlayer {
   id: string;
@@ -46,6 +47,15 @@ interface Member {
 
 type BarrierPhase = 'idle' | 'waiting' | 'released' | 'fallback';
 
+/** Where the tiles that play together are, published by the compositor for streams that join later. */
+export interface MultiviewGroupClock {
+  mapHash: string;
+  time: number;
+  observedAt: number;
+  playbackRate: number;
+  playing: boolean;
+}
+
 /** A startup-only barrier. No timers or seeks are used once playback has begun. */
 export class MultiviewStartBarrier {
   private ids: string[] = [];
@@ -55,6 +65,8 @@ export class MultiviewStartBarrier {
   private phase: BarrierPhase = 'idle';
   private mapKey = '';
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private group: MultiviewGroupClock | null = null;
+  private held = new Set<string>();
   waitSeconds = defaultCompositorWaitSeconds;
 
   constructor(private readonly now: () => number = () => performance.now()) {}
@@ -70,6 +82,7 @@ export class MultiviewStartBarrier {
     this.waitSeconds = settings.waitSeconds;
     this.ids = visible.map((player) => player.id);
     this.members.clear();
+    this.held.clear();
     this.phase = 'idle';
   }
 
@@ -90,7 +103,7 @@ export class MultiviewStartBarrier {
       this.mapKey = mapKey;
       this.phase = 'waiting';
       const seconds = lateJoin ? Math.min(this.waitSeconds, lateJoinWaitSeconds) : this.waitSeconds;
-      this.timer = setTimeout(() => this.release(false), seconds * 1000);
+      this.timer = setTimeout(() => this.releaseReady(), seconds * 1000);
     }
     this.members.set(id, { mapKey, streamId });
     if (this.phase === 'waiting' && mapKey !== this.mapKey) this.release(false);
@@ -115,6 +128,48 @@ export class MultiviewStartBarrier {
       } else this.release(false);
     }
     return this.phase === 'waiting';
+  }
+
+  /** On timeout the streams that are ready start together; the rest join the group once they have its time buffered. */
+  private releaseReady() {
+    if (this.phase !== 'waiting') return;
+    const ready = [...this.members.values()]
+      .map((member) => member.participant)
+      .filter((entry): entry is BufferedStartParticipant => entry?.ready === true);
+    const first = ready[0];
+    if (first === undefined || !ready.every((entry) => entry.playbackRate === first.playbackRate)) {
+      this.release(false);
+      return;
+    }
+    const target = Math.max(0, ...ready.map((entry) => entry.firstFrameTime));
+    const startable = ready.filter((entry) => entry.latestFrameTime - target >= (entry.minimumBufferSeconds ?? 0.05));
+    this.clearTimer();
+    this.phase = startable.length > 0 ? 'released' : 'fallback';
+    const startedAt = this.now();
+    for (const entry of startable) entry.start(target, startedAt);
+  }
+
+  /** The group's song time now, for a stream joining the map after the group started; null when nobody plays it. */
+  groupTime(mapHash: string) {
+    const group = this.group;
+    if (!this.enabled || group === null || mapHash === '' || group.mapHash !== mapHash.toLowerCase()) return null;
+    // The compositor republishes ten times a second; an old clock means nobody is playing this map any more.
+    if (this.now() - group.observedAt > groupClockLifetimeMs) return null;
+    const elapsed = group.playing ? ((this.now() - group.observedAt) / 1000) * group.playbackRate : 0;
+    return group.time + elapsed;
+  }
+
+  setGroupClock(clock: MultiviewGroupClock | null) {
+    this.group = clock === null ? null : { ...clock, mapHash: clock.mapHash.toLowerCase() };
+  }
+
+  /** Tiles held while another tile of the group is paused; they stay still until it plays again. */
+  setHeld(ids: Iterable<string>) {
+    this.held = new Set(ids);
+  }
+
+  isHeld(id: string) {
+    return this.enabled && this.held.has(id);
   }
 
   private release(aligned: boolean) {
@@ -143,5 +198,7 @@ export class MultiviewStartBarrier {
     this.release(false);
     this.clearTimer();
     this.members.clear();
+    this.held.clear();
+    this.group = null;
   }
 }

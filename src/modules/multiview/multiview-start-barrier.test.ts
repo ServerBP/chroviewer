@@ -36,7 +36,25 @@ describe('buffered compositor startup', () => {
     expect(barrier.isWaitingFor('0', 'stream-0')).toBe(true);
     vi.advanceTimersByTime(200);
     expect(barrier.isWaitingFor('0', 'stream-0')).toBe(false);
-    expect(member.start).not.toHaveBeenCalled();
+    expect(member.start).toHaveBeenCalledExactlyOnceWith(60, 0);
+    barrier.dispose();
+  });
+
+  test('a stream that joins after the group started is told the group time, and held tiles stay held', () => {
+    let now = 1_000;
+    const barrier = new MultiviewStartBarrier(() => now);
+    barrier.configure(roster(2));
+    expect(barrier.groupTime('ABC')).toBeNull();
+    barrier.setGroupClock({ mapHash: 'ABC', time: 70, observedAt: 1_000, playbackRate: 1, playing: true });
+    now = 1_500;
+    expect(barrier.groupTime('abc')).toBe(70.5);
+    expect(barrier.groupTime('other')).toBeNull();
+    barrier.setHeld(['1']);
+    expect(barrier.isHeld('1')).toBe(true);
+    expect(barrier.isHeld('0')).toBe(false);
+    barrier.configure(roster(2).map((player) => ({ ...player, settings: { compositorSyncType: 'slow' } })));
+    expect(barrier.isHeld('1')).toBe(false);
+    expect(barrier.groupTime('abc')).toBeNull();
     barrier.dispose();
   });
 
@@ -96,10 +114,12 @@ describe('buffered compositor startup', () => {
     vi.advanceTimersByTime(29_999);
     expect(barrier.isWaitingFor('0', 'early')).toBe(true);
     vi.advanceTimersByTime(1);
+    expect(early.start).toHaveBeenCalledTimes(1);
     expect(barrier.update('0', 'early', early)).toBe(false);
     barrier.begin('1', 'late', 'map');
-    expect(barrier.update('1', 'late', participant())).toBe(false);
-    expect(early.start).not.toHaveBeenCalled();
+    const late = participant();
+    expect(barrier.update('1', 'late', late)).toBe(false);
+    expect(late.start).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
     barrier.dispose();
   });

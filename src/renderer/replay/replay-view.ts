@@ -31,6 +31,7 @@ import {
   createSaberTrailMaterial,
 } from '../materials/map-object-materials';
 import { shaderUniformValue } from '../materials/shared';
+import { AnticheatOverlay, type Ghost, type SwingPath } from './anticheat-overlay';
 import { createCg5SaberTrailMaterial } from './cg5-saber-materials';
 import {
   createCustomSaberInstance,
@@ -95,6 +96,10 @@ export class ReplayView {
   private readonly replayLeftTrailBase = new Object3D();
   private readonly replayRightTrailBase = new Object3D();
   private readonly gameplayHud = new ReplayGameplayHud();
+  private readonly anticheat = new AnticheatOverlay((target, from, to, amount) => {
+    this.sampleTransform(target, from, to, amount);
+  });
+  private anticheatPaths: SwingPath[] = [];
   private readonly replayHeadset: ReplayHeadset;
   private readonly cameraController: ReplayCameraController;
   private readonly replayPosition = new Vector3();
@@ -175,7 +180,12 @@ export class ReplayView {
     this.replayHeadTrack.add(this.replayHeadset.root);
     this.replayLeftHandTrack.add(this.replayLeftHand);
     this.replayRightHandTrack.add(this.replayRightHand);
-    this.replayPlayerRoot.add(this.replayHeadTrack, this.replayLeftHandTrack, this.replayRightHandTrack);
+    this.replayPlayerRoot.add(
+      this.replayHeadTrack,
+      this.replayLeftHandTrack,
+      this.replayRightHandTrack,
+      this.anticheat.root,
+    );
     this.root.add(this.replayPlayerRoot);
     this.poseHeadTrack.add(this.poseHead);
     this.posePlayerRoot.add(this.poseHeadTrack);
@@ -257,6 +267,16 @@ export class ReplayView {
   }
 
   setReplay(replay: Replay | null, hitScoreVisualizer?: HitScoreVisualizerConfig | null) {
+    if (replay !== this.replay) {
+      this.anticheatPaths = [];
+      this.anticheat.setPaths(
+        [],
+        null,
+        [this.replayLeftOffset, this.replayRightOffset],
+        [this.replayLeftTip.position, this.replayRightTip.position],
+      );
+      this.anticheat.setGhosts([], this.saberSettings.saberBladeLength);
+    }
     this.replay = replay;
     this.hasSampledReplayPose = false;
     this.gameplayHud.setReplay(replay, hitScoreVisualizer);
@@ -267,6 +287,27 @@ export class ReplayView {
     this.applySaberOffsets();
     this.cameraController.setReplayPresence(this.hasReplay);
     this.updateHeadsetVisibility();
+  }
+
+  /** The saber tip's path over the swings and turn-arounds an anticheat finding points at */
+  setAnticheatPaths(paths: SwingPath[]) {
+    this.anticheatPaths = paths;
+    this.applySaberOffsets();
+    this.anticheat.setPaths(
+      paths,
+      this.replay,
+      [this.replayLeftOffset, this.replayRightOffset],
+      [this.replayLeftTip.position, this.replayRightTip.position],
+    );
+  }
+
+  /** Other players' replays of the map, drawn as plain sabers moving with the same song clock */
+  setAnticheatGhosts(ghosts: Ghost[]) {
+    this.anticheat.setGhosts(ghosts, this.saberSettings.saberBladeLength);
+  }
+
+  setAnticheatGhostVisible(index: number, visible: boolean) {
+    this.anticheat.setGhostVisible(index, visible);
   }
 
   setHitScoreVisualizer(hitScoreVisualizer: HitScoreVisualizerConfig | null) {
@@ -328,6 +369,8 @@ export class ReplayView {
     for (const trail of this.replayTrails) setReplaySaberTrailSettings(trail, settings);
     this.applySaberOffsets();
     this.applySaberModel();
+    this.anticheat.setBladeLength(settings.saberBladeLength);
+    if (this.anticheatPaths.length > 0) this.setAnticheatPaths(this.anticheatPaths);
     if (isCustomSaberModel(settings.saberModel) && settings.saberModel !== previousModel) {
       void this.loadCustomSaberModel(settings.saberModel);
     }
@@ -467,6 +510,7 @@ export class ReplayView {
       this.noodlePlayerTransform.apply(this.replayRightHandTrack, noodle.rightHand, leftHanded);
     }
     this.hasSampledReplayPose = true;
+    this.anticheat.update(time, [this.replayLeftOffset, this.replayRightOffset]);
     this.updateTrails(time, this.replay.poses, sample);
     this.cameraController.update(this.replayHeadset.root, time);
   }
@@ -651,6 +695,7 @@ export class ReplayView {
     this.clearCustomSabers();
     this.replayHeadset.dispose();
     this.gameplayHud.dispose();
+    this.anticheat.dispose();
     for (const geometry of this.replayGeometries) geometry.dispose();
     for (const saber of this.replaySabers) for (const geometry of saber.geometries) geometry.dispose();
     for (const material of this.replayMaterials) material.dispose();

@@ -1,5 +1,6 @@
 import { Result } from 'better-result';
 
+import { anticheatFileKind, parseAnticheatFile } from '../../replay/anticheat';
 import { isBeatLeaderReplay, parseBeatLeaderReplay } from '../../replay/parse-beatleader';
 import { parseScoreSaberReplay } from '../../replay/parse-scoresaber';
 import { isTarfReplay, parseTarfReplay } from '../../replay/parse-tarf';
@@ -13,6 +14,17 @@ async function execute(request: WorkerRequest): Promise<WorkerSuccess> {
   }
   if (request.kind === 'replay') {
     const bytes = new Uint8Array(request.data);
+    if (anticheatFileKind(bytes) !== null) {
+      // The first replay is the one played back; a comparison carries the others along for their sabers
+      const file = parseAnticheatFile(bytes);
+      const [first, ...rest] = file.replays.map((tarf) => parseTarfReplay(tarf));
+      if (first === undefined) throw new Error('anticheat file holds no replay');
+      first.anticheat =
+        file.document.kind === 'comparison'
+          ? { kind: 'comparison', comparison: file.document, others: rest }
+          : { kind: 'report', report: file.document };
+      return { id: request.id, ok: true, kind: request.kind, result: first };
+    }
     const replay = isTarfReplay(bytes)
       ? parseTarfReplay(bytes)
       : isBeatLeaderReplay(bytes)

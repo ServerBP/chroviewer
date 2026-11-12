@@ -26,7 +26,7 @@ import {
 import { loadEnvironment } from './environment/environment-loader';
 import type { LoadedEnvironment } from './environment/environment-runtime';
 import { EnvironmentLightRuntime } from './map/environment-light-runtime';
-import { MapObjectRenderer } from './map/map-object-renderer';
+import { MapObjectRenderer, type NoteHighlight } from './map/map-object-renderer';
 import { NoodlePlayerTransform } from './map/noodle-player-transform';
 import { createMirrorMaterial, createSkyboxMaterial } from './materials/scene-materials';
 import { collectMirrorConsumers, hasVisibleMirrorConsumer } from './mirror/mirror-consumers';
@@ -40,6 +40,7 @@ import { PostBloomPipeline } from './post-bloom/pipeline';
 import { DEFAULT_QUALITY } from './quality';
 import { DEFAULT_RENDER_PERFORMANCE, type RenderPerformanceOptions } from './render-performance';
 import type { RenderView } from './renderer-lifecycle';
+import type { Ghost, SwingPath } from './replay/anticheat-overlay';
 import { ReplayOrthographicOverlay } from './replay/orthographic-overlay';
 import type { ReplayCameraMode } from './replay/replay-camera';
 import { ReplayView } from './replay/replay-view';
@@ -276,6 +277,25 @@ export class MapView implements RenderView {
     this.replayView.setReplay(replay, hitScoreVisualizer);
     this.baseProviders.reset();
     this.mapObjects.invalidate();
+  }
+
+  /** What an anticheat report points at: notes to ring and the saber tip's path over swings */
+  setAnticheatMarks(highlights: NoteHighlight[], paths: SwingPath[]) {
+    this.mapObjects.setNoteHighlights(highlights);
+    this.replayView.setAnticheatPaths(paths);
+  }
+
+  /** Other players' replays of the map in an anticheat comparison */
+  setAnticheatGhosts(ghosts: Ghost[]) {
+    this.replayView.setAnticheatGhosts(ghosts);
+  }
+
+  setAnticheatGhostVisible(index: number, visible: boolean) {
+    this.replayView.setAnticheatGhostVisible(index, visible);
+  }
+
+  get matchedAnticheatNotes() {
+    return this.mapObjects.matchedHighlights;
   }
 
   setHitScoreVisualizer(hitScoreVisualizer: HitScoreVisualizerConfig | null) {
