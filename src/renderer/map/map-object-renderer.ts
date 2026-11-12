@@ -1,9 +1,12 @@
 import {
+  DoubleSide,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   PlaneGeometry,
   Quaternion,
   RepeatWrapping,
+  RingGeometry,
   ShaderMaterial,
   TextureLoader,
   Vector3,
@@ -41,6 +44,7 @@ import type {
   NoteInstance,
   WallInstance,
 } from '../../core/placement/map-render-data';
+import { sameNote, type AnticheatNoteRef } from '../../core/replay/anticheat';
 import type { ReplayPose } from '../../core/replay/types';
 import type { SpawnState } from '../../core/spawn/variable-njs';
 import type { FogUniforms } from '../bloomfog/pipeline';
@@ -114,6 +118,22 @@ const yAxis = new Vector3(0, 1, 0);
 const mapPlayerCenter = new Vector3(0, 1.7, 0);
 const degToRad = Math.PI / 180;
 const noteModelScale = 1;
+
+/** A note the anticheat points at, ringed in `color` while it flies and for a moment after it was cut */
+export interface NoteHighlight {
+  note: AnticheatNoteRef;
+  color: Rgb;
+}
+
+const HIGHLIGHT_AFTER_CUT = 0.35;
+
+function noteHighlightGeometry() {
+  return new RingGeometry(0.36, 0.44, 40).translate(0, 0, 0.27);
+}
+
+function noteHighlightMaterial() {
+  return new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, side: DoubleSide, toneMapped: false });
+}
 const previewRotationFps = 90;
 const white: Rgb = [1, 1, 1];
 const unitScale: Rgb = [1, 1, 1];
@@ -157,6 +177,9 @@ export class MapObjectRenderer {
   private arrowGlows: InstancedGroup[] = [];
   private decorativeArrowGlows: InstancedGroup[] = [];
   private circleGlows: InstancedGroup[] = [];
+  private noteHighlights: InstancedGroup | null = null;
+  private highlightRequests: NoteHighlight[] = [];
+  private readonly highlightOf = new Map<number, NoteHighlight>();
   private bombs: InstancedGroup | null = null;
   private links: InstancedGroup[] = [];
   private wallCores: InstancedGroup | null = null;
@@ -275,6 +298,11 @@ export class MapObjectRenderer {
       (material) => new InstancedGroup(circleGlowGeometry(), material, data.capacity.notes),
     );
     this.bombs = new InstancedGroup(bombGeometry(), bombMaterial, data.capacity.bombs);
+    const highlightMaterial = noteHighlightMaterial();
+    this.ownedMaterials.push(highlightMaterial);
+    this.noteHighlights = new InstancedGroup(noteHighlightGeometry(), highlightMaterial, data.capacity.notes);
+    this.noteHighlights.mesh.renderOrder = 10;
+    this.noteHighlights.mesh.userData.mirrorExcluded = true;
     this.links = noteMaterials.map(
       (material) => new InstancedGroup(chainLinkGeometry(), material, data.capacity.chainLinks),
     );
@@ -299,6 +327,7 @@ export class MapObjectRenderer {
       ...this.arrowGlows,
       ...this.decorativeArrowGlows,
       ...this.circleGlows,
+      this.noteHighlights,
       this.bombs,
       ...this.links,
       this.wallCores,
@@ -308,6 +337,7 @@ export class MapObjectRenderer {
     ];
     for (const group of this.instanceGroups) this.root.add(group.mesh);
     this.setScreenDisplacementEffects(this.screenDisplacementEffects);
+    this.matchHighlights();
 
     this.arcEntries = data.arcs.map((arc) => {
       const color = arcColors[arc.colorIndex] ?? colors.leftNote;
@@ -367,6 +397,30 @@ export class MapObjectRenderer {
       },
       true,
     );
+  }
+
+  /** Notes to ring, matched to the map's notes by their time, place on the grid, colour and arrow */
+  setNoteHighlights(highlights: NoteHighlight[]) {
+    this.highlightRequests = highlights;
+    this.matchHighlights();
+    this.invalidate();
+  }
+
+  private matchHighlights() {
+    this.highlightOf.clear();
+    const notes = this.data?.notes ?? [];
+    if (this.highlightRequests.length === 0) return;
+    for (const [index, note] of notes.entries()) {
+      const identity = note.replayIdentity;
+      if (identity === undefined) continue;
+      const highlight = this.highlightRequests.find((request) => sameNote(request.note, identity));
+      if (highlight !== undefined) this.highlightOf.set(index, highlight);
+    }
+  }
+
+  /** How many of the requested highlights found their note in the map */
+  get matchedHighlights() {
+    return this.highlightOf.size;
   }
 
   setColors(colors: ColorScheme) {
@@ -474,7 +528,11 @@ export class MapObjectRenderer {
         const visible =
           noodleObjectVisible(note, now, movementBeat, noodle) &&
           (!hitPreviewNotes || !interactable || isVisibleBeforeHit(note, movementBeat));
-        if (!visible || (note.replayEndTime !== undefined && replayTime >= note.replayEndTime)) continue;
+        const highlight = this.highlightOf.get(index);
+        // A highlighted note keeps its ring a moment after it was cut, so pausing on the cut still shows which note it was
+        const cut = note.replayEndTime !== undefined && replayTime >= note.replayEndTime;
+        const ringOnly = cut && highlight !== undefined && replayTime < (note.replayEndTime ?? 0) + HIGHLIGHT_AFTER_CUT;
+        if (!visible || (cut && !ringOnly)) continue;
         const bodyDissolve = noodle.dissolve ?? 1;
         const arrowDissolve = noodle.dissolveArrow ?? 1;
         const noteTime = songBpmTimeToSeconds(note.beat, data.songBpm);
@@ -515,6 +573,8 @@ export class MapObjectRenderer {
             true,
           );
         }
+        if (highlight !== undefined) this.noteHighlights?.push(this.matrix, highlight.color);
+        if (ringOnly) continue;
         const color = animatedNoodleColor(
           noodle.color,
           note.customColor ?? (note.colorIndex === 1 ? colors.rightNote : colors.leftNote),
@@ -808,6 +868,8 @@ export class MapObjectRenderer {
     for (const material of this.ownedMaterials) material.dispose();
     this.noteBodies = this.arrows = this.decorativeArrows = this.arrowGlows = this.decorativeArrowGlows = [];
     this.circleGlows = this.links = [];
+    this.noteHighlights = null;
+    this.highlightOf.clear();
     this.bombs = this.wallCores = this.legacySolidWallCores = this.wallFrames = this.wallFakeGlows = null;
     this.wallCoreLowMaterial = this.wallCoreHighMaterial = null;
     this.wallCoreEntries = [];
