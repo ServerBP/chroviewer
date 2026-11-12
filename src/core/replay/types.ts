@@ -1,3 +1,4 @@
+import type { AnticheatAttachment } from './anticheat';
 import type { HitScoreVisualizerPlatform } from './hit-score-visualizer';
 
 export interface ReplayVector3 {
@@ -196,6 +197,8 @@ export interface Replay {
   legacyScoreSaber?: LegacyScoreSaberData;
   /** Song time of the first frame a live stream delivered; later than the song start when joined mid-song. */
   liveStartTime?: number;
+  /** The anticheat's report, or a comparison with other players, when the replay came from a BeatKhana anticheat file. */
+  anticheat?: AnticheatAttachment;
   liveHistoryBase?: {
     scoringNotes: number;
     misses: number;

@@ -6,6 +6,7 @@ import { useTranslations } from 'use-intl';
 import { BeatmapParser } from '../../core/beatmap/worker/client';
 import { isBeatLeaderReplay } from '../../core/replay/parse-beatleader';
 import { applyLegacyScoreSaberMetadata, isScoreSaberReplay } from '../../core/replay/parse-scoresaber';
+import { anticheatFileKind } from '../../core/replay/anticheat';
 import { isTarfReplay } from '../../core/replay/parse-tarf';
 import { replayMapHash, type Replay } from '../../core/replay/types';
 import { extractMapArchive, mapSourceFiles } from '../../sources/archive';
@@ -264,7 +265,7 @@ export function useViewerFileSource({
           const archive = yield* Result.await(extractMapArchive(new Uint8Array(data)));
           if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
           sourceFiles.push(...archive);
-        } else if (/\.(dat|bsor|tarf)$/i.test(file.name)) {
+        } else if (/\.(dat|bsor|tarf|bkacr|bkaccmp)$/i.test(file.name)) {
           const data = yield* Result.await(
             Result.tryPromise({
               try: () => file.arrayBuffer(),
@@ -278,7 +279,7 @@ export function useViewerFileSource({
           );
           if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
           const bytes = new Uint8Array(data);
-          if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes) || isTarfReplay(bytes)) {
+          if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes) || isTarfReplay(bytes) || anticheatFileKind(bytes) !== null) {
             if (replay !== null) {
               return Result.err(
                 new SourceError({

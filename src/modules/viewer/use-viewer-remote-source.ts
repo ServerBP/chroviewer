@@ -7,6 +7,7 @@ import { useTranslations } from 'use-intl';
 
 import { isBeatLeaderReplay } from '../../core/replay/parse-beatleader';
 import { applyLegacyScoreSaberMetadata, isScoreSaberReplay } from '../../core/replay/parse-scoresaber';
+import { anticheatFileKind } from '../../core/replay/anticheat';
 import { isTarfReplay } from '../../core/replay/parse-tarf';
 import type { Replay } from '../../core/replay/types';
 import { replayMapHash } from '../../core/replay/types';
@@ -59,7 +60,7 @@ type RemoteSourceCommand = { requestId: number } & (
       autoplay?: boolean;
     }
   | { type: 'shared-replay'; replayUrl: string; beat?: number; autoplay?: boolean }
-  | { type: 'shared-tarf'; tarfPath: string; beat?: number; autoplay?: boolean }
+  | { type: 'shared-tarf'; tarfPath: string; beat?: number; startSeconds?: number; autoplay?: boolean }
   | { type: 'shared-score'; scoreId: string; beat?: number; autoplay?: boolean }
   | { type: 'shared-beatleader'; scoreId: string; beat?: number; autoplay?: boolean }
 );
@@ -254,7 +255,7 @@ export function useViewerRemoteSource({
   async function loadReplayData(
     requestId: number,
     data: ArrayBuffer,
-    pending: { beat?: number; autoplay?: boolean } = {},
+    pending: { beat?: number; startSeconds?: number; autoplay?: boolean } = {},
     sourceLink?: ViewerSourceLink,
   ) {
     return Result.gen(async function* () {
@@ -316,7 +317,7 @@ export function useViewerRemoteSource({
   async function loadTarfPath(
     requestId: number,
     tarfPath: string,
-    pending: { beat?: number; autoplay?: boolean } = {},
+    pending: { beat?: number; startSeconds?: number; autoplay?: boolean } = {},
   ) {
     const url = new URL(tarfPath, window.location.origin);
     const sameOrigin = url.origin === window.location.origin;
@@ -443,7 +444,7 @@ export function useViewerRemoteSource({
     }
     return Result.gen(async function* () {
       const pathname = new URL(linkUrl).pathname.toLowerCase();
-      const replayByName = pathname.endsWith('.dat') || pathname.endsWith('.bsor') || pathname.endsWith('.tarf');
+      const replayByName = pathname.endsWith('.dat') || pathname.endsWith('.bsor') || pathname.endsWith('.tarf') || pathname.endsWith('.bkacr') || pathname.endsWith('.bkaccmp');
       const data = yield* Result.await(
         requestArrayBuffer(sourceDownloadUrl(linkUrl), {
           source: 'local',
@@ -454,7 +455,7 @@ export function useViewerRemoteSource({
       );
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
       const bytes = new Uint8Array(data);
-      if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes) || isTarfReplay(bytes)) {
+      if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes) || isTarfReplay(bytes) || anticheatFileKind(bytes) !== null) {
         yield* Result.await(loadReplayData(requestId, data, {}, { type: 'replay', url: linkUrl }));
         if (isSourceRequestCurrent(requestId)) {
           await navigate({ to: '/', search: { replayUrl: linkUrl }, replace: true });
@@ -555,6 +556,7 @@ export function useViewerRemoteSource({
       case 'shared-tarf':
         return loadTarfPath(command.requestId, command.tarfPath, {
           beat: command.beat,
+          startSeconds: command.startSeconds,
           autoplay: command.autoplay,
         });
       case 'shared-score':
@@ -640,6 +642,7 @@ export function useViewerRemoteSource({
         type: 'shared-tarf',
         tarfPath: search.tarfPath,
         beat: search.beat,
+        startSeconds: search.t,
         autoplay: search.autoplay,
         requestId,
       });

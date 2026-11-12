@@ -1089,7 +1089,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
         type="file"
         className="hidden"
         multiple
-        accept=".dat,.bsor,.tarf,.json,.zip,.ogg,.egg,.wav,.mp3"
+        accept=".dat,.bsor,.tarf,.bkacr,.bkaccmp,.json,.zip,.ogg,.egg,.wav,.mp3"
         onChange={(event) => {
           void sources.loadFiles([...(event.currentTarget.files ?? [])]);
           event.currentTarget.value = '';

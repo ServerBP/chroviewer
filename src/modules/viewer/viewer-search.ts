@@ -68,6 +68,10 @@ export const viewerSearchSchema = z.pipe(
     map: z.catch(z.optional(mapSourceSchema), undefined),
     replayUrl: z.catch(z.optional(remoteSourceUrlSchema), undefined),
     tarfPath: z.catch(z.optional(tarfPathSchema), undefined),
+    // BeatKhana anticheat files (.bkacr, .bkaccmp) load the way TARF files do
+    bkacrPath: z.catch(z.optional(tarfPathSchema), undefined),
+    bkaccmpPath: z.catch(z.optional(tarfPathSchema), undefined),
+    t: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     scoreId: z.catch(z.optional(scoreIdSchema), undefined),
     scoreIdBL: z.catch(z.optional(scoreIdSchema), undefined),
     difficulty: z.catch(z.optional(difficultyRankSchema), undefined),
@@ -119,7 +123,9 @@ export const viewerSearchSchema = z.pipe(
     watcherPlayerId: z.catch(z.optional(livePlayerIdSchema), undefined),
     authToken: z.catch(z.optional(z.string().check(z.minLength(1), z.maxLength(4096))), undefined),
   }),
-  z.transform((search) => {
+  z.transform(({ bkacrPath, bkaccmpPath, ...rest }) => {
+    const anticheatPath = rest.tarfPath ?? bkacrPath ?? bkaccmpPath;
+    const search: typeof rest = anticheatPath === undefined ? rest : { ...rest, tarfPath: anticheatPath };
     if (search.party !== undefined) {
       return {
         ...search,
