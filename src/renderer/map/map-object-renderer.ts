@@ -132,7 +132,15 @@ function noteHighlightGeometry() {
 }
 
 function noteHighlightMaterial() {
-  return new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, side: DoubleSide, toneMapped: false });
+  return new MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.95,
+    depthTest: false,
+    depthWrite: false,
+    side: DoubleSide,
+    toneMapped: false,
+  });
 }
 const previewRotationFps = 90;
 const white: Rgb = [1, 1, 1];

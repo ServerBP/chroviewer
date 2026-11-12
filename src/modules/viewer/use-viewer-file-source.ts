@@ -4,9 +4,9 @@ import { Result } from 'better-result';
 import { useTranslations } from 'use-intl';
 
 import { BeatmapParser } from '../../core/beatmap/worker/client';
+import { anticheatFileKind } from '../../core/replay/anticheat';
 import { isBeatLeaderReplay } from '../../core/replay/parse-beatleader';
 import { applyLegacyScoreSaberMetadata, isScoreSaberReplay } from '../../core/replay/parse-scoresaber';
-import { anticheatFileKind } from '../../core/replay/anticheat';
 import { isTarfReplay } from '../../core/replay/parse-tarf';
 import { replayMapHash, type Replay } from '../../core/replay/types';
 import { extractMapArchive, mapSourceFiles } from '../../sources/archive';
@@ -279,7 +279,12 @@ export function useViewerFileSource({
           );
           if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
           const bytes = new Uint8Array(data);
-          if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes) || isTarfReplay(bytes) || anticheatFileKind(bytes) !== null) {
+          if (
+            isScoreSaberReplay(bytes) ||
+            isBeatLeaderReplay(bytes) ||
+            isTarfReplay(bytes) ||
+            anticheatFileKind(bytes) !== null
+          ) {
             if (replay !== null) {
               return Result.err(
                 new SourceError({

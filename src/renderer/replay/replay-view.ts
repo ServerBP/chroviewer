@@ -31,6 +31,7 @@ import {
   createSaberTrailMaterial,
 } from '../materials/map-object-materials';
 import { shaderUniformValue } from '../materials/shared';
+import { AnticheatOverlay, type Ghost, type SwingPath } from './anticheat-overlay';
 import { createCg5SaberTrailMaterial } from './cg5-saber-materials';
 import {
   createCustomSaberInstance,
@@ -41,7 +42,6 @@ import {
   type CustomSaberColorBinding,
   type CustomSaberInstance,
 } from './custom-saber';
-import { AnticheatOverlay, type Ghost, type SwingPath } from './anticheat-overlay';
 import { ReplayGameplayHud } from './hud/gameplay-hud';
 import { ReplayCameraController, type ReplayCameraMode } from './replay-camera';
 import {
@@ -180,7 +180,12 @@ export class ReplayView {
     this.replayHeadTrack.add(this.replayHeadset.root);
     this.replayLeftHandTrack.add(this.replayLeftHand);
     this.replayRightHandTrack.add(this.replayRightHand);
-    this.replayPlayerRoot.add(this.replayHeadTrack, this.replayLeftHandTrack, this.replayRightHandTrack, this.anticheat.root);
+    this.replayPlayerRoot.add(
+      this.replayHeadTrack,
+      this.replayLeftHandTrack,
+      this.replayRightHandTrack,
+      this.anticheat.root,
+    );
     this.root.add(this.replayPlayerRoot);
     this.poseHeadTrack.add(this.poseHead);
     this.posePlayerRoot.add(this.poseHeadTrack);
@@ -264,7 +269,12 @@ export class ReplayView {
   setReplay(replay: Replay | null, hitScoreVisualizer?: HitScoreVisualizerConfig | null) {
     if (replay !== this.replay) {
       this.anticheatPaths = [];
-      this.anticheat.setPaths([], null, [this.replayLeftOffset, this.replayRightOffset], [this.replayLeftTip.position, this.replayRightTip.position]);
+      this.anticheat.setPaths(
+        [],
+        null,
+        [this.replayLeftOffset, this.replayRightOffset],
+        [this.replayLeftTip.position, this.replayRightTip.position],
+      );
       this.anticheat.setGhosts([], this.saberSettings.saberBladeLength);
     }
     this.replay = replay;
@@ -283,7 +293,12 @@ export class ReplayView {
   setAnticheatPaths(paths: SwingPath[]) {
     this.anticheatPaths = paths;
     this.applySaberOffsets();
-    this.anticheat.setPaths(paths, this.replay, [this.replayLeftOffset, this.replayRightOffset], [this.replayLeftTip.position, this.replayRightTip.position]);
+    this.anticheat.setPaths(
+      paths,
+      this.replay,
+      [this.replayLeftOffset, this.replayRightOffset],
+      [this.replayLeftTip.position, this.replayRightTip.position],
+    );
   }
 
   /** Other players' replays of the map, drawn as plain sabers moving with the same song clock */

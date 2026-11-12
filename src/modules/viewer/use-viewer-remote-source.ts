@@ -5,9 +5,9 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Result } from 'better-result';
 import { useTranslations } from 'use-intl';
 
+import { anticheatFileKind } from '../../core/replay/anticheat';
 import { isBeatLeaderReplay } from '../../core/replay/parse-beatleader';
 import { applyLegacyScoreSaberMetadata, isScoreSaberReplay } from '../../core/replay/parse-scoresaber';
-import { anticheatFileKind } from '../../core/replay/anticheat';
 import { isTarfReplay } from '../../core/replay/parse-tarf';
 import type { Replay } from '../../core/replay/types';
 import { replayMapHash } from '../../core/replay/types';
@@ -444,7 +444,12 @@ export function useViewerRemoteSource({
     }
     return Result.gen(async function* () {
       const pathname = new URL(linkUrl).pathname.toLowerCase();
-      const replayByName = pathname.endsWith('.dat') || pathname.endsWith('.bsor') || pathname.endsWith('.tarf') || pathname.endsWith('.bkacr') || pathname.endsWith('.bkaccmp');
+      const replayByName =
+        pathname.endsWith('.dat') ||
+        pathname.endsWith('.bsor') ||
+        pathname.endsWith('.tarf') ||
+        pathname.endsWith('.bkacr') ||
+        pathname.endsWith('.bkaccmp');
       const data = yield* Result.await(
         requestArrayBuffer(sourceDownloadUrl(linkUrl), {
           source: 'local',
@@ -455,7 +460,12 @@ export function useViewerRemoteSource({
       );
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
       const bytes = new Uint8Array(data);
-      if (isScoreSaberReplay(bytes) || isBeatLeaderReplay(bytes) || isTarfReplay(bytes) || anticheatFileKind(bytes) !== null) {
+      if (
+        isScoreSaberReplay(bytes) ||
+        isBeatLeaderReplay(bytes) ||
+        isTarfReplay(bytes) ||
+        anticheatFileKind(bytes) !== null
+      ) {
         yield* Result.await(loadReplayData(requestId, data, {}, { type: 'replay', url: linkUrl }));
         if (isSourceRequestCurrent(requestId)) {
           await navigate({ to: '/', search: { replayUrl: linkUrl }, replace: true });

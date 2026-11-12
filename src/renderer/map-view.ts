@@ -40,9 +40,9 @@ import { PostBloomPipeline } from './post-bloom/pipeline';
 import { DEFAULT_QUALITY } from './quality';
 import { DEFAULT_RENDER_PERFORMANCE, type RenderPerformanceOptions } from './render-performance';
 import type { RenderView } from './renderer-lifecycle';
+import type { Ghost, SwingPath } from './replay/anticheat-overlay';
 import { ReplayOrthographicOverlay } from './replay/orthographic-overlay';
 import type { ReplayCameraMode } from './replay/replay-camera';
-import type { Ghost, SwingPath } from './replay/anticheat-overlay';
 import { ReplayView } from './replay/replay-view';
 
 function fullscreenTriangle() {

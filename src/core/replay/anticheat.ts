@@ -116,7 +116,11 @@ export interface AnticheatComparison {
 /** What a replay loaded from an anticheat file carries besides its motion */
 export type AnticheatAttachment =
   | { kind: 'report'; report: AnticheatReport }
-  | { kind: 'comparison'; comparison: AnticheatComparison; /** The other players' replays, in `players` order after the first */ others: Replay[] };
+  | {
+      kind: 'comparison';
+      comparison: AnticheatComparison;
+      /** The other players' replays, in `players` order after the first */ others: Replay[];
+    };
 
 export interface AnticheatFile {
   kind: 'bkacr' | 'bkaccmp';
@@ -129,7 +133,8 @@ const recordHeaderLength = 16;
 const supportedMajorVersion = 1;
 const recordTypes = { document: 1, replay: 2 };
 
-const magicOf = (data: Uint8Array) => (data.byteLength >= fileHeaderLength ? String.fromCharCode(...data.subarray(0, 4)) : '');
+const magicOf = (data: Uint8Array) =>
+  data.byteLength >= fileHeaderLength ? String.fromCharCode(...data.subarray(0, 4)) : '';
 
 export function anticheatFileKind(data: Uint8Array): AnticheatFile['kind'] | null {
   const magic = magicOf(data);
@@ -169,7 +174,8 @@ export function parseAnticheatFile(data: Uint8Array): AnticheatFile {
     if (codec !== 0 && codec !== 1) throw new Error(`unknown anticheat record codec ${String(codec)}`);
     const payload = codec === 1 ? inflateSync(stored, { out: new Uint8Array(decodedLength) }) : stored;
     if (payload.byteLength !== decodedLength) throw new Error('anticheat record length does not match its header');
-    if (crc32(payload) !== checksum) throw new Error(`anticheat record at offset ${String(offset)} failed its checksum`);
+    if (crc32(payload) !== checksum)
+      throw new Error(`anticheat record at offset ${String(offset)} failed its checksum`);
     if (type === recordTypes.document) {
       if (document !== undefined) throw new Error('anticheat file has more than one report');
       document = JSON.parse(new TextDecoder().decode(payload)) as AnticheatReport | AnticheatComparison;

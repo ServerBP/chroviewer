@@ -39,7 +39,13 @@ const PATH_LEAD = 0.6;
 const PATH_RADIUS = 0.012;
 
 function material(color: Rgb, opacity: number) {
-  return new MeshBasicMaterial({ color: new Color(...color), transparent: true, opacity, depthWrite: false, toneMapped: false });
+  return new MeshBasicMaterial({
+    color: new Color(...color),
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    toneMapped: false,
+  });
 }
 
 interface PathEntry {
@@ -78,7 +84,12 @@ export class AnticheatOverlay {
   private tipAt(replay: Replay, time: number, hand: 0 | 1, offset: Object3D, tip: Vector3) {
     const frames = sampleReplayFrames(replay.poses, time);
     if (frames === null) return null;
-    this.sample(this.scratchHand, hand === 0 ? frames.from.leftHand : frames.from.rightHand, hand === 0 ? frames.to.leftHand : frames.to.rightHand, frames.amount);
+    this.sample(
+      this.scratchHand,
+      hand === 0 ? frames.from.leftHand : frames.from.rightHand,
+      hand === 0 ? frames.to.leftHand : frames.to.rightHand,
+      frames.amount,
+    );
     this.scratchHand.updateMatrix();
     offset.updateMatrix();
     return tip.clone().applyMatrix4(this.matrix.multiplyMatrices(this.scratchHand.matrix, offset.matrix));
@@ -95,7 +106,10 @@ export class AnticheatOverlay {
       }
       if (points.length < 2) continue;
       const curve = new CatmullRomCurve3(points);
-      const mesh = new Mesh(new TubeGeometry(curve, Math.min(400, points.length * 2), PATH_RADIUS, 6, false), material(path.color, 0.9));
+      const mesh = new Mesh(
+        new TubeGeometry(curve, Math.min(400, points.length * 2), PATH_RADIUS, 6, false),
+        material(path.color, 0.9),
+      );
       mesh.renderOrder = 9;
       mesh.visible = false;
       this.root.add(mesh);
@@ -113,7 +127,10 @@ export class AnticheatOverlay {
       const head = new Mesh(this.ghostHeadGeometry, headMaterial);
       const hands: [Object3D, Object3D] = [new Object3D(), new Object3D()];
       const offsets: [Object3D, Object3D] = [new Object3D(), new Object3D()];
-      const blades: [Mesh, Mesh] = [new Mesh(this.ghostBladeGeometry, bladeMaterial), new Mesh(this.ghostBladeGeometry, bladeMaterial)];
+      const blades: [Mesh, Mesh] = [
+        new Mesh(this.ghostBladeGeometry, bladeMaterial),
+        new Mesh(this.ghostBladeGeometry, bladeMaterial),
+      ];
       for (let hand = 0; hand < 2; hand++) {
         const blade = blades[hand];
         const offset = offsets[hand];
@@ -143,7 +160,8 @@ export class AnticheatOverlay {
   }
 
   update(time: number, offsets: [Object3D, Object3D]) {
-    for (const { path, mesh } of this.paths) mesh.visible = time >= path.from - PATH_LEAD && time <= path.to + PATH_LEAD;
+    for (const { path, mesh } of this.paths)
+      mesh.visible = time >= path.from - PATH_LEAD && time <= path.to + PATH_LEAD;
     for (const entry of this.ghosts) {
       const frames = sampleReplayFrames(entry.ghost.replay.poses, time);
       entry.root.visible = frames !== null && entry.root.userData.hidden !== true;
