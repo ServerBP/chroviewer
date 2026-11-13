@@ -321,17 +321,21 @@ export function useViewerRemoteSource({
   ) {
     const url = new URL(tarfPath, window.location.origin);
     const sameOrigin = url.origin === window.location.origin;
-    const request = (href: string) =>
+    const request = (href: string, direct: boolean) =>
       requestArrayBuffer(href, {
         source: 'local',
         label: 'Replay',
         operation: 'download-replay',
         ...downloadOptions('replay', requestId),
+        // Without a request of its own, requestArrayBuffer sends cross-origin URLs through the source proxy
+        ...(direct ? { request: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init) } : {}),
       });
     return Result.gen(async function* () {
-      const direct = await request(url.href);
+      const direct = await request(url.href, true);
+      // A site that answered keeps its answer (an expired link stays a 404); only one the browser can't read goes through the proxy
+      const answered = direct.isErr() && direct.error.status !== undefined;
       const data = yield* Result.await(
-        direct.isOk() || sameOrigin ? Promise.resolve(direct) : request(sourceDownloadUrl(url.href)),
+        direct.isOk() || sameOrigin || answered ? Promise.resolve(direct) : request(sourceDownloadUrl(url.href), false),
       );
       if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
       yield* Result.await(loadReplayData(requestId, data, pending, { type: 'replay', url: url.href }));
