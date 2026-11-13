@@ -120,6 +120,7 @@ export const replaySaberModelIds = [
   'cube-community-new',
   'cube-community-v1',
   'euc',
+  'spider-slider-sticks',
 ] as const;
 
 export type ReplaySaberModelId = (typeof replaySaberModelIds)[number];

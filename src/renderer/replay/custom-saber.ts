@@ -20,6 +20,7 @@ import { createSaberGlowMaterial } from '../materials/map-object-materials';
 import type { MaterialTexture } from '../materials/shared';
 import { createCg5SaberGlowMaterial } from './cg5-saber-materials';
 import { createReplaySurfaceMaterial, type ReplayDirectionalLights, type ReplaySurface } from './replay-headset';
+import { createSpiderSaberFresnelMaterial, createSpiderSaberGlowMaterial } from './spider-saber-materials';
 
 type CustomSaberModelId = Exclude<ReplaySaberModelId, 'default'>;
 type CustomSaberMaterialRole = 'surface' | 'custom-surface' | 'static-glow' | 'custom-glow';
@@ -61,9 +62,15 @@ const MODEL_PATHS: Record<CustomSaberModelId, string> = {
   'cube-community-new': 'cube-community-new.glb',
   'cube-community-v1': 'cube-community-v1.glb',
   euc: 'euc.glb',
+  'spider-slider-sticks': 'spider-slider-sticks.glb',
 };
 
 const MODEL_TRAILS: Record<CustomSaberModelId, CustomSaberTrailDefinition> = {
+  'spider-slider-sticks': {
+    base: 0.695900022983551,
+    tip: 1.000499963760376,
+    texture: 'spider-slider-sticks-trail.png',
+  },
   beatkhana: {
     base: 0.504500031,
     tip: 1.004500031,
@@ -240,6 +247,11 @@ export async function createCustomSaberInstance(
 
   function createMaterial(part: CustomSaberPart) {
     const materialColor = part.colorIndex === null ? part.color : colors[part.colorIndex];
+    if (model === 'spider-slider-sticks') {
+      return part.role === 'custom-glow'
+        ? createSpiderSaberGlowMaterial(fog, materialColor)
+        : createSpiderSaberFresnelMaterial(fog, materialColor);
+    }
     if (model === 'cg5' && (part.role === 'custom-glow' || materialBaseName(part.name) === 'Hilt')) {
       return createCg5SaberGlowMaterial(fog, materialColor, part.role === 'custom-glow' ? 0.8 : 0);
     }

@@ -102,3 +102,14 @@ test('preserves a serialized multi-map showcase configuration from a long browse
   expect(validated.hidePlatform).toBe(true);
   expect(JSON.parse(validated.showcaseConfig ?? '{}').maps).toHaveLength(8);
 });
+
+test('selects Spider Slider Sticks through aliases, canonical URLs and per-player settings', () => {
+  for (const query of [
+    '?saber=spider-slider-sticks',
+    '?saberModel=spider-slider-sticks',
+    `?settings=${encodeURIComponent(JSON.stringify({ saberModel: 'spider-slider-sticks' }))}`,
+  ]) {
+    expect(z.parse(viewerSearchSchema, parseUrlSearch(query)).settings?.saberModel).toBe('spider-slider-sticks');
+  }
+  expect(z.parse(viewerSearchSchema, parseUrlSearch('?saber=euc')).settings?.saberModel).toBe('euc');
+});

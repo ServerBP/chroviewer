@@ -1,5 +1,11 @@
 # Asset attributions
 
+## Spider Slider Sticks
+
+- SpiderSliderSticks by qlulezz, from the supplied saber bundle.
+- Original active meshes, transforms, material settings, and trail texture retained.
+- See [port notes](docs/spider-slider-sticks.md) for shader and coordinate details.
+
 ## CG5 saber
 
 - CG5 Saber-Trail by Snowwisslow and Xanadu, from the supplied saber bundle.

@@ -87,7 +87,8 @@ leftColor=%23rrggbb            URL-encoded #rrggbb left saber color.
 rightColor=%23rrggbb           URL-encoded #rrggbb right saber color.
 showSabers=true|false
 saber=cg5                     Select CG5 (alias for saberModel=cg5).
-saberModel=default|beatkhana|cg5|cube-community-new|cube-community-v1|euc
+saber=spider-slider-sticks     Select Spider Slider Sticks (same alias).
+saberModel=default|beatkhana|cg5|cube-community-new|cube-community-v1|euc|spider-slider-sticks
 saberWidth=0.25..3            Scale the saber's width without changing its length.
 saberScale=0.25..3
 saberBladeWidth=0.25..4       Blade width multiplier.

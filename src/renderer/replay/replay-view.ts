@@ -63,6 +63,7 @@ import {
   type ReplaySaberModel,
   type ReplaySaberTrail,
 } from './saber';
+import { createSpiderSaberTrailMaterial } from './spider-saber-materials';
 
 function saberCoreColor([red, green, blue]: Rgb): Rgb {
   return [0.55 + red * 0.45, 0.55 + green * 0.45, 0.55 + blue * 0.45];
@@ -630,9 +631,11 @@ export class ReplayView {
         const color = this.saberColors[index] ?? DEFAULT_COLORS.leftNote;
         if (trail === undefined) continue;
         const trailMaterial =
-          displacementTexture === undefined
-            ? createSaberTrailMaterial(color, trailTexture)
-            : createCg5SaberTrailMaterial(color, trailTexture, displacementTexture);
+          model === 'spider-slider-sticks'
+            ? createSpiderSaberTrailMaterial(color, trailTexture)
+            : displacementTexture === undefined
+              ? createSaberTrailMaterial(color, trailTexture)
+              : createCg5SaberTrailMaterial(color, trailTexture, displacementTexture);
         setReplaySaberTrailMaterial(trail, trailMaterial);
         this.customSaberMaterials.push(trailMaterial);
       }
