@@ -4,6 +4,7 @@ import { useTranslations } from 'use-intl';
 
 import { songBpmTimeToSeconds } from '../../core/beatmap/bpm';
 import { difficultyRank, effectiveNoteJumpSpeed } from '../../core/beatmap/info';
+import { audioDurationSeconds } from '../../core/clock/audio-duration';
 import { buildHitsoundEvents } from '../../core/clock/hitsounds';
 import { isForcedLightshowMode, type LightshowMode } from '../../core/lighting/basic-light';
 import { applyReplayHeightEvents, buildMapRenderData } from '../../core/placement/map-render-data';
@@ -324,7 +325,12 @@ export function useViewerSession({
     });
     const hitsoundEvents = buildHitsoundEvents([...data.notes, ...data.chainLinks], sources.songBpm);
     const replayEnd = sources.replayRef.current?.poses.at(-1)?.time ?? 0;
-    const fallbackDuration = Math.max(songBpmTimeToSeconds(data.endBeat, sources.songBpm) + 1, replayEnd);
+    // Muted POVs run on a silent clock. It has to last as long as the song, as the audible clock does, or a muted
+    // live POV stops a second after the last note while the outro is still being played.
+    const fallbackDuration = Math.max(
+      audioDurationSeconds(sources.audioDataRef.current) ?? songBpmTimeToSeconds(data.endBeat, sources.songBpm) + 1,
+      replayEnd,
+    );
     const clockPromise =
       transport.clockRef.current === null
         ? transport.load({
