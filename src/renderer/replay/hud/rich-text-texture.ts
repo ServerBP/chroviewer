@@ -31,6 +31,12 @@ const pixelBudget = 24 * 1024 * 1024;
  */
 const renderBudgetMs = 4;
 const renderBudgetWindowMs = 16;
+/**
+ * Text that was deferred, oldest first, with when it last asked. Players ask again every frame while they still want
+ * it, so a text not asked for in this long has been dropped and no longer holds its place.
+ */
+const waiting = new Map<string, number>();
+const waitingExpiryMs = 200;
 /** TMP point size that `<size=N>` and `<cspace=N>` values are measured against, per world unit. */
 const pointsPerWorldUnit = 10;
 
@@ -351,7 +357,15 @@ export function acquireRichTextTexture(
       budgetWindowStart = now;
       budgetSpent = 0;
     }
-    if (budgetSpent >= renderBudgetMs) return 'deferred';
+    for (const [waitingKey, askedAt] of waiting) if (now - askedAt > waitingExpiryMs) waiting.delete(waitingKey);
+    // First come, first drawn. Players update in a fixed order each frame, so without the queue the first one could
+    // spend every frame's budget on its own new text and the next player's flying scores expired undrawn.
+    const first = waiting.keys().next().value;
+    if (budgetSpent >= renderBudgetMs || (first !== undefined && first !== key)) {
+      waiting.set(key, now);
+      return 'deferred';
+    }
+    waiting.delete(key);
     const rendered = render(text, color, baseFontSize);
     budgetSpent += performance.now() - now;
     if (rendered === null) return null;

@@ -194,7 +194,9 @@ then read from the replay it is drawing, at its own playback time, and posted th
       accuracy, combo, maxCombo, notesMissed, badCuts, bombHits, wallHits, playerHealth, songPosition } | null }] }
 score is null until the tile's playback reaches its replay. TournamentAssistant streams scores with
 modifiers applied, so no unmodified score is sent. A stream joined mid-song takes the misses, cuts, hits
-and highest combo it did not see from the realtime score the parent sent for that moment.
+and highest combo it did not see from the realtime score the parent sent for that moment, so the
+parent only needs to send songPosition, notesMissed, badCuts, bombHits, wallHits and maxCombo. While
+scores are requested, beatkhana:multiview-state carries score: null for every player.
 
 COMPOSITOR SYNCHRONIZATION
 compositorSyncType=slow|wait-for-all

@@ -149,6 +149,8 @@ export function MultiviewShell() {
   const configuredIdsRef = useRef(new Set<string>());
   const lastStatePublishRef = useRef(Number.NEGATIVE_INFINITY);
   const [scoreRate, setScoreRate] = useState(0);
+  const scoreRateRef = useRef(0);
+  scoreRateRef.current = scoreRate;
   const scoreHistoriesRef = useRef(new Map<string, MultiviewScoreHistory>());
   const groupHoldRef = useRef(createGroupHoldState());
   const [heldIds, setHeldIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -422,9 +424,12 @@ export function MultiviewShell() {
           id: player.id,
           playerId: player.playerId,
           platformIds: player.platformIds,
+          // Streamed replay scores replace the parent's own; echoing them back as well only costs a clone.
           score:
-            scoreTimelinesRef.current.get(player.id)?.at(timeline.sampleFor(player.id, now)?.time ?? 0)?.score ??
-            player.score,
+            scoreRateRef.current > 0
+              ? null
+              : (scoreTimelinesRef.current.get(player.id)?.at(timeline.sampleFor(player.id, now)?.time ?? 0)?.score ??
+                player.score),
           status: playbackRef.current.get(player.id)?.status ?? 'waiting',
           time: timeline.sampleFor(player.id, now)?.time ?? 0,
         })),
