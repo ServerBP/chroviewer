@@ -32,6 +32,16 @@ export function forceUprightQuaternion(quaternion: Quaternion, euler = new Euler
 
 export type ReplayCameraMode = 'static' | 'follow' | 'first-person';
 
+/** Where the camera looks at a cut from while a reviewer inspects it: the normal camera, or close around the cut */
+export type InspectView = 'player' | 'close' | 'side' | 'top';
+
+// Offsets from the cut, in the player's space (the player faces −z)
+const INSPECT_OFFSETS: Record<Exclude<InspectView, 'player'>, [number, number, number]> = {
+  close: [0.3, 0.35, 2.1],
+  side: [2.5, 0.25, 0.1],
+  top: [0, 2.7, 0.4],
+};
+
 export class ReplayCameraController {
   private readonly position = new Vector3();
   private readonly offset = new Vector3();
@@ -48,6 +58,8 @@ export class ReplayCameraController {
   private poseReady = false;
   private replayTime = Number.NEGATIVE_INFINITY;
   private updatedAt = performance.now();
+  private inspect: { view: Exclude<InspectView, 'player'>; target: Vector3 } | null = null;
+  private followOverride = false;
 
   constructor(private readonly camera: PerspectiveCamera) {
     this.camera.far = GAMEPLAY_CAMERA_FAR;
@@ -123,10 +135,28 @@ export class ReplayCameraController {
     this.applyFov();
   }
 
+  /** Markers are watched from behind and above: in first person the camera would sit inside the player's own head marker */
+  setFollowOverride(enabled: boolean) {
+    this.followOverride = enabled;
+    this.reset();
+  }
+
+  /** Looks at `target` from one of the inspection views, until the view is 'player' or the target is gone */
+  setInspect(view: InspectView, target: Vector3 | null) {
+    this.inspect = view === 'player' || target === null ? null : { view, target: target.clone() };
+    if (this.inspect === null) this.reset();
+  }
+
   update(head: Object3D, time: number) {
-    if (this.mode === 'first-person') {
+    if (this.inspect !== null) {
+      this.camera.position.copy(this.inspect.target).add(this.offset.set(...INSPECT_OFFSETS[this.inspect.view]));
+      this.camera.lookAt(this.inspect.target);
+      return;
+    }
+    const mode = this.followOverride && this.mode === 'first-person' ? 'follow' : this.mode;
+    if (mode === 'first-person') {
       this.updateFirstPerson(head, time);
-    } else if (this.mode === 'follow') {
+    } else if (mode === 'follow') {
       head.getWorldPosition(this.position);
       this.camera.position.copy(this.position).add(this.offset.set(0, 0.4, 2.5));
       this.camera.lookAt(this.position.add(this.offset.set(0, 0, -2)));

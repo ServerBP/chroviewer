@@ -72,6 +72,8 @@ export const viewerSearchSchema = z.pipe(
     bkacrPath: z.catch(z.optional(tarfPathSchema), undefined),
     bkaccmpPath: z.catch(z.optional(tarfPathSchema), undefined),
     t: z.catch(z.optional(nonnegativeNumberSchema), undefined),
+    // The song time of an anticheat finding's place to open focused, with its cut drawn against the note
+    acMark: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     scoreId: z.catch(z.optional(scoreIdSchema), undefined),
     scoreIdBL: z.catch(z.optional(scoreIdSchema), undefined),
     difficulty: z.catch(z.optional(difficultyRankSchema), undefined),

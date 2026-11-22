@@ -1,15 +1,34 @@
 import { Result } from 'better-result';
-import { BufferAttribute, BufferGeometry, Group, Mesh, PerspectiveCamera, Scene, type WebGLRenderer } from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Group,
+  Matrix4,
+  Mesh,
+  PerspectiveCamera,
+  Scene,
+  type WebGLRenderer,
+} from 'three';
 
 import { HeckBaseProviderRuntime } from '../core/animation/base-provider';
-import { songBpmTimeToSeconds } from '../core/beatmap/bpm';
+import { secondsToSongBpmTime, songBpmTimeToSeconds } from '../core/beatmap/bpm';
 import type { InfoColorScheme } from '../core/beatmap/info';
 import type { ChromaEnvironmentData } from '../core/chroma-environment';
 import { DEFAULT_COLORS, resolveColorScheme, type ColorScheme, type Rgb } from '../core/colors';
 import { isForcedLightshowMode, shouldShowMapObjects, type LightshowMode } from '../core/lighting/basic-light';
 import { sampleNoodlePlayerTrack } from '../core/noodle-runtime';
 import { applyReplayHeightEvents, applyReplayNoteEvents, type MapRenderData } from '../core/placement/map-render-data';
+import type { AnticheatMark } from '../core/replay/anticheat';
 import type { HitScoreVisualizerConfig } from '../core/replay/hit-score-visualizer';
+import {
+  bladeOf,
+  checkCut,
+  DEFAULT_HITBOX_RULES,
+  goodCutBox,
+  hitboxRules,
+  noteScale,
+  type HitboxRules,
+} from '../core/replay/note-hitbox';
 import type { Replay, ReplayHeightEvent, ReplayNoteEvent } from '../core/replay/types';
 import {
   DEFAULT_REPLAY_CAMERA_SETTINGS,
@@ -26,7 +45,7 @@ import {
 import { loadEnvironment } from './environment/environment-loader';
 import type { LoadedEnvironment } from './environment/environment-runtime';
 import { EnvironmentLightRuntime } from './map/environment-light-runtime';
-import { MapObjectRenderer, type NoteHighlight } from './map/map-object-renderer';
+import { MapObjectRenderer, type HitboxMode, type NoteHighlight } from './map/map-object-renderer';
 import { NoodlePlayerTransform } from './map/noodle-player-transform';
 import { createMirrorMaterial, createSkyboxMaterial } from './materials/scene-materials';
 import { collectMirrorConsumers, hasVisibleMirrorConsumer } from './mirror/mirror-consumers';
@@ -40,15 +59,32 @@ import { PostBloomPipeline } from './post-bloom/pipeline';
 import { DEFAULT_QUALITY } from './quality';
 import { DEFAULT_RENDER_PERFORMANCE, type RenderPerformanceOptions } from './render-performance';
 import type { RenderView } from './renderer-lifecycle';
+import type { Figure } from './replay/anticheat-figures';
+import { frameAround, type InspectorFocus } from './replay/anticheat-inspector';
 import type { Ghost, SwingPath } from './replay/anticheat-overlay';
 import { ReplayOrthographicOverlay } from './replay/orthographic-overlay';
-import type { ReplayCameraMode } from './replay/replay-camera';
+import type { InspectView, ReplayCameraMode } from './replay/replay-camera';
 import { ReplayView } from './replay/replay-view';
 
 function fullscreenTriangle() {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
   return geometry;
+}
+
+/** One good cut checked against its note's box */
+export interface CutCheck {
+  time: number;
+  noteIndex: number;
+  dot: boolean;
+  hits: boolean;
+  /**
+   * How much the note's good-cut box would have to grow to touch the box around the blade's sweep, with the note where it
+   * stood on the frame before the cut or on the cut's frame, whichever is closer (1 or less: it touched)
+   */
+  scaleNeeded: number;
+  cutScaleNeeded: number;
+  previousScaleNeeded: number;
 }
 
 export class MapView implements RenderView {
@@ -96,6 +132,8 @@ export class MapView implements RenderView {
   private playerPlatformVisible = true;
 
   private data: MapRenderData | null = null;
+  private focusNote = -1;
+  private hitboxRules: HitboxRules = DEFAULT_HITBOX_RULES;
   private beatSource: () => number = () => 0;
 
   constructor(
@@ -275,6 +313,12 @@ export class MapView implements RenderView {
 
   setReplay(replay: Replay | null, hitScoreVisualizer?: HitScoreVisualizerConfig | null) {
     this.replayView.setReplay(replay, hitScoreVisualizer);
+    this.mapObjects.setNoteScale(noteScale(replay?.metadata.modifiers));
+    this.hitboxRules =
+      replay === null
+        ? DEFAULT_HITBOX_RULES
+        : hitboxRules(replay.metadata.modifiers, replay.metadata.characteristic, replay.metadata.gameVersion);
+    this.mapObjects.setHitboxRules(this.hitboxRules);
     this.baseProviders.reset();
     this.mapObjects.invalidate();
   }
@@ -292,6 +336,114 @@ export class MapView implements RenderView {
 
   setAnticheatGhostVisible(index: number, visible: boolean) {
     this.replayView.setAnticheatGhostVisible(index, visible);
+  }
+
+  /** The cut a reviewer is looking at: its note's boxes where it was cut, the blade's sweep and the arrow's tolerance */
+  setAnticheatFocus(focus: { mark: AnticheatMark; tolerance: number | null; color: InspectorFocus['color'] } | null) {
+    const note = focus?.mark.note;
+    if (focus === null || note === null || note === undefined) {
+      this.focusNote = -1;
+      this.replayView.setAnticheatFocus(null);
+      return;
+    }
+    this.focusNote = this.mapObjects.noteIndexOf(note, focus.mark.time);
+    const dot = this.data?.notes[this.focusNote]?.dot ?? note.direction === 8;
+    const poses =
+      this.focusNote < 0
+        ? null
+        : this.posesAtCut(this.focusNote, this.data?.notes[this.focusNote]?.replayEndTime ?? focus.mark.time);
+    this.replayView.setAnticheatFocus({ ...focus, dot, rules: this.hitboxRules, noteIndex: this.focusNote, poses });
+    this.mapObjects.invalidate();
+  }
+
+  /**
+   * Where a note was drawn on the frame before a cut and on the cut's frame, in the space replay poses are drawn in. The
+   * game tests a cut against the note's box as it stood on one of them, so both are measured.
+   */
+  private posesAtCut(index: number, time: number): { previous: Matrix4 | null; cut: Matrix4 | null } | null {
+    const data = this.data;
+    const replay = this.replayView.currentReplay;
+    if (data === null || replay === null) return null;
+    const around = frameAround(replay.poses, time);
+    if (around === null) return null;
+    const space = this.replayView.playerSpace;
+    const at = (seconds: number) => {
+      this.update(secondsToSongBpmTime(seconds, data.songBpm));
+      const pose = this.mapObjects.notePose(index);
+      if (pose === null || Math.abs(pose.time - seconds) > 0.002) return null;
+      space.updateWorldMatrix(true, false);
+      return space.matrixWorld.clone().invert().multiply(pose.matrix);
+    };
+    const previous = at(around.previous.time);
+    const cut = at(time);
+    return { previous, cut };
+  }
+
+  get anticheatInspection() {
+    return this.replayView.anticheatInspection;
+  }
+
+  setAnticheatInspectView(view: InspectView) {
+    this.replayView.setAnticheatInspectView(view);
+  }
+
+  setHitboxMode(mode: HitboxMode) {
+    this.mapObjects.setHitboxMode(mode);
+  }
+
+  setAnticheatFigures(enabled: boolean, figures: Figure[]) {
+    this.replayView.setAnticheatFigures(enabled, figures);
+  }
+
+  /**
+   * Every good cut of the replay against its note's good-cut box: the note placed as drawn on the cut frame, the blade swept
+   * from the frame before. Steps through the play in time order, so it takes a few seconds on long maps.
+   */
+  async checkEveryCut(onProgress?: (done: number, total: number) => void): Promise<CutCheck[]> {
+    const data = this.data;
+    const replay = this.replayView.currentReplay;
+    if (data === null || replay === null) return [];
+    const byTime = new Map<number, number>();
+    for (const [index, note] of data.notes.entries())
+      if (note.replayEndTime !== undefined) byTime.set(note.replayEndTime, index);
+    const cuts = replay.notes
+      .filter((event) => event.eventType === 1 && byTime.has(event.time))
+      .sort((left, right) => left.time - right.time);
+    const results: CutCheck[] = [];
+
+    for (const [done, event] of cuts.entries()) {
+      const index = byTime.get(event.time) ?? -1;
+      const around = frameAround(replay.poses, event.time);
+      const note = data.notes[index];
+      const poses = note === undefined ? null : this.posesAtCut(index, event.time);
+      if (around !== null && note !== undefined && poses !== null && (poses.cut !== null || poses.previous !== null)) {
+        const hand = event.saberType === 0 ? 'leftHand' : 'rightHand';
+        const shape = note.dot ? 'dot' : 'arrow';
+        const blades = [bladeOf(around.previous[hand]), bladeOf(around.current[hand])] as const;
+        const scaleAt = (pose: Matrix4 | null, box: ReturnType<typeof goodCutBox>) =>
+          pose === null ? Number.POSITIVE_INFINITY : checkCut(pose, box, blades[0], blades[1]).box.scaleNeeded;
+        const box = goodCutBox(shape, this.hitboxRules);
+        const cutScale = scaleAt(poses.cut, box);
+        const previousScale = scaleAt(poses.previous, box);
+        const scaleNeeded = Math.min(cutScale, previousScale);
+        results.push({
+          time: event.time,
+          noteIndex: index,
+          dot: note.dot,
+          scaleNeeded,
+          hits: scaleNeeded <= 1,
+          cutScaleNeeded: cutScale,
+          previousScaleNeeded: previousScale,
+        });
+      }
+      if (done % 40 === 39) {
+        onProgress?.(done + 1, cuts.length);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+    onProgress?.(cuts.length, cuts.length);
+    this.mapObjects.invalidate();
+    return results;
   }
 
   get matchedAnticheatNotes() {
@@ -505,6 +657,10 @@ export class MapView implements RenderView {
       data.leftHanded,
     );
     this.mapObjects.update(now, this.replayView, this.baseProviders);
+    this.replayView.updateAnticheatInspector(
+      replayTime,
+      this.focusNote < 0 ? null : this.mapObjects.notePose(this.focusNote),
+    );
   }
 
   render(renderer: WebGLRenderer) {

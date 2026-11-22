@@ -1,4 +1,5 @@
 import {
+  BoxGeometry,
   DoubleSide,
   Matrix4,
   Mesh,
@@ -16,6 +17,7 @@ import {
   type Material,
   type Texture,
 } from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import type { PointSampleContext } from '../../core/animation/point-definition';
 import { secondsToSongBpmTime, songBpmTimeToSeconds } from '../../core/beatmap/bpm';
@@ -45,6 +47,14 @@ import type {
   WallInstance,
 } from '../../core/placement/map-render-data';
 import { sameNote, type AnticheatNoteRef } from '../../core/replay/anticheat';
+import {
+  badCutBox,
+  DEFAULT_HITBOX_RULES,
+  goodCutBox,
+  type HitboxRules,
+  type NoteBox,
+  type NoteShape,
+} from '../../core/replay/note-hitbox';
 import type { ReplayPose } from '../../core/replay/types';
 import type { SpawnState } from '../../core/spawn/variable-njs';
 import type { FogUniforms } from '../bloomfog/pipeline';
@@ -79,6 +89,7 @@ import {
   wallCoreGeometry,
   wallFrameGeometry,
 } from '../object-geometry';
+import { withoutBloom } from '../replay/overlay-material';
 import type { ReplayView } from '../replay/replay-view';
 import { wallTransform } from '../wall-transform';
 import { ActiveWindowIndex } from './active-window-index';
@@ -117,12 +128,74 @@ const zAxis = new Vector3(0, 0, 1);
 const yAxis = new Vector3(0, 1, 0);
 const mapPlayerCenter = new Vector3(0, 1.7, 0);
 const degToRad = Math.PI / 180;
-const noteModelScale = 1;
+const UNIT_BOX: NoteBox = { center: [0, 0, 0], size: [1, 1, 1] };
+
+/** Which notes show the game's cut boxes: none, the notes an anticheat finding points at, or every note */
+export type HitboxMode = 'off' | 'marked' | 'all';
+
+/** A note's world matrix as last drawn, at song time `time` */
+export interface NotePose {
+  matrix: Matrix4;
+  time: number;
+  dot: boolean;
+  colorIndex: number;
+}
+
+// The box's twelve edges as thin bars, so they stay visible from any side and work with instancing
+function boxOutlineGeometry(box: NoteBox, thickness = 0.008) {
+  const [width, height, depth] = box.size;
+  const [cx, cy, cz] = box.center;
+  const bars: BoxGeometry[] = [];
+  for (const y of [-height / 2, height / 2]) {
+    for (const z of [-depth / 2, depth / 2])
+      bars.push(new BoxGeometry(width, thickness, thickness).translate(cx, cy + y, cz + z));
+  }
+  for (const x of [-width / 2, width / 2]) {
+    for (const z of [-depth / 2, depth / 2])
+      bars.push(new BoxGeometry(thickness, height, thickness).translate(cx + x, cy, cz + z));
+    for (const y of [-height / 2, height / 2])
+      bars.push(new BoxGeometry(thickness, thickness, depth).translate(cx + x, cy + y, cz));
+  }
+  const merged = mergeGeometries(bars);
+  for (const bar of bars) bar.dispose();
+  return merged;
+}
+
+function hitboxMaterial(opacity: number) {
+  return withoutBloom(
+    new MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+}
 
 /** A note the anticheat points at, ringed in `color` while it flies and for a moment after it was cut */
 export interface NoteHighlight {
   note: AnticheatNoteRef;
   color: Rgb;
+  /** When the replay cut or missed it, for maps whose note times differ slightly from the recorder's */
+  time?: number;
+}
+
+/** The same place on the grid with the same colour and arrow, cut by the replay at `time` */
+function cutThere(
+  ref: AnticheatNoteRef,
+  time: number,
+  note: { replayEndTime?: number; replayIdentity?: { lineIndex: number; lineLayer: number; colorType: number } },
+) {
+  const identity = note.replayIdentity;
+  return (
+    identity !== undefined &&
+    note.replayEndTime !== undefined &&
+    Math.abs(note.replayEndTime - time) < 0.002 &&
+    identity.lineIndex === ref.line &&
+    identity.lineLayer === ref.layer &&
+    identity.colorType === ref.color
+  );
 }
 
 const HIGHLIGHT_AFTER_CUT = 0.35;
@@ -132,15 +205,17 @@ function noteHighlightGeometry() {
 }
 
 function noteHighlightMaterial() {
-  return new MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.95,
-    depthTest: false,
-    depthWrite: false,
-    side: DoubleSide,
-    toneMapped: false,
-  });
+  return withoutBloom(
+    new MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+      side: DoubleSide,
+      toneMapped: false,
+    }),
+  );
 }
 const previewRotationFps = 90;
 const white: Rgb = [1, 1, 1];
@@ -188,6 +263,16 @@ export class MapObjectRenderer {
   private noteHighlights: InstancedGroup | null = null;
   private highlightRequests: NoteHighlight[] = [];
   private readonly highlightOf = new Map<number, NoteHighlight>();
+  private hitboxGroups: { good: InstancedGroup; bad: InstancedGroup } | null = null;
+  private hitboxRules: HitboxRules = DEFAULT_HITBOX_RULES;
+  private readonly boxMatrices = new Map<string, Matrix4>();
+  private readonly boxMatrix = new Matrix4();
+  /** Undoes the note's own scale: Small Notes draws notes at half size, but the game keeps their boxes full size */
+  private readonly colliderScale = new Matrix4();
+  private readonly colliderMatrix = new Matrix4();
+  private hitboxMode: HitboxMode = 'off';
+  private noteScale = 1;
+  private readonly notePoses = new Map<number, NotePose>();
   private bombs: InstancedGroup | null = null;
   private links: InstancedGroup[] = [];
   private wallCores: InstancedGroup | null = null;
@@ -311,6 +396,18 @@ export class MapObjectRenderer {
     this.noteHighlights = new InstancedGroup(noteHighlightGeometry(), highlightMaterial, data.capacity.notes);
     this.noteHighlights.mesh.renderOrder = 10;
     this.noteHighlights.mesh.userData.mirrorExcluded = true;
+    const goodBoxMaterial = hitboxMaterial(0.9);
+    const badBoxMaterial = hitboxMaterial(0.55);
+    this.ownedMaterials.push(goodBoxMaterial, badBoxMaterial);
+    const boxes = data.capacity.notes + data.capacity.chainLinks;
+    this.hitboxGroups = {
+      good: new InstancedGroup(boxOutlineGeometry(UNIT_BOX, 0.012), goodBoxMaterial, boxes),
+      bad: new InstancedGroup(boxOutlineGeometry(UNIT_BOX, 0.01), badBoxMaterial, boxes),
+    };
+    for (const group of Object.values(this.hitboxGroups)) {
+      group.mesh.renderOrder = 11;
+      group.mesh.userData.mirrorExcluded = true;
+    }
     this.links = noteMaterials.map(
       (material) => new InstancedGroup(chainLinkGeometry(), material, data.capacity.chainLinks),
     );
@@ -336,6 +433,7 @@ export class MapObjectRenderer {
       ...this.decorativeArrowGlows,
       ...this.circleGlows,
       this.noteHighlights,
+      ...Object.values(this.hitboxGroups),
       this.bombs,
       ...this.links,
       this.wallCores,
@@ -421,9 +519,95 @@ export class MapObjectRenderer {
     for (const [index, note] of notes.entries()) {
       const identity = note.replayIdentity;
       if (identity === undefined) continue;
-      const highlight = this.highlightRequests.find((request) => sameNote(request.note, identity));
+      const highlight = this.highlightRequests.find(
+        (request) =>
+          sameNote(request.note, identity) ||
+          (request.time !== undefined && cutThere(request.note, request.time, note)),
+      );
       if (highlight !== undefined) this.highlightOf.set(index, highlight);
     }
+  }
+
+  setHitboxMode(mode: HitboxMode) {
+    if (mode === this.hitboxMode) return;
+    this.hitboxMode = mode;
+    this.invalidate();
+  }
+
+  /** Small Notes draws every note (and its boxes) at half size, as the game does */
+  setNoteScale(scale: number) {
+    if (scale === this.noteScale) return;
+    this.noteScale = scale;
+    this.colliderScale.makeScale(1 / scale, 1 / scale, 1 / scale);
+    // The note's cut boxes keep their size: Small Notes only draws the note smaller
+    this.noteLookStates.clear();
+    this.invalidate();
+  }
+
+  /** Pro Mode and old dots change the boxes */
+  setHitboxRules(rules: HitboxRules) {
+    this.hitboxRules = rules;
+    this.boxMatrices.clear();
+    this.invalidate();
+  }
+
+  /** Places a unit box as the note's box of the given kind */
+  private boxIn(kind: 'good' | 'bad', shape: NoteShape) {
+    const key = `${kind}:${shape}`;
+    let matrix = this.boxMatrices.get(key);
+    if (matrix === undefined) {
+      const box = kind === 'good' ? goodCutBox(shape, this.hitboxRules) : badCutBox(shape, this.hitboxRules);
+      matrix = new Matrix4().compose(new Vector3(...box.center), new Quaternion(), new Vector3(...box.size));
+      this.boxMatrices.set(key, matrix);
+    }
+    return matrix;
+  }
+
+  private pushBoxes(shape: NoteShape, color: readonly [number, number, number, number?]) {
+    this.colliderMatrix.multiplyMatrices(this.matrix, this.colliderScale);
+    this.hitboxGroups?.good.push(
+      this.boxMatrix.multiplyMatrices(this.colliderMatrix, this.boxIn('good', shape)),
+      color,
+    );
+    this.hitboxGroups?.bad.push(this.boxMatrix.multiplyMatrices(this.colliderMatrix, this.boxIn('bad', shape)), white);
+  }
+
+  /**
+   * Index of the map note an anticheat mark names, or -1. Several notes can share a time and place (stacks, dense streams);
+   * the one the replay cut nearest `time` is the one meant.
+   */
+  noteIndexOf(ref: AnticheatNoteRef, time?: number) {
+    const notes = this.data?.notes ?? [];
+    let best = -1;
+    let bestGap = Number.POSITIVE_INFINITY;
+    for (const [index, note] of notes.entries()) {
+      if (note.replayIdentity === undefined) continue;
+      if (!sameNote(ref, note.replayIdentity) && (time === undefined || !cutThere(ref, time, note))) continue;
+      const gap = time === undefined || note.replayEndTime === undefined ? 1e6 : Math.abs(note.replayEndTime - time);
+      if (best < 0 || gap < bestGap) {
+        best = index;
+        bestGap = gap;
+      }
+    }
+    return best;
+  }
+
+  /** The world matrix of the note's cut boxes (its own, without Small Notes' scale) as last drawn, while it was in play */
+  notePose(index: number): NotePose | null {
+    return this.notePoses.get(index) ?? null;
+  }
+
+  private capturePose(index: number, time: number, dot: boolean, colorIndex: number) {
+    let pose = this.notePoses.get(index);
+    if (pose === undefined) {
+      pose = { matrix: new Matrix4(), time, dot, colorIndex };
+      this.notePoses.set(index, pose);
+    }
+    pose.matrix.multiplyMatrices(
+      this.root.matrixWorld,
+      this.colliderMatrix.multiplyMatrices(this.matrix, this.colliderScale),
+    );
+    pose.time = time;
   }
 
   /** How many of the requested highlights found their note in the map */
@@ -540,7 +724,9 @@ export class MapObjectRenderer {
         // A highlighted note keeps its ring a moment after it was cut, so pausing on the cut still shows which note it was
         const cut = note.replayEndTime !== undefined && replayTime >= note.replayEndTime;
         const ringOnly = cut && highlight !== undefined && replayTime < (note.replayEndTime ?? 0) + HIGHLIGHT_AFTER_CUT;
-        if (!visible || (cut && !ringOnly)) continue;
+        // On the cut itself the note is still placed, so its box and pose at the cut can be shown and measured
+        const atCut = cut && replayTime <= (note.replayEndTime ?? 0) + 1e-4;
+        if (!visible || (cut && !ringOnly && !atCut)) continue;
         const bodyDissolve = noodle.dissolve ?? 1;
         const arrowDissolve = noodle.dissolveArrow ?? 1;
         const noteTime = songBpmTimeToSeconds(note.beat, data.songBpm);
@@ -557,13 +743,13 @@ export class MapObjectRenderer {
             poseFrames,
             replayView.headPosition,
             replayView,
-            noteModelScale,
+            this.noteScale,
             noodle.time !== undefined,
             noodle,
             context,
           );
         } else {
-          this.composeAt(note, movementBeat, x, y, rotation, noteModelScale, true, movementState);
+          this.composeAt(note, movementBeat, x, y, rotation, this.noteScale, true, movementState);
           const spawnBeat = currentSpawnBeat(note, movementState);
           const preJumpPosition =
             now < spawnBeat && noodle.definitePosition !== undefined
@@ -582,7 +768,12 @@ export class MapObjectRenderer {
           );
         }
         if (highlight !== undefined) this.noteHighlights?.push(this.matrix, highlight.color);
-        if (ringOnly) continue;
+        if (interactable) this.capturePose(index, replayTime, note.dot, colorIndex);
+        if (interactable && (this.hitboxMode === 'all' || (this.hitboxMode === 'marked' && highlight !== undefined))) {
+          const noteColor = note.customColor ?? (note.colorIndex === 1 ? colors.rightNote : colors.leftNote);
+          this.pushBoxes(note.dot ? 'dot' : 'arrow', highlight?.color ?? noteColor);
+        }
+        if (ringOnly || cut) continue;
         const color = animatedNoodleColor(
           noodle.color,
           note.customColor ?? (note.colorIndex === 1 ? colors.rightNote : colors.leftNote),
@@ -621,7 +812,7 @@ export class MapObjectRenderer {
         ? bomb.y
         : bomb.startY + (bomb.y - bomb.startY) * spawnProgress(bomb, movementBeat, movementState);
       if ((noodle.dissolve ?? 1) <= 0) continue;
-      this.composeAt(bomb, movementBeat, bomb.x, y, 0, 1, true, movementState);
+      this.composeAt(bomb, movementBeat, bomb.x, y, 0, this.noteScale, true, movementState);
       const spawnBeat = currentSpawnBeat(bomb, movementState);
       const preJumpPosition =
         now < spawnBeat && noodle.definitePosition !== undefined
@@ -663,7 +854,7 @@ export class MapObjectRenderer {
           (!hitPreviewNotes || !interactable || isVisibleBeforeHit(link, movementBeat));
         if (!visible || (link.replayEndTime !== undefined && replayTime >= link.replayEndTime)) continue;
         if ((noodle.dissolve ?? 1) <= 0) continue;
-        this.composeAt(link, movementBeat, link.x, y, rotation, noteModelScale, false, movementState);
+        this.composeAt(link, movementBeat, link.x, y, rotation, this.noteScale, false, movementState);
         const spawnBeat = currentSpawnBeat(link, movementState);
         const preJumpPosition =
           now < spawnBeat && noodle.definitePosition !== undefined
@@ -685,6 +876,7 @@ export class MapObjectRenderer {
           link.customColor ?? (link.colorIndex === 1 ? colors.rightNote : colors.leftNote),
         );
         this.links[colorIndex]?.push(this.matrix, color, noodle.dissolve ?? 1, index + 1);
+        if (this.hitboxMode === 'all') this.pushBoxes('chain', color);
       }
     }
 
@@ -877,6 +1069,8 @@ export class MapObjectRenderer {
     this.noteBodies = this.arrows = this.decorativeArrows = this.arrowGlows = this.decorativeArrowGlows = [];
     this.circleGlows = this.links = [];
     this.noteHighlights = null;
+    this.hitboxGroups = null;
+    this.notePoses.clear();
     this.highlightOf.clear();
     this.bombs = this.wallCores = this.legacySolidWallCores = this.wallFrames = this.wallFakeGlows = null;
     this.wallCoreLowMaterial = this.wallCoreHighMaterial = null;
@@ -1123,7 +1317,7 @@ export class MapObjectRenderer {
       : note.startY +
         (note.y - note.startY) * jump +
         spawnFlipYOffset(note, movementBeat, note.flipYSide, movementState);
-    this.composeAt(note, movementBeat, x, y, 0, noteModelScale, true, movementState);
+    this.composeAt(note, movementBeat, x, y, 0, this.noteScale, true, movementState);
     const spawnBeat = currentSpawnBeat(note, movementState);
     const preJumpPosition =
       now < spawnBeat && noodle.definitePosition !== undefined

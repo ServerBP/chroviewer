@@ -92,6 +92,7 @@ const searchKeyAliases = new Map(
     tarfpath: 'tarfPath',
     bkacrpath: 'bkacrPath',
     bkaccmppath: 'bkaccmpPath',
+    acmark: 'acMark',
     scoreid: 'scoreId',
     ssscoreid: 'scoreId',
     difficulty: 'difficulty',

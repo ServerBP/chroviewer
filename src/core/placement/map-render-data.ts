@@ -209,6 +209,8 @@ function objectJumpY(
   );
 }
 
+const LOOSE_NOTE_TIME = 0.005;
+
 function approximately(left: number, right: number) {
   return Math.abs(left - right) < Math.max(1e-6 * Math.max(Math.abs(left), Math.abs(right)), Number.EPSILON * 8);
 }
@@ -637,6 +639,13 @@ export function applyReplayNoteEvents(data: MapRenderData, events: ReplayNoteEve
     linkedObjects ??= indexLinkedObjects(data.notes, data.bombs);
     propagateLinkedCut(linkedObjects, source, time, eventType, data.songBpm, data.noodle);
   };
+  const unmatched: ReplayNoteEvent[] = [];
+  const claim = (note: NoteInstance, event: ReplayNoteEvent) => {
+    note.replayEndTime = event.time;
+    note.replayEventType = event.eventType;
+    propagate(note, event.time, event.eventType);
+    if (event.noteId.gameplayType !== undefined) note.lookAtPlayer = event.noteId.gameplayType === 0;
+  };
   for (const event of events) {
     const identity = event.noteId;
     if (event.eventType === 4) {
@@ -687,11 +696,37 @@ export function applyReplayNoteEvents(data: MapRenderData, events: ReplayNoteEve
         target.cutDirection === identity.cutDirection
       );
     });
-    if (note === undefined) continue;
-    note.replayEndTime = event.time;
-    note.replayEventType = event.eventType;
-    propagate(note, event.time, event.eventType);
-    if (identity.gameplayType !== undefined) note.lookAtPlayer = identity.gameplayType === 0;
+    if (note === undefined) {
+      unmatched.push(event);
+      continue;
+    }
+    claim(note, event);
+  }
+  // The game times notes in float32 through every BPM change, so on some maps its note times drift from these by more than
+  // rounding: an event still unclaimed takes the nearest free note of the same place, colour and arrow within 5 ms
+  for (const event of unmatched) {
+    const identity = event.noteId;
+    let best: NoteInstance | undefined;
+    for (const candidate of data.notes) {
+      const target = candidate.replayIdentity;
+      if (
+        target === undefined ||
+        candidate.replayEndTime !== undefined ||
+        target.lineIndex !== identity.lineIndex ||
+        target.lineLayer !== identity.lineLayer ||
+        target.colorType !== identity.colorType ||
+        target.cutDirection !== identity.cutDirection ||
+        Math.abs(target.time - identity.time) >= LOOSE_NOTE_TIME
+      ) {
+        continue;
+      }
+      if (
+        best?.replayIdentity === undefined ||
+        Math.abs(target.time - identity.time) < Math.abs(best.replayIdentity.time - identity.time)
+      )
+        best = candidate;
+    }
+    if (best !== undefined) claim(best, event);
   }
 }
 

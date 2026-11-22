@@ -16,6 +16,9 @@ import {
 import type { Rgb } from '../../core/colors';
 import { sampleReplayFrames } from '../../core/replay/sampling';
 import type { Replay, ReplayTransform } from '../../core/replay/types';
+import { AnticheatFigures } from './anticheat-figures';
+import { AnticheatInspector } from './anticheat-inspector';
+import { mainViewOnly, withoutBloom } from './overlay-material';
 
 /** Moves `target` to the pose between two frames, the way the replay's own sabers move */
 export type SampleTransform = (target: Object3D, from: ReplayTransform, to: ReplayTransform, amount: number) => void;
@@ -39,13 +42,15 @@ const PATH_LEAD = 0.6;
 const PATH_RADIUS = 0.012;
 
 function material(color: Rgb, opacity: number) {
-  return new MeshBasicMaterial({
-    color: new Color(...color),
-    transparent: true,
-    opacity,
-    depthWrite: false,
-    toneMapped: false,
-  });
+  return withoutBloom(
+    new MeshBasicMaterial({
+      color: new Color(...color),
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
 }
 
 interface PathEntry {
@@ -68,6 +73,9 @@ interface GhostEntry {
  */
 export class AnticheatOverlay {
   readonly root = new Group();
+  readonly inspector = new AnticheatInspector();
+  readonly figures = new AnticheatFigures();
+  private figureMode = false;
   private paths: PathEntry[] = [];
   private ghosts: GhostEntry[] = [];
   private readonly scratchHand = new Object3D();
@@ -78,6 +86,13 @@ export class AnticheatOverlay {
 
   constructor(private readonly sample: SampleTransform) {
     this.root.name = 'anticheat-overlay';
+    this.root.add(this.inspector.root, this.figures.root);
+  }
+
+  /** Players as markers instead of sabers and headsets */
+  setFigureMode(enabled: boolean) {
+    this.figureMode = enabled;
+    this.figures.setVisible(enabled);
   }
 
   /** Tip of a saber in the player's space at `time`: the hand's pose, the saber offset, then the tip along the blade */
@@ -112,7 +127,7 @@ export class AnticheatOverlay {
       );
       mesh.renderOrder = 9;
       mesh.visible = false;
-      this.root.add(mesh);
+      this.root.add(mainViewOnly(mesh));
       this.paths.push({ path, mesh });
     }
   }
@@ -145,7 +160,7 @@ export class AnticheatOverlay {
       }
       root.add(head);
       root.visible = false;
-      this.root.add(root);
+      this.root.add(mainViewOnly(root));
       this.ghosts.push({ ghost, root, head, hands, offsets, blades });
     }
   }
@@ -160,11 +175,12 @@ export class AnticheatOverlay {
   }
 
   update(time: number, offsets: [Object3D, Object3D]) {
+    this.figures.update(time);
     for (const { path, mesh } of this.paths)
       mesh.visible = time >= path.from - PATH_LEAD && time <= path.to + PATH_LEAD;
     for (const entry of this.ghosts) {
       const frames = sampleReplayFrames(entry.ghost.replay.poses, time);
-      entry.root.visible = frames !== null && entry.root.userData.hidden !== true;
+      entry.root.visible = frames !== null && entry.root.userData.hidden !== true && !this.figureMode;
       if (frames === null) continue;
       this.sample(entry.head, frames.from.head, frames.to.head, frames.amount);
       this.sample(entry.hands[0], frames.from.leftHand, frames.to.leftHand, frames.amount);
@@ -208,6 +224,8 @@ export class AnticheatOverlay {
   dispose() {
     this.clearPaths();
     this.clearGhosts();
+    this.inspector.dispose();
+    this.figures.dispose();
     const geometries: BufferGeometry[] = [this.ghostHeadGeometry, this.ghostBladeGeometry];
     for (const geometry of geometries) geometry.dispose();
   }
