@@ -26,6 +26,7 @@ import {
   loadViewerSettings,
   sanitizeViewerSettings,
 } from '../../core/viewer-settings';
+import { embeddingReplyOrigin, isEmbeddingParentMessage } from '../../embedding';
 import { environmentCatalog } from '../../renderer/environment/environment-catalog';
 import type { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { activeFindings, findingMarkers, findingsOf, ghostsOf, sceneMarks } from '../anticheat/anticheat-marks';
@@ -83,22 +84,6 @@ import { cn } from '@/lib/utils';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function baseHost(hostname: string) {
-  const normalized = hostname.toLowerCase().replace(/^www\./, '');
-  if (normalized === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(normalized) || normalized.includes(':')) {
-    return normalized;
-  }
-  return normalized.split('.').slice(-2).join('.');
-}
-
-function isSameBaseSite(origin: string) {
-  try {
-    return baseHost(new URL(origin).hostname) === baseHost(window.location.hostname);
-  } catch {
-    return false;
-  }
 }
 
 function dynamicSettingsPatch(values: Record<string, unknown>) {
@@ -512,9 +497,9 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     const livePlayerId = liveTarget.playerId;
 
     function receiveRealtimeScore(event: MessageEvent) {
-      if (event.source !== window.parent || !isSameBaseSite(event.origin)) return;
+      if (!isEmbeddingParentMessage(event, window.parent)) return;
       if (!isEmbeddedRealtimeScoreMessage(event.data, livePlayerId)) return;
-      embeddedScoreParentOriginRef.current = event.origin;
+      embeddedScoreParentOriginRef.current = embeddingReplyOrigin(event.origin);
       embeddedScorePlatformIdsRef.current = [event.data.playerId, ...event.data.platformIds];
       timeline.add(event.data.score);
     }
@@ -554,7 +539,12 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
 
     function applyEmbeddedViewerSettings(event: MessageEvent) {
       const data: unknown = event.data;
-      if (event.source !== window.parent || !isRecord(data) || data.type !== 'beatkhana:viewer-settings') return;
+      if (
+        !isEmbeddingParentMessage(event, window.parent) ||
+        !isRecord(data) ||
+        data.type !== 'beatkhana:viewer-settings'
+      )
+        return;
       const masterVolume = Number(data.masterVolume);
       const songVolume = Number(data.songVolume);
       const hitsoundVolume = Number(data.hitsoundVolume);

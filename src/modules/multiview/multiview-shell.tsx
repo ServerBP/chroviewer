@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BeatmapParser } from '../../core/beatmap/worker/client';
-import { isBeatKhanaFrameAncestor } from '../../embed-origins';
+import { embeddingReplyOrigin, isEmbeddingParentMessage } from '../../embedding';
 import { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { broadcastSettingsForPlayerCount } from '../../renderer/render-performance';
 import { EmbeddedRealtimeScoreTimeline } from '../live/embedded-realtime-score-sync';
@@ -41,29 +41,6 @@ declare global {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function sameBaseSite(origin: string) {
-  try {
-    const normalize = (hostname: string) => {
-      const value = hostname.toLowerCase().replace(/^www\./, '');
-      if (value === 'localhost' || value.includes(':') || /^\d{1,3}(\.\d{1,3}){3}$/.test(value)) return value;
-      return value.split('.').slice(-2).join('.');
-    };
-    return normalize(new URL(origin).hostname) === normalize(location.hostname);
-  } catch {
-    return false;
-  }
-}
-
-export function trustedParentOrigin(origin: string) {
-  if (sameBaseSite(origin) || isBeatKhanaFrameAncestor(origin)) return true;
-  try {
-    const { hostname, protocol } = new URL(origin);
-    return protocol === 'http:' && (hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]');
-  } catch {
-    return false;
-  }
 }
 
 function validPlayer(value: unknown): value is MultiviewPlayerConfig {
@@ -217,8 +194,8 @@ export function MultiviewShell() {
       return removeListener;
     }
     function receive(event: MessageEvent) {
-      if (event.source !== window.parent || !trustedParentOrigin(event.origin)) return;
-      parentOriginRef.current = event.origin;
+      if (!isEmbeddingParentMessage(event, window.parent)) return;
+      parentOriginRef.current = embeddingReplyOrigin(event.origin);
       applyConfig(event.data);
     }
     window.addEventListener('message', receive);

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BeatmapParser } from '../../core/beatmap/worker/client';
+import { embeddingReplyOrigin, isEmbeddingParentMessage } from '../../embedding';
 import { MultiviewRendererHost } from '../../renderer/multiview-renderer-host';
 import { broadcastSettingsForPlayerCount } from '../../renderer/render-performance';
 import { LiveMapCache } from '../live/live-map-cache';
-import { trustedParentOrigin } from '../multiview/multiview-shell';
 import { MultiviewStartBarrier } from '../multiview/multiview-start-barrier';
 import { MultiviewTimeline } from '../multiview/multiview-timeline';
 import { ViewerShell, type MultiviewPlaybackSnapshot } from '../viewer/viewer-shell';
@@ -127,8 +127,8 @@ export function ReplayCompositorShell() {
 
   useEffect(() => {
     function receive(event: MessageEvent) {
-      if (event.source !== window.parent || !trustedParentOrigin(event.origin)) return;
-      parentOriginRef.current = event.origin;
+      if (!isEmbeddingParentMessage(event, window.parent)) return;
+      parentOriginRef.current = embeddingReplyOrigin(event.origin);
       const data: unknown = event.data;
       if (validConfig(data)) {
         setConfig((current) => (current !== null && JSON.stringify(current) === JSON.stringify(data) ? current : data));
@@ -262,7 +262,8 @@ export function ReplayCompositorShell() {
     <main ref={rootRef} data-replay-compositor-root className="relative size-full overflow-hidden bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 z-10 size-full" />
       {visiblePlayers.map((player) => {
-        const tile = tiles.get(player.id)!;
+        const tile = tiles.get(player.id);
+        if (tile === undefined) return null;
         const state = statuses.get(player.id);
         const waiting = state === undefined || state.status === 'loading' || state.status === 'error';
         return (
