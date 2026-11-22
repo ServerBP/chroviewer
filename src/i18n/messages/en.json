@@ -195,6 +195,8 @@
         "cube-community-v1": "Cube Community V1",
         "default": "Default",
         "euc": "European Championship",
+        "sc-saber": "SC Saber",
+        "sc-saber-cc": "SC Saber CC",
         "spider-slider-sticks": "Spider Slider Sticks"
       },
       "saberBladeLength": "Blade length",

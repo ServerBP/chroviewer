@@ -88,7 +88,9 @@ rightColor=%23rrggbb           URL-encoded #rrggbb right saber color.
 showSabers=true|false
 saber=cg5                     Select CG5 (alias for saberModel=cg5).
 saber=spider-slider-sticks     Select Spider Slider Sticks (same alias).
-saberModel=default|beatkhana|cg5|cube-community-new|cube-community-v1|euc|spider-slider-sticks
+saber=sc-saber                Select SC Saber (fixed pink/white colors).
+saber=sc-saber-cc             Select SC Saber CC (per-player custom colors).
+saberModel=default|beatkhana|cg5|cube-community-new|cube-community-v1|euc|sc-saber|sc-saber-cc|spider-slider-sticks
 saberWidth=0.25..3            Scale the saber's width without changing its length.
 saberScale=0.25..3
 saberBladeWidth=0.25..4       Blade width multiplier.
@@ -140,6 +142,12 @@ animated fire trail and glow. In the compositor, set saberModel=cg5 in the selec
 player's settings object, just like euc or beatkhana; other players keep their own
 models and colors. If the compositor builds a viewer URL per player, append
 &saber=cg5 (or &saberModel=cg5) to that player's URL.
+
+SC Saber uses its original fixed pink/white colors. SC Saber CC follows each
+player's replay/custom colors, including its trail. Select them in BeatKhana's
+overlay saber picker or set settings.saberModel to "sc-saber" / "sc-saber-cc" in
+each player of beatkhana:multiview-config or beatkhana:replay-compositor-config.
+Both IDs also work with saber, saberModel, settings JSON, and shared links.
 
 CAMERA
 camera=static|follow|first-person

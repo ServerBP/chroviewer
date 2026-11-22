@@ -63,6 +63,7 @@ import {
   type ReplaySaberModel,
   type ReplaySaberTrail,
 } from './saber';
+import { createScSaberTrailMaterial } from './sc-saber-materials';
 import { createSpiderSaberTrailMaterial } from './spider-saber-materials';
 
 function saberCoreColor([red, green, blue]: Rgb): Rgb {
@@ -628,14 +629,17 @@ export class ReplayView {
           setCustomSaberMaterialColor(binding.material, this.saberColors[binding.colorIndex]);
         }
         const trail = this.replayTrails[index];
-        const color = this.saberColors[index] ?? DEFAULT_COLORS.leftNote;
+        const side = index === 0 ? 0 : 1;
+        const color = this.saberColors[side];
         if (trail === undefined) continue;
         const trailMaterial =
-          model === 'spider-slider-sticks'
-            ? createSpiderSaberTrailMaterial(color, trailTexture)
-            : displacementTexture === undefined
-              ? createSaberTrailMaterial(color, trailTexture)
-              : createCg5SaberTrailMaterial(color, trailTexture, displacementTexture);
+          model === 'sc-saber' || model === 'sc-saber-cc'
+            ? createScSaberTrailMaterial(model === 'sc-saber-cc', side, color, trailTexture)
+            : model === 'spider-slider-sticks'
+              ? createSpiderSaberTrailMaterial(color, trailTexture)
+              : displacementTexture === undefined
+                ? createSaberTrailMaterial(color, trailTexture)
+                : createCg5SaberTrailMaterial(color, trailTexture, displacementTexture);
         setReplaySaberTrailMaterial(trail, trailMaterial);
         this.customSaberMaterials.push(trailMaterial);
       }
@@ -651,6 +655,10 @@ export class ReplayView {
   }
 
   private updateTrails(time: number, frames: readonly ReplayPose[], sample: ReplayFrameSample) {
+    for (const material of this.customSaberMaterials) {
+      const timeUniform: IUniform<number> | undefined = material.uniforms._Time;
+      if (timeUniform !== undefined) timeUniform.value = time;
+    }
     for (const trail of this.replayTrails) {
       const timeUniform: IUniform<number> | undefined = trail.mesh.material.uniforms._Time;
       if (timeUniform !== undefined) timeUniform.value = time;

@@ -79,3 +79,13 @@ test('TARF sources discard map selection while preserving independent preview pa
     previewStartSeconds: 30,
   });
 });
+
+for (const saberModel of ['sc-saber', 'sc-saber-cc'] as const) {
+  test(`shared replay links preserve ${saberModel}`, () => {
+    const share = viewerSearchForShare({ type: 'replay', replayUrl: 'https://example.com/replay.bsor' }, 12, {
+      saberModel,
+      saberWidth: 0.8,
+    });
+    expect(z.parse(viewerSearchSchema, share).settings).toEqual({ saberModel, saberWidth: 0.8 });
+  });
+}

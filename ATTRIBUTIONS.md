@@ -1,5 +1,11 @@
 # Asset attributions
 
+## SC sabers
+
+- SC Saber and SC Saber CC by KudneuS, from the supplied saber bundles.
+- Original meshes, grip-relative transforms, material properties, hologram mask,
+  trail texture and endpoints retained. See [port notes](docs/sc-sabers.md).
+
 ## Spider Slider Sticks
 
 - SpiderSliderSticks by qlulezz, from the supplied saber bundle.

@@ -20,6 +20,7 @@ import { createSaberGlowMaterial } from '../materials/map-object-materials';
 import type { MaterialTexture } from '../materials/shared';
 import { createCg5SaberGlowMaterial } from './cg5-saber-materials';
 import { createReplaySurfaceMaterial, type ReplayDirectionalLights, type ReplaySurface } from './replay-headset';
+import { createScSaberMaterial, readScSaberSurface, type ScSaberSurface } from './sc-saber-materials';
 import { createSpiderSaberFresnelMaterial, createSpiderSaberGlowMaterial } from './spider-saber-materials';
 
 type CustomSaberModelId = Exclude<ReplaySaberModelId, 'default'>;
@@ -33,10 +34,12 @@ interface CustomSaberPart {
   colorIndex: CustomSaberColorIndex;
   role: CustomSaberMaterialRole;
   texture?: MaterialTexture;
+  scSurface?: ScSaberSurface;
 }
 
 interface CustomSaberTemplate {
   sides: [CustomSaberPart[], CustomSaberPart[]];
+  hologram?: Texture;
 }
 
 export interface CustomSaberColorBinding {
@@ -62,10 +65,22 @@ const MODEL_PATHS: Record<CustomSaberModelId, string> = {
   'cube-community-new': 'cube-community-new.glb',
   'cube-community-v1': 'cube-community-v1.glb',
   euc: 'euc.glb',
+  'sc-saber': 'sc-saber.glb',
+  'sc-saber-cc': 'sc-saber-cc.glb',
   'spider-slider-sticks': 'spider-slider-sticks.glb',
 };
 
 const MODEL_TRAILS: Record<CustomSaberModelId, CustomSaberTrailDefinition> = {
+  'sc-saber': {
+    base: 0.10000000149011612,
+    tip: 1.0045000314712524,
+    texture: 'sc-saber-trail.png',
+  },
+  'sc-saber-cc': {
+    base: 0.10000000149011612,
+    tip: 1.0045000314712524,
+    texture: 'sc-saber-trail.png',
+  },
   'spider-slider-sticks': {
     base: 0.695900022983551,
     tip: 1.000499963760376,
@@ -148,12 +163,17 @@ function loadTexture(fileName: string) {
     .loadAsync(`${import.meta.env.BASE_URL}sabers/textures/${fileName}`)
     .then((texture) => {
       // CG5's fire shader reads masks and displacement, not sRGB colors.
-      texture.colorSpace = fileName.startsWith('cg5-') ? NoColorSpace : SRGBColorSpace;
+      texture.colorSpace =
+        fileName.startsWith('cg5-') || fileName === 'sc-saber-hologram.png' ? NoColorSpace : SRGBColorSpace;
       if (fileName === 'cg5-trail-displacement.png') {
         texture.wrapS = RepeatWrapping;
         texture.wrapT = RepeatWrapping;
       }
       texture.name = fileName;
+      if (fileName === 'sc-saber-hologram.png') {
+        texture.wrapS = RepeatWrapping;
+        texture.wrapT = RepeatWrapping;
+      }
       return texture;
     })
     .catch((error: unknown) => {
@@ -170,8 +190,9 @@ async function loadTemplate(model: CustomSaberModelId): Promise<CustomSaberTempl
   const loading = Promise.all([
     new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}sabers/models/${MODEL_PATHS[model]}`),
     model === 'cube-community-new' ? loadTexture('cube-community-new-handle.png') : Promise.resolve(undefined),
+    model === 'sc-saber' || model === 'sc-saber-cc' ? loadTexture('sc-saber-hologram.png') : Promise.resolve(undefined),
   ])
-    .then(([gltf, cubeHandleTexture]) => {
+    .then(([gltf, cubeHandleTexture, hologram]) => {
       const sides: [CustomSaberPart[], CustomSaberPart[]] = [[], []];
       const sourceMaterials = new Set<Material>();
       gltf.scene.traverse((object) => {
@@ -197,11 +218,12 @@ async function loadTemplate(model: CustomSaberModelId): Promise<CustomSaberTempl
           color: materialColor(model, source),
           colorIndex: colorIndex(model, source.name, role, side),
           role,
+          scSurface: hologram === undefined ? undefined : readScSaberSurface(source),
           texture: texture === undefined ? undefined : { texture, scale: [1, 1], offset: [0, 0] },
         });
       });
       for (const material of sourceMaterials) material.dispose();
-      return { sides };
+      return { sides, hologram };
     })
     .catch((error: unknown) => {
       templateCache.delete(model);
@@ -247,6 +269,9 @@ export async function createCustomSaberInstance(
 
   function createMaterial(part: CustomSaberPart) {
     const materialColor = part.colorIndex === null ? part.color : colors[part.colorIndex];
+    if (part.scSurface !== undefined && template.hologram !== undefined) {
+      return createScSaberMaterial(fog, materialColor, part.scSurface, template.hologram);
+    }
     if (model === 'spider-slider-sticks') {
       return part.role === 'custom-glow'
         ? createSpiderSaberGlowMaterial(fog, materialColor)

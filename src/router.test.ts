@@ -113,3 +113,19 @@ test('selects Spider Slider Sticks through aliases, canonical URLs and per-playe
   }
   expect(z.parse(viewerSearchSchema, parseUrlSearch('?saber=euc')).settings?.saberModel).toBe('euc');
 });
+
+for (const model of ['sc-saber', 'sc-saber-cc'] as const) {
+  test(`selects ${model} through query aliases and per-player overlay settings`, () => {
+    for (const query of [
+      `?saber=${model}`,
+      `?saberModel=${model}`,
+      `?settings=${encodeURIComponent(JSON.stringify({ saberModel: model, leftColor: '#00ff00' }))}`,
+    ]) {
+      expect(z.parse(viewerSearchSchema, parseUrlSearch(query)).settings?.saberModel).toBe(model);
+    }
+    expect(z.parse(viewerSearchSchema, { settings: { saberModel: model, leftColor: '#00ff00' } }).settings).toEqual({
+      saberModel: model,
+      leftColor: '#00ff00',
+    });
+  });
+}

@@ -120,6 +120,8 @@ export const replaySaberModelIds = [
   'cube-community-new',
   'cube-community-v1',
   'euc',
+  'sc-saber',
+  'sc-saber-cc',
   'spider-slider-sticks',
 ] as const;
 
