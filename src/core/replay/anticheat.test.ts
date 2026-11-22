@@ -117,3 +117,68 @@ describe('BeatKhana anticheat files', () => {
     expect(sameNote(mark, { ...note, time: 12.315 })).toBe(false);
   });
 });
+
+describe('version 3 files', () => {
+  test("marks carry the recorded cut and the report the play's rules", () => {
+    const cut = {
+      saber: 1,
+      speed: 57.2,
+      saberDirection: [0, -0.2, 0.98],
+      cutPoint: [0.48, 0.99, 0.55],
+      cutNormal: [0.78, -0.6, -0.1],
+      distance: 0.54,
+      deviation: -83.8,
+      timeDeviation: 0.017,
+      beforeRating: 1,
+      afterRating: 0.5,
+      speedOk: true,
+      directionOk: true,
+      saberTypeOk: true,
+      recorded: true,
+    };
+    const document = {
+      ...report,
+      rules: {
+        modifiers: ['SA'],
+        directionTolerance: 40,
+        minBladeSpeed: 2,
+        centreLimit: 1.3,
+        smallNotes: false,
+        proMode: false,
+        noArrows: false,
+        checked: true,
+        reason: null,
+      },
+      findings: [
+        {
+          id: 'goodCutsOutsideDirectionTolerance',
+          severity: 'critical',
+          category: 'integrity',
+          title: 'Cuts outside the direction tolerance',
+          detail: '',
+          marks: [
+            {
+              kind: 'note',
+              time: 1.77,
+              end: 1.77,
+              hand: 1,
+              note: { time: 1.756, line: 3, layer: 0, color: 1, direction: 1 },
+              value: 83.8,
+              expected: 40,
+              label: '84° off',
+              cut,
+            },
+          ],
+          series: null,
+          markTotal: 594,
+          aid: false,
+        },
+      ],
+    };
+    const parsed = parseAnticheatFile(file('BKAC', document, [new Uint8Array([1, 2, 3])]));
+    const loaded = parsed.document as AnticheatReport;
+    expect(loaded.rules?.directionTolerance).toBe(40);
+    expect(loaded.findings[0]?.markTotal).toBe(594);
+    expect(loaded.findings[0]?.marks[0]?.cut?.cutPoint).toEqual([0.48, 0.99, 0.55]);
+  });
+});

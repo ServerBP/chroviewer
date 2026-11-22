@@ -1,5 +1,6 @@
 import {
   Group,
+  Matrix4,
   Object3D,
   PerspectiveCamera,
   Quaternion,
@@ -31,6 +32,8 @@ import {
   createSaberTrailMaterial,
 } from '../materials/map-object-materials';
 import { shaderUniformValue } from '../materials/shared';
+import type { Figure } from './anticheat-figures';
+import type { InspectorFocus } from './anticheat-inspector';
 import { AnticheatOverlay, type Ghost, type SwingPath } from './anticheat-overlay';
 import { createCg5SaberTrailMaterial } from './cg5-saber-materials';
 import {
@@ -43,7 +46,7 @@ import {
   type CustomSaberInstance,
 } from './custom-saber';
 import { ReplayGameplayHud } from './hud/gameplay-hud';
-import { ReplayCameraController, type ReplayCameraMode } from './replay-camera';
+import { ReplayCameraController, type InspectView, type ReplayCameraMode } from './replay-camera';
 import {
   createReplaySurfaceMaterial,
   ReplayHeadset,
@@ -132,6 +135,9 @@ export class ReplayView {
   private hasSampledReplayPose = false;
   private lightshowMode: LightshowMode = 'full';
   private gameUIEnabled = true;
+  private figureMode = false;
+  private inspectView: InspectView = 'player';
+  private inspecting = false;
 
   constructor(
     camera: PerspectiveCamera,
@@ -278,6 +284,8 @@ export class ReplayView {
         [this.replayLeftTip.position, this.replayRightTip.position],
       );
       this.anticheat.setGhosts([], this.saberSettings.saberBladeLength);
+      this.anticheat.inspector.clear();
+      this.anticheat.figures.setFigures([]);
     }
     this.replay = replay;
     this.hasSampledReplayPose = false;
@@ -310,6 +318,62 @@ export class ReplayView {
 
   setAnticheatGhostVisible(index: number, visible: boolean) {
     this.anticheat.setGhostVisible(index, visible);
+    this.anticheat.figures.setFigureHidden(index + 1, !visible);
+  }
+
+  /** The cut a reviewer is looking at, drawn against its note's boxes and arrow */
+  setAnticheatFocus(focus: InspectorFocus | null) {
+    this.anticheat.inspector.setFocus(focus, this.replay);
+    this.inspecting = focus !== null;
+    for (const trail of this.replayTrails) trail.mesh.visible = !this.inspecting && !this.figureMode;
+    this.applyInspectView();
+  }
+
+  /** The camera's view of the focused cut */
+  setAnticheatInspectView(view: InspectView) {
+    this.inspectView = view;
+    this.applyInspectView();
+  }
+
+  private applyInspectView() {
+    const target = this.anticheat.inspector.target;
+    this.anticheat.root.updateWorldMatrix(true, false);
+    this.cameraController.setInspect(
+      this.inspectView,
+      target === null ? null : this.anticheat.root.localToWorld(target),
+    );
+  }
+
+  updateAnticheatInspector(time: number, notePose: { matrix: Matrix4; time: number } | null) {
+    this.anticheat.inspector.update(time, notePose, this.anticheat.root);
+  }
+
+  get currentReplay() {
+    return this.replay;
+  }
+
+  get anticheatInspection() {
+    return this.anticheat.inspector.inspection;
+  }
+
+  /** The space replay poses are drawn in, for placing world objects among them */
+  get playerSpace(): Object3D {
+    return this.anticheat.root;
+  }
+
+  /**
+   * Players as markers (head dot with axes, saber hilts and tip trails) instead of sabers and headsets: this replay's own
+   * player first, then the compared players in their colours
+   */
+  setAnticheatFigures(enabled: boolean, figures: Figure[]) {
+    this.anticheat.figures.setFigures(enabled ? figures : []);
+    this.anticheat.setFigureMode(enabled);
+    this.figureMode = enabled;
+    this.cameraController.setFollowOverride(enabled);
+    this.replayLeftOffset.visible = !enabled;
+    this.replayRightOffset.visible = !enabled;
+    for (const trail of this.replayTrails) trail.mesh.visible = !enabled && !this.inspecting;
+    this.updateHeadsetVisibility();
   }
 
   setHitScoreVisualizer(hitScoreVisualizer: HitScoreVisualizerConfig | null) {
@@ -351,7 +415,9 @@ export class ReplayView {
 
   private updateHeadsetVisibility() {
     this.replayHeadset.root.visible =
-      this.showHeadset && (this.orthographicOverlayRendering || this.cameraController.cameraMode !== 'first-person');
+      !this.figureMode &&
+      this.showHeadset &&
+      (this.orthographicOverlayRendering || this.cameraController.cameraMode !== 'first-person');
   }
 
   setOrthographicOverlayRendering(rendering: boolean) {
@@ -368,7 +434,11 @@ export class ReplayView {
     }
     this.saberSettings = { ...settings };
     for (const saber of this.replaySabers) setReplaySaberSettings(saber, settings);
-    for (const trail of this.replayTrails) setReplaySaberTrailSettings(trail, settings);
+    for (const trail of this.replayTrails) {
+      setReplaySaberTrailSettings(trail, settings);
+      // Trails would cover the cut being inspected and the markers
+      if (this.inspecting || this.figureMode) trail.mesh.visible = false;
+    }
     this.applySaberOffsets();
     this.applySaberModel();
     this.anticheat.setBladeLength(settings.saberBladeLength);

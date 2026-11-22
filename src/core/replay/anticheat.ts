@@ -22,6 +22,43 @@ export interface AnticheatNoteRef {
   direction: number;
 }
 
+/** A cut as the game recorded it, in the player's space as the replay stores it (Unity axes, metres) */
+export interface AnticheatCut {
+  /** 0 left saber, 1 right saber */
+  saber: number;
+  speed: number;
+  saberDirection: [number, number, number];
+  cutPoint: [number, number, number];
+  cutNormal: [number, number, number];
+  /** Distance of the cut plane from the note's centre */
+  distance: number;
+  /** Angle between the cut and the arrow as the game reports it */
+  deviation: number;
+  timeDeviation: number;
+  beforeRating: number;
+  afterRating: number;
+  speedOk: boolean;
+  directionOk: boolean;
+  saberTypeOk: boolean;
+  /** False when the recorder wrote zeros or garbage instead of a cut */
+  recorded: boolean;
+}
+
+/** What changes the note's box and the arrow's tolerance in the play the report is about */
+export interface AnticheatRules {
+  modifiers: string[];
+  /** Degrees either side of the arrow the game accepts */
+  directionTolerance: number;
+  minBladeSpeed: number;
+  centreLimit: number;
+  smallNotes: boolean;
+  proMode: boolean;
+  noArrows: boolean;
+  /** Whether the game-rule checks read this replay, and why not */
+  checked: boolean;
+  reason: string | null;
+}
+
 export interface AnticheatMark {
   kind: 'note' | 'swing' | 'turn' | 'frame' | 'stretch';
   /** Song seconds */
@@ -33,6 +70,7 @@ export interface AnticheatMark {
   value: number | null;
   expected: number | null;
   label: string;
+  cut?: AnticheatCut;
 }
 
 export interface AnticheatSeries {
@@ -52,6 +90,13 @@ export interface AnticheatFinding {
   detail: string;
   marks: AnticheatMark[];
   series: AnticheatSeries | null;
+  /** Marks the file had before it cut the list short */
+  markTotal?: number;
+  /** A review aid listed on every replay (the cuts closest to the limits), not a finding */
+  aid?: boolean;
+  measure?: number;
+  value?: number;
+  share?: number | null;
 }
 
 export interface AnticheatReplayInfo {
@@ -67,7 +112,8 @@ export interface AnticheatReplayInfo {
   hmd: string | null;
   platform: string | null;
   fps: number | null;
-  humanity: number | null;
+  /** Only in files from the statistical anticheat (version 2) */
+  humanity?: number | null;
 }
 
 export interface AnticheatReport {
@@ -76,6 +122,7 @@ export interface AnticheatReport {
   player: { name: string; label: string } | null;
   summary: string | null;
   findings: AnticheatFinding[];
+  rules?: AnticheatRules | null;
 }
 
 export interface AnticheatComparisonPlayer extends AnticheatReplayInfo {
@@ -83,6 +130,7 @@ export interface AnticheatComparisonPlayer extends AnticheatReplayInfo {
   player: { name: string; label: string } | null;
   summary: string | null;
   findings: AnticheatFinding[];
+  rules?: AnticheatRules | null;
 }
 
 export interface AnticheatComparison {
