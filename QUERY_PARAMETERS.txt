@@ -161,12 +161,18 @@ tarfPath=<path or HTTPS URL>  Load a TournamentAssistant (.tarf) replay from a p
                               like /replays/match.tarf, or from another site. A map baked into
                               the replay is used instead of downloading it from BeatSaver.
 bkacrPath=<path or HTTPS URL> Load a BeatKhana anticheat replay (.bkacr): a replay with the anticheat's
-                              report. A panel lists the findings; notes they point at are ringed, swings
-                              show the path of the saber tip and the timeline marks every place.
+                              report. A panel lists the findings and their places; notes they point at are
+                              ringed with their cut boxes, swings show the path of the saber tip and the
+                              timeline marks every place. Picking a place draws the cut against the note:
+                              its good-cut and bad-cut boxes, the blade's sweep, the arrow's tolerance and
+                              the recorded cut point and plane.
 bkaccmpPath=<path or HTTPS URL>
                               Load a BeatKhana anticheat comparison (.bkaccmp): several players' replays of
                               one map. The first is played back, the others are drawn as coloured sabers
-                              with the same song clock, next to how alike the players move.
+                              with the same song clock, next to how alike the players move. Markers mode
+                              draws every player as a head with its axes, saber hilts and tip trails.
+acMark=<seconds>              With bkacrPath or bkaccmpPath: open focused on the finding's place at this
+                              song time, paused on the cut.
 t=<seconds>                   Initial song time for non-live playback, in seconds.
 scoreId=<ScoreSaber score>    Load a ScoreSaber replay.
 beat=<number>                 Initial beat for non-live playback.
