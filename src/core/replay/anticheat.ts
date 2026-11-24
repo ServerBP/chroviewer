@@ -50,7 +50,10 @@ export interface AnticheatRules {
   /** Degrees either side of the arrow the game accepts */
   directionTolerance: number;
   minBladeSpeed: number;
-  centreLimit: number;
+  /** How many times the good-cut box BeatKhana lets a cut's sweep need before it counts as outside it */
+  hitboxLimit?: number;
+  /** Files written before the box check: the old distance limit, no longer a rule */
+  centreLimit?: number;
   smallNotes: boolean;
   proMode: boolean;
   noArrows: boolean;

@@ -142,7 +142,7 @@ describe('version 3 files', () => {
         modifiers: ['SA'],
         directionTolerance: 40,
         minBladeSpeed: 2,
-        centreLimit: 1.3,
+        hitboxLimit: 1.5,
         smallNotes: false,
         proMode: false,
         noArrows: false,

@@ -56,7 +56,6 @@ export function InspectorCard({
   const cut = mark.cut;
   const hand = mark.hand === 0 ? t('left') : mark.hand === 1 ? t('right') : null;
   const minSpeed = rules?.minBladeSpeed ?? 2;
-  const centreLimit = rules?.centreLimit ?? 1.3;
   const deviation = cut === undefined ? null : Math.abs(cut.deviation);
   const sweep = inspection?.sweep ?? null;
   return (
@@ -121,8 +120,7 @@ export function InspectorCard({
           )}
           <Row
             label={t('distance')}
-            value={t('distanceOf', { value: number(cut.distance, 2), limit: centreLimit })}
-            state={cut.recorded && cut.distance > centreLimit ? 'bad' : null}
+            value={t('distanceOf', { value: number(cut.distance, 2) })}
           />
           {sweep !== null && (
             <Row

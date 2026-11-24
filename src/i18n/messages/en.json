@@ -549,7 +549,7 @@
       "tipSpeed": "Tip speed between frames",
       "metresPerSecond": "{value} m/s",
       "distance": "Cut plane from the centre",
-      "distanceOf": "{value} m (people stay under 1.1, limit {limit})",
+      "distanceOf": "{value} m (not a rule: the blade has to reach the box)",
       "sweep": "Blade through the box",
       "sweepHit": "yes",
       "sweepMiss": "no, it needed {scale}× the box (people's cuts reach up to 4×)",
