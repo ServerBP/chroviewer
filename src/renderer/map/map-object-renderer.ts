@@ -23,7 +23,7 @@ import type { PointSampleContext } from '../../core/animation/point-definition';
 import { secondsToSongBpmTime, songBpmTimeToSeconds } from '../../core/beatmap/bpm';
 import { BOMB_COLOR, type ColorScheme, type Rgb } from '../../core/colors';
 import { noodleTrackControlsTime, sampleNoodlePlayerTrack, type NoodleTransform } from '../../core/noodle-runtime';
-import { NOTE_Y_OFFSET, Y_OFFSET, Z_OFFSET } from '../../core/placement/grid';
+import { NOTE_Y_OFFSET, NOTE_Z_OFFSET, Y_OFFSET, Z_OFFSET } from '../../core/placement/grid';
 import {
   aheadDistance,
   currentHalfJumpDurationInBeats,
@@ -49,6 +49,7 @@ import type {
 import { sameNote, type AnticheatNoteRef } from '../../core/replay/anticheat';
 import {
   badCutBox,
+  boxScale,
   DEFAULT_HITBOX_RULES,
   goodCutBox,
   type HitboxRules,
@@ -534,12 +535,12 @@ export class MapObjectRenderer {
     this.invalidate();
   }
 
-  /** Small Notes draws every note (and its boxes) at half size, as the game does */
+  /** Small Notes draws every note at half size and its boxes at three quarters, as the game does */
   setNoteScale(scale: number) {
     if (scale === this.noteScale) return;
     this.noteScale = scale;
-    this.colliderScale.makeScale(1 / scale, 1 / scale, 1 / scale);
-    // The note's cut boxes keep their size: Small Notes only draws the note smaller
+    const boxes = boxScale(scale);
+    this.colliderScale.makeScale(boxes, boxes, boxes);
     this.noteLookStates.clear();
     this.invalidate();
   }
@@ -1010,7 +1011,7 @@ export class MapObjectRenderer {
       const movementBeat = noodleMovementBeat(arc, now, noodle, duration);
       entry.mesh.visible = noodleObjectVisible(arc, now, movementBeat, noodle) && (noodle.dissolve ?? 1) > 0;
       if (!entry.mesh.visible) continue;
-      const headAhead = Z_OFFSET + (arc.headBeat - movementBeat) * unitsPerBeat;
+      const headAhead = NOTE_Z_OFFSET + (arc.headBeat - movementBeat) * unitsPerBeat;
       this.position.set(0, NOTE_Y_OFFSET, -headAhead);
       this.quaternion.identity();
       this.noodleObjectTransform.applyWorldRotation(this.pose, arc.worldRotation);
@@ -1021,7 +1022,7 @@ export class MapObjectRenderer {
       const arcSpawnBeat = arc.headBeat - hjdBeats;
       const preJumpPosition =
         now < arcSpawnBeat && noodle.definitePosition !== undefined
-          ? this.spawnPosition.set(0, NOTE_Y_OFFSET, -(Z_OFFSET + (arc.headBeat - arcSpawnBeat) * unitsPerBeat))
+          ? this.spawnPosition.set(0, NOTE_Y_OFFSET, -(NOTE_Z_OFFSET + (arc.headBeat - arcSpawnBeat) * unitsPerBeat))
           : undefined;
       this.noodleObjectTransform.apply(
         this.pose,
@@ -1111,8 +1112,8 @@ export class MapObjectRenderer {
     movementState: SpawnState,
   ) {
     const distance = terminalRetreat
-      ? noteJumpAheadDistance(motion, now, movementState)
-      : aheadDistance(motion, now, movementState);
+      ? noteJumpAheadDistance(motion, now, movementState, NOTE_Z_OFFSET)
+      : aheadDistance(motion, now, movementState, NOTE_Z_OFFSET);
     this.position.set(x, y, -distance);
     this.quaternion.setFromAxisAngle(zAxis, rotationDeg * degToRad);
     this.noodleObjectTransform.applyWorldRotation(this.pose, motion.worldRotation);

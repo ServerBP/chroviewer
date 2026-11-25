@@ -52,6 +52,8 @@ export interface AnticheatRules {
   minBladeSpeed: number;
   /** How many times the good-cut box BeatKhana lets a cut's sweep need before it counts as outside it */
   hitboxLimit?: number;
+  /** BeatKhana placed the note's box from the map and the game's note movement, not from the recorded cut values */
+  exactHitbox?: boolean;
   /** Files written before the box check: the old distance limit, no longer a rule */
   centreLimit?: number;
   smallNotes: boolean;

@@ -3,19 +3,17 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { AnticheatRules } from './anticheat';
 import type { ReplayTransform } from './types';
 
-// The note's colliders, from BeatLeader's measurements of the game's assets (the values its web replay viewer draws): the
-// good-cut box is 0.8 wide and 1.0 deep, 0.5 high on arrows and 0.8 on dots (0.5 on dots before game 1.20, with Old Dots
-// or in an OldDots mode), 0.2 high on chain links, and sits 0.25 m towards the player from the note's centre; the bad-cut
-// box is a 0.4 m cube at the centre (0.35 × 0.1 × 0.35 on chain links); bombs are a 0.18 m sphere. A good cut needs the box
-// around the blade's sweep since the last frame to overlap the good-cut box as the note stood on that frame or the one
-// before (on people's replays 99.6% of good cuts do).
+// The note's colliders, from the game's note prefabs: the good-cut box is 0.8 wide and 1.0 deep, 0.5 high on arrows and 0.8
+// on dots (0.5 on dots before game 1.20, with Old Dots or in an OldDots mode), 0.2 high on chain links, and sits 0.25 m
+// towards the player from the note's centre; the bad-cut box is a 0.35 m cube at the centre (0.35 × 0.1 × 0.35 on chain
+// links, 0.5 m with Pro Mode); bombs are a 0.18 m sphere. Small Notes draws the note at half size and its boxes at
+// 0.5 × (2 − 0.5) = 0.75. The game overlaps the good-cut box with a box built from the blade on the cut frame and the
+// middle of the blade on the frame before (`cutBox`), with the note as it stood on that frame or the one before.
 //
-// For the modifiers BeatLeader's viewer draws Pro Mode as a 0.5 m cube and Small Notes at half size, but the game's own
-// verdicts say otherwise for the good-cut box: on eight Pro Mode and Small Notes replays (games 1.24 to 1.37) a third to
-// half of the cuts the game counted as good never touched those boxes, while all but a few percent touched the standard
-// full-size box. So Small Notes only draws the note at half size, and Pro Mode keeps the good-cut box (its bad-cut box is
-// BeatLeader's 0.5 m cube). Sizes are in the note's local space, in this viewer's axes (Unity's z flipped, so +z points
-// from the note towards the player).
+// Pro Mode's prefab carries a 0.5 m heading cube, but on 35 Pro Mode replays (games 1.21 to 1.40) the cuts the game counted
+// as good needed up to three times that cube while all of them fit the standard box, so Pro Mode keeps the good-cut box.
+// Sizes are in the note's local space, in this viewer's axes (Unity's z flipped, so +z points from the note towards the
+// player).
 
 export interface NoteBox {
   /** Centre in the note's local space */
@@ -42,7 +40,7 @@ export function goodCutBox(shape: NoteShape, rules: HitboxRules = DEFAULT_HITBOX
 export function badCutBox(shape: NoteShape, rules: HitboxRules = DEFAULT_HITBOX_RULES): NoteBox {
   if (shape === 'chain') return { center: [0, 0, 0], size: [0.35, 0.1, 0.35] };
   if (rules.proMode) return { center: [0, 0, 0], size: [0.5, 0.5, 0.5] };
-  return { center: [0, 0, 0], size: [0.4, 0.4, 0.4] };
+  return { center: [0, 0, 0], size: [0.35, 0.35, 0.35] };
 }
 
 export const ARROW_GOOD_CUT_BOX = goodCutBox('arrow');
@@ -59,10 +57,11 @@ export const BLADE_LENGTH = 1;
 export const DEFAULT_DIRECTION_TOLERANCE = 60;
 export const STRICT_DIRECTION_TOLERANCE = 40;
 /**
- * People's good cuts needed the box at most this much larger in the every-cut check: frames and tracking aren't exact.
- * 99% fit the box itself; the furthest needed 2.6 times its size without modifiers and 3.5 with Pro Mode.
+ * A good cut whose blade box needs the note's box larger than this is outside it, as the replay analyser counts it. The note's
+ * turn on the game's cut frame isn't recorded: of 61,000 good cuts on 60 people's replays 99% fit the box itself, 22 needed
+ * more than 1.1 times it and 2 more than 1.25.
  */
-export const HUMAN_SCALE_NEEDED = 4;
+export const HUMAN_SCALE_NEEDED = 1.25;
 
 export function hasModifier(modifiers: readonly string[] | undefined, code: string) {
   return modifiers?.includes(code) === true;
@@ -75,9 +74,14 @@ export function directionTolerance(modifiers: readonly string[] | undefined, rul
   return hasModifier(modifiers, 'SA') ? STRICT_DIRECTION_TOLERANCE : DEFAULT_DIRECTION_TOLERANCE;
 }
 
-/** The scale the game draws every note at in this play; its boxes keep their size */
+/** The scale the game draws every note at in this play */
 export function noteScale(modifiers: readonly string[] | undefined) {
   return hasModifier(modifiers, 'SC') ? 0.5 : 1;
+}
+
+/** The scale of a note's boxes against the note itself: the game sets each cuttable to (2 − the note's scale) */
+export function boxScale(scale: number) {
+  return 2 - scale;
 }
 
 /** The box rules of a play from its modifiers, mode and game version */
@@ -192,42 +196,38 @@ function orientedBoxHitsBox(
 }
 
 /**
- * The game finds the notes a blade cut with a box around the blade's sweep since the last frame (along the blade, along
- * the sweep and across it), not with the sweep itself; this is that box, in the space of the given points.
+ * The box the game's `NoteCutter` overlaps with the notes (`GeometryTools.ThreePointsToBox`): flat in the swing plane, the
+ * length of this frame's blade, reaching back to the middle of the blade on the frame before.
  */
-export function sweepBox(previous: { bottom: Vector3; top: Vector3 }, current: { bottom: Vector3; top: Vector3 }) {
-  const points = [previous.bottom, previous.top, current.top, current.bottom];
-  const along = new Vector3().subVectors(current.top, current.bottom).normalize();
-  const sweep = new Vector3()
-    .addVectors(current.top, current.bottom)
-    .sub(previous.top)
-    .sub(previous.bottom)
-    .multiplyScalar(0.5);
-  sweep.addScaledVector(along, -sweep.dot(along));
-  if (sweep.lengthSq() < 1e-10) sweep.set(along.y, -along.x, 0).add(new Vector3(0, along.z, -along.y));
-  sweep.normalize();
-  const across = new Vector3().crossVectors(along, sweep).normalize();
-  const axes: [Vector3, Vector3, Vector3] = [along, sweep, across];
-  const center = new Vector3();
-  const extents: [number, number, number] = [0, 0, 0];
-  for (const [index, axis] of axes.entries()) {
-    const values = points.map((point) => point.dot(axis));
-    const low = Math.min(...values);
-    const high = Math.max(...values);
-    center.addScaledVector(axis, (low + high) / 2);
-    extents[index] = Math.max((high - low) / 2, 1e-4);
-  }
+export function cutBox(previous: { bottom: Vector3; top: Vector3 }, current: { bottom: Vector3; top: Vector3 }) {
+  const along = new Vector3().subVectors(current.top, current.bottom);
+  const length = along.length();
+  const middle = new Vector3().addVectors(current.top, current.bottom).multiplyScalar(0.5);
+  const back = new Vector3().addVectors(previous.top, previous.bottom).multiplyScalar(0.5).sub(middle);
+  if (length > 1e-6) along.divideScalar(length);
+  back.addScaledVector(along, -back.dot(along));
+  const depth = back.length();
+  if (depth > 1e-9) back.divideScalar(depth);
+  else
+    back
+      .set(along.y, -along.x, 0)
+      .add(new Vector3(0, along.z, -along.y))
+      .normalize();
+  const across = new Vector3().crossVectors(along, back).normalize();
+  const center = middle.addScaledVector(back, depth / 2);
+  const axes: [Vector3, Vector3, Vector3] = [along, back, across];
+  const extents: [number, number, number] = [length / 2, depth / 2, 0];
   return { center, axes, extents };
 }
 
 export interface SweepChecks {
   /** The blade's sweep itself (two triangles between the frames) */
   sweep: SweepCheck;
-  /** The box around the sweep, as the game looks for notes */
+  /** The game's cut box (`cutBox`), as the game looks for notes */
   box: SweepCheck;
 }
 
-/** Both tests of a cut against a note's box: the sweep itself, and the box around it the game uses */
+/** Both tests of a cut against a note's box: the sweep itself, and the box the game uses */
 export function checkCut(
   noteMatrix: Matrix4,
   box: NoteBox,
@@ -238,7 +238,7 @@ export function checkCut(
   scratch.inverse.copy(noteMatrix).invert();
   const shift = new Vector3(...box.center);
   const local = (point: Vector3) => point.clone().applyMatrix4(scratch.inverse).sub(shift);
-  const enclosing = sweepBox(
+  const enclosing = cutBox(
     { bottom: local(previous.bottom), top: local(previous.top) },
     { bottom: local(current.bottom), top: local(current.top) },
   );

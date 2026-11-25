@@ -11,7 +11,8 @@ import {
   goodCutBox,
   hitboxRules,
   noteScale,
-  sweepBox,
+  boxScale,
+  cutBox,
 } from './note-hitbox';
 
 const note = new Matrix4().makeTranslation(0, 1, -1);
@@ -33,16 +34,17 @@ describe('note hitboxes', () => {
     expect(result.box.scaleNeeded).toBeCloseTo(2, 1);
   });
 
-  test('the box around a sweep holds all four blade ends', () => {
-    const previous = blade(0.1, 1.4, 0);
-    const current = blade(-0.3, 0.6, 0.2);
-    const box = sweepBox(previous, current);
-    for (const point of [previous.bottom, previous.top, current.bottom, current.top]) {
-      const offset = point.clone().sub(box.center);
-      box.axes.forEach((axis, index) => {
-        expect(Math.abs(offset.dot(axis))).toBeLessThanOrEqual((box.extents[index] ?? 0) + 1e-6);
-      });
-    }
+  test("the game's cut box runs along this frame's blade back to the previous blade's middle", () => {
+    const previous = blade(0.4, 1.4, 0);
+    const current = blade(0, 1.0, 0);
+    const box = cutBox(previous, current);
+    // One metre along the blade, 0.4 m back towards the previous middle, flat across the swing
+    expect(box.extents[0]).toBeCloseTo(0.5);
+    expect(box.extents[1]).toBeCloseTo(Math.hypot(0.4, 0.4) / 2);
+    expect(box.extents[2]).toBe(0);
+    expect(box.center.x).toBeCloseTo(0.2);
+    expect(box.center.y).toBeCloseTo(1.2);
+    expect(box.center.z).toBeCloseTo(-0.5);
   });
 
   test('a replay transform becomes a one metre blade along the saber', () => {
@@ -62,7 +64,7 @@ describe('note hitboxes', () => {
     expect(Math.abs(cutAngleOnNote(upArrow, [0, -1, 0])?.degrees ?? 0)).toBeCloseTo(180);
   });
 
-  test("boxes follow BeatLeader's measurements of the game, with old dots, chains and Pro Mode's bad-cut box", () => {
+  test("boxes follow the game's note prefabs, with old dots, chains, Small Notes and Pro Mode's bad-cut box", () => {
     expect(goodCutBox('dot')).toEqual({ center: [0, 0, 0.25], size: [0.8, 0.8, 1] });
     expect(goodCutBox('dot', hitboxRules(['OD']))).toEqual({ center: [0, 0, 0.25], size: [0.8, 0.5, 1] });
     expect(goodCutBox('dot', hitboxRules([], 'Standard', '1.19.1')).size).toEqual([0.8, 0.5, 1]);
@@ -70,8 +72,10 @@ describe('note hitboxes', () => {
     // The game's own good-cut verdicts keep the standard good-cut box under Pro Mode
     expect(goodCutBox('arrow', hitboxRules(['PM']))).toEqual(goodCutBox('arrow'));
     expect(badCutBox('arrow', hitboxRules(['PM'])).size).toEqual([0.5, 0.5, 0.5]);
+    expect(badCutBox('arrow').size).toEqual([0.35, 0.35, 0.35]);
     expect(badCutBox('chain').size).toEqual([0.35, 0.1, 0.35]);
     expect(noteScale(['SC'])).toBe(0.5);
+    expect(noteScale(['SC']) * boxScale(noteScale(['SC']))).toBe(0.75);
   });
 
   test('strict angles narrow the tolerance', () => {
