@@ -12,15 +12,23 @@ interface ReplayOrthoOverlayProps {
   overlayRef: Ref<HTMLButtonElement>;
   view: ViewerSettings['orthoCameraView'];
   onViewChange: (view: ViewerSettings['orthoCameraView']) => void;
+  /** Drawn large, for looking closely at one cut */
+  large?: boolean;
+  onLargeChange?: (large: boolean) => void;
 }
 
-export function ReplayOrthoOverlay({ overlayRef, view, onViewChange }: ReplayOrthoOverlayProps) {
+export function ReplayOrthoOverlay({ overlayRef, view, onViewChange, large = false, onLargeChange }: ReplayOrthoOverlayProps) {
   const t = useTranslations('settings.camera');
   const [controlsVisible, setControlsVisible] = useState(false);
 
   return (
     <section
-      className="pointer-events-auto fixed top-16 right-3 z-20 w-[min(24rem,calc(100vw-1.5rem))] max-sm:top-14 max-sm:right-2 max-sm:w-[min(18rem,calc(100vw-1rem))]"
+      className={cn(
+        'pointer-events-auto fixed top-16 right-3 z-20 max-sm:top-14 max-sm:right-2',
+        large
+          ? 'w-[min(52rem,calc(100vw-1.5rem))] max-sm:w-[calc(100vw-1rem)]'
+          : 'w-[min(24rem,calc(100vw-1.5rem))] max-sm:w-[min(18rem,calc(100vw-1rem))]',
+      )}
       onPointerEnter={() => {
         if (window.matchMedia('(hover: hover)').matches) setControlsVisible(true);
       }}
@@ -62,6 +70,18 @@ export function ReplayOrthoOverlay({ overlayRef, view, onViewChange }: ReplayOrt
           <ToggleGroupItem value="back">{t('backView')}</ToggleGroupItem>
           <ToggleGroupItem value="right">{t('rightView')}</ToggleGroupItem>
         </ToggleGroup>
+        {onLargeChange !== undefined && (
+          <button
+            type="button"
+            className="bg-card/88 border-border ml-2 rounded-lg border px-3 text-sm shadow-lg backdrop-blur-xl"
+            aria-pressed={large}
+            onClick={() => {
+              onLargeChange(!large);
+            }}
+          >
+            {large ? t('orthoSmaller') : t('orthoLarger')}
+          </button>
+        )}
       </div>
     </section>
   );

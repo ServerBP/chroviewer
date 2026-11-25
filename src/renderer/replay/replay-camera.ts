@@ -33,12 +33,14 @@ export function forceUprightQuaternion(quaternion: Quaternion, euler = new Euler
 export type ReplayCameraMode = 'static' | 'follow' | 'first-person';
 
 /** Where the camera looks at a cut from while a reviewer inspects it: the normal camera, or close around the cut */
-export type InspectView = 'player' | 'close' | 'side' | 'top';
+export type InspectView = 'player' | 'close' | 'left' | 'side' | 'right' | 'top';
 
 // Offsets from the cut, in the player's space (the player faces −z)
 const INSPECT_OFFSETS: Record<Exclude<InspectView, 'player'>, [number, number, number]> = {
   close: [0.3, 0.35, 2.1],
-  side: [2.5, 0.25, 0.1],
+  left: [-2.5, 0.25, 0.1],
+  side: [1.8, 0.6, 1.7],
+  right: [2.5, 0.25, 0.1],
   top: [0, 2.7, 0.4],
 };
 

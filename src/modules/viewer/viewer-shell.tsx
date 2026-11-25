@@ -796,8 +796,24 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
     songBpm: sources.songBpm,
     sceneKey: `${session.selectedKey}:${String(session.difficultyLoading)}`,
     ready: session.viewerReady && !session.difficultyLoading,
-    initialMark: search.acMark,
+    initialMark: search.acMark ?? replay?.cutReview?.time,
   });
+  // A .bkacf is one flagged cut: its review opens on the cut, slowed down, and the clip loops until it's switched off
+  const cutReview = replay?.cutReview ?? null;
+  const [cutLoop, setCutLoop] = useState(true);
+  const [orthoLarge, setOrthoLarge] = useState(false);
+  const reviewedClip = useRef<unknown>(null);
+  useEffect(() => {
+    if (cutReview === null || reviewedClip.current === cutReview) return;
+    reviewedClip.current = cutReview;
+    review.setOpen(true);
+    setCutLoop(true);
+    transport.setPlaybackRate(0.25);
+  }, [cutReview, review, transport]);
+  useEffect(() => {
+    if (cutReview === null || !cutLoop || !transport.playing) return;
+    if (transport.time >= cutReview.end - 0.01) transport.seek(cutReview.start);
+  }, [cutReview, cutLoop, transport]);
   const timelineMarkers = useMemo(
     () =>
       [
@@ -1005,6 +1021,8 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
         (!partyActive || (party.mapReady && (partyIsHost || party.serverState?.mapRevealed === true))) && (
           <ReplayOrthoOverlay
             overlayRef={session.orthoOverlayRef}
+            large={orthoLarge}
+            onLargeChange={setOrthoLarge}
             view={settings.orthoCameraView}
             onViewChange={(orthoCameraView) => {
               setSettings((current) => ({ ...current, orthoCameraView }));
@@ -1106,7 +1124,7 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
         type="file"
         className="hidden"
         multiple
-        accept=".dat,.bsor,.tarf,.bkacr,.bkaccmp,.json,.zip,.ogg,.egg,.wav,.mp3"
+        accept=".dat,.bsor,.tarf,.bkacr,.bkaccmp,.bkacf,.json,.zip,.ogg,.egg,.wav,.mp3"
         onChange={(event) => {
           void sources.loadFiles([...(event.currentTarget.files ?? [])]);
           event.currentTarget.value = '';
@@ -1389,6 +1407,14 @@ export function ViewerShell({ multiview }: ViewerShellProps = {}) {
             time={transport.time}
             playbackRate={transport.playbackRate}
             onPlaybackRate={transport.setPlaybackRate}
+            cutLoop={cutReview === null ? undefined : cutLoop}
+            onCutLoop={setCutLoop}
+            ortho={cutReview === null ? undefined : { enabled: settings.orthoCameraEnabled, large: orthoLarge }}
+            onOrtho={(next) => {
+              const enabled = next.enabled;
+              if (enabled !== undefined) setSettings((current) => ({ ...current, orthoCameraEnabled: enabled }));
+              if (next.large !== undefined) setOrthoLarge(next.large);
+            }}
             onClose={() => {
               review.setOpen(false);
             }}

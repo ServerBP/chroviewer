@@ -59,13 +59,19 @@ interface AnticheatPanelProps {
   onTogglePlayer: (index: number, visible: boolean) => void;
   onView: (view: Partial<AnticheatViewState>) => void;
   onPlaybackRate: (rate: number) => void;
+  /** A .bkacf's clip loops while this is on; undefined for other files */
+  cutLoop?: boolean;
+  onCutLoop?: (loop: boolean) => void;
+  /** The orthographic camera beside a .bkacf's cut, and whether it is drawn large */
+  ortho?: { enabled: boolean; large: boolean };
+  onOrtho?: (next: { enabled?: boolean; large?: boolean }) => void;
   onCheckCuts: () => void;
   onClose: () => void;
 }
 
 const HANDS = ['left', 'right', 'head'] as const;
 const RATES = [1, 0.5, 0.25, 0.1];
-const CAMERAS: InspectView[] = ['player', 'close', 'side', 'top'];
+const CAMERAS: InspectView[] = ['player', 'close', 'left', 'side', 'right', 'top'];
 const SEVERITIES: AnticheatSeverity[] = ['critical', 'warning', 'notice', 'info'];
 
 /** A finding's measure over the play, with the current moment and where most people are */
@@ -260,6 +266,10 @@ export function AnticheatPanel({
   onTogglePlayer,
   onView,
   onPlaybackRate,
+  cutLoop,
+  onCutLoop,
+  ortho,
+  onOrtho,
   onCheckCuts,
   onClose,
 }: AnticheatPanelProps) {
@@ -404,6 +414,42 @@ export function AnticheatPanel({
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
+              {cutLoop !== undefined && (
+                <>
+                  <label htmlFor="anticheat-cut-loop" className="text-muted-foreground text-xs">
+                    {t('view.loop')}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="anticheat-cut-loop"
+                      checked={cutLoop}
+                      onCheckedChange={(loop) => {
+                        onCutLoop?.(loop);
+                      }}
+                    />
+                    <span className="text-muted-foreground text-xs">{t('view.loopHint')}</span>
+                  </div>
+                </>
+              )}
+              {ortho !== undefined && (
+                <>
+                  <span className="text-muted-foreground text-xs">{t('view.ortho')}</span>
+                  <ToggleGroup
+                    type="single"
+                    value={!ortho.enabled ? 'off' : ortho.large ? 'large' : 'on'}
+                    aria-label={t('view.ortho')}
+                    onValueChange={(value) => {
+                      if (value === 'off') onOrtho?.({ enabled: false });
+                      if (value === 'on') onOrtho?.({ enabled: true, large: false });
+                      if (value === 'large') onOrtho?.({ enabled: true, large: true });
+                    }}
+                  >
+                    <ToggleGroupItem value="off">{t('view.off')}</ToggleGroupItem>
+                    <ToggleGroupItem value="on">{t('view.orthoOn')}</ToggleGroupItem>
+                    <ToggleGroupItem value="large">{t('view.orthoLarge')}</ToggleGroupItem>
+                  </ToggleGroup>
+                </>
+              )}
               <label htmlFor="anticheat-figures" className="text-muted-foreground text-xs">
                 {t('view.figures')}
               </label>

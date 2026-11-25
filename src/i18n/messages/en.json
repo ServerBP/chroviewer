@@ -76,6 +76,8 @@
       "responseSpeed": "Response speed",
       "rotationOffset": "Rotation offset",
       "rightView": "Right",
+      "orthoLarger": "Larger",
+      "orthoSmaller": "Smaller",
       "showHeadset": "Show headset",
       "showOrthoCamera": "Show ortho camera",
       "smoothing": "Smoothing",
@@ -517,9 +519,16 @@
       "cameras": {
         "player": "Normal",
         "close": "Close",
+        "left": "Left",
         "side": "Side",
+        "right": "Right",
         "top": "Above"
-      }
+      },
+      "loop": "Loop",
+      "loopHint": "Plays the second around the cut again and again",
+      "ortho": "Ortho",
+      "orthoOn": "On",
+      "orthoLarge": "Large"
     },
     "check": {
       "button": "Check every cut",
