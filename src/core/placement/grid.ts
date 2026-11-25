@@ -5,6 +5,12 @@ export const Y_OFFSET = 0.25;
 const PLAYER_Y_OFFSET = 0.6;
 const OBSTACLE_Y_OFFSET = -0.15;
 export const Z_OFFSET = 0.65;
+/**
+ * Notes (and the bombs, chain links and arcs that move with them) cross the player's head depth plus this at their beat: the
+ * game's own cut values place the note's centre 0.25 m further than the lane's 0.65 on every replay, at any head position
+ * (25,000 cuts of 89 BeatLeader replays, games 1.17 to 1.40).
+ */
+export const NOTE_Z_OFFSET = Z_OFFSET + 0.25;
 
 export const NOTE_Y_OFFSET = Y_OFFSET + PLAYER_Y_OFFSET;
 export const WALL_Y_OFFSET = Y_OFFSET + OBSTACLE_Y_OFFSET;

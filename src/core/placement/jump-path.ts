@@ -41,21 +41,26 @@ export function currentSpawnBeat(motion: ObjectMotion, state: SpawnState) {
   return motion.spawnAnchorBeat - currentHalfJumpDurationInBeats(motion, state);
 }
 
-function jumpLineDistance(motion: ObjectMotion, nowBeat: number, state: SpawnState) {
-  return Z_OFFSET + (motion.beat - nowBeat) * currentUnitsPerBeat(motion, state);
+function jumpLineDistance(motion: ObjectMotion, nowBeat: number, state: SpawnState, zOffset: number) {
+  return zOffset + (motion.beat - nowBeat) * currentUnitsPerBeat(motion, state);
 }
 
-export function aheadDistance(motion: ObjectMotion, nowBeat: number, state: SpawnState): number {
+export function aheadDistance(motion: ObjectMotion, nowBeat: number, state: SpawnState, zOffset = Z_OFFSET): number {
   const spawnBeat = currentSpawnBeat(motion, state);
-  if (nowBeat >= spawnBeat) return jumpLineDistance(motion, nowBeat, state);
+  if (nowBeat >= spawnBeat) return jumpLineDistance(motion, nowBeat, state, zOffset);
 
   const enterBeat = spawnBeat - motion.leadInBeats;
   const travel = clamp01((nowBeat - enterBeat) / motion.leadInBeats);
-  return jumpLineDistance(motion, spawnBeat, state) + leadInDistance * (1 - travel);
+  return jumpLineDistance(motion, spawnBeat, state, zOffset) + leadInDistance * (1 - travel);
 }
 
-export function noteJumpAheadDistance(motion: ObjectMotion, nowBeat: number, state: SpawnState): number {
-  const regularDistance = aheadDistance(motion, nowBeat, state);
+export function noteJumpAheadDistance(
+  motion: ObjectMotion,
+  nowBeat: number,
+  state: SpawnState,
+  zOffset = Z_OFFSET,
+): number {
+  const regularDistance = aheadDistance(motion, nowBeat, state, zOffset);
   const jumpDuration = currentHalfJumpDurationInBeats(motion, state) * 2;
   const retreatDuration = jumpDuration * 0.25;
   const retreatBeat = currentSpawnBeat(motion, state) + jumpDuration - retreatDuration;
