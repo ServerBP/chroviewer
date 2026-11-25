@@ -453,6 +453,7 @@ export function useViewerRemoteSource({
         pathname.endsWith('.bsor') ||
         pathname.endsWith('.tarf') ||
         pathname.endsWith('.bkacr') ||
+        pathname.endsWith('.bkacf') ||
         pathname.endsWith('.bkaccmp');
       const data = yield* Result.await(
         requestArrayBuffer(sourceDownloadUrl(linkUrl), {

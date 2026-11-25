@@ -71,6 +71,8 @@ export const viewerSearchSchema = z.pipe(
     // BeatKhana anticheat files (.bkacr, .bkaccmp) load the way TARF files do
     bkacrPath: z.catch(z.optional(tarfPathSchema), undefined),
     bkaccmpPath: z.catch(z.optional(tarfPathSchema), undefined),
+    // One cut the live anticheat flagged (.bkacf), a TARF of the second around it
+    bkacfPath: z.catch(z.optional(tarfPathSchema), undefined),
     t: z.catch(z.optional(nonnegativeNumberSchema), undefined),
     // The song time of an anticheat finding's place to open focused, with its cut drawn against the note
     acMark: z.catch(z.optional(nonnegativeNumberSchema), undefined),
@@ -125,8 +127,8 @@ export const viewerSearchSchema = z.pipe(
     watcherPlayerId: z.catch(z.optional(livePlayerIdSchema), undefined),
     authToken: z.catch(z.optional(z.string().check(z.minLength(1), z.maxLength(4096))), undefined),
   }),
-  z.transform(({ bkacrPath, bkaccmpPath, ...rest }) => {
-    const anticheatPath = rest.tarfPath ?? bkacrPath ?? bkaccmpPath;
+  z.transform(({ bkacrPath, bkaccmpPath, bkacfPath, ...rest }) => {
+    const anticheatPath = rest.tarfPath ?? bkacrPath ?? bkaccmpPath ?? bkacfPath;
     const search: typeof rest = anticheatPath === undefined ? rest : { ...rest, tarfPath: anticheatPath };
     if (search.party !== undefined) {
       return {

@@ -21,6 +21,7 @@ import type {
 import { parseMapPackage } from './parse-map-package';
 import { sourceErrorMessage } from './source-error-message';
 import type { DifficultyRow, MapIdentity, MapMeta, ViewerSourceLink } from './viewer-types';
+import { attachCutReview } from '../../core/replay/cut-file';
 
 export interface PendingSharedView {
   autoplay?: boolean;
@@ -134,7 +135,12 @@ export function useViewerFileSource({
     parserRef.current ??= new BeatmapParser();
     const parser = parserRef.current;
     return Result.tryPromise({
-      try: () => parser.parseReplay(data),
+      try: async () => {
+        const replay = await parser.parseReplay(data);
+        // Only a .bkacf holds a single note event with its own map: it opens as a review of that cut
+        if (isTarfReplay(bytes) && replay.notes.length === 1 && replay.mapFiles !== undefined) attachCutReview(replay);
+        return replay;
+      },
       catch: (cause) =>
         sourceError(cause, {
           message: cause instanceof Error ? cause.message : 'replay could not be parsed',
@@ -265,7 +271,7 @@ export function useViewerFileSource({
           const archive = yield* Result.await(extractMapArchive(new Uint8Array(data)));
           if (!isSourceRequestCurrent(requestId)) return Result.ok(undefined);
           sourceFiles.push(...archive);
-        } else if (/\.(dat|bsor|tarf|bkacr|bkaccmp)$/i.test(file.name)) {
+        } else if (/\.(dat|bsor|tarf|bkacr|bkaccmp|bkacf)$/i.test(file.name)) {
           const data = yield* Result.await(
             Result.tryPromise({
               try: () => file.arrayBuffer(),

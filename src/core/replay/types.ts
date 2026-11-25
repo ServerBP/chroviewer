@@ -1,5 +1,6 @@
 import type { AnticheatAttachment } from './anticheat';
 import type { HitScoreVisualizerPlatform } from './hit-score-visualizer';
+import type { CutReview } from './cut-file';
 
 export interface ReplayVector3 {
   x: number;
@@ -199,6 +200,8 @@ export interface Replay {
   liveStartTime?: number;
   /** The anticheat's report, or a comparison with other players, when the replay came from a BeatKhana anticheat file. */
   anticheat?: AnticheatAttachment;
+  /** Set for a `.bkacf`: one flagged cut and the second around it, played as a loop */
+  cutReview?: CutReview;
   liveHistoryBase?: {
     scoringNotes: number;
     misses: number;
